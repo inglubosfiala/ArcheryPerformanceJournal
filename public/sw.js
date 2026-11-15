@@ -26,6 +26,7 @@ const SHELL = [
   './icons/icon-192.png',
   './icons/icon-512.png',
   './icons/maskable-512.png',
+  './js/theme-boot.js',
   './js/main.js',
   './js/config.js',
   './js/core/dom.js',

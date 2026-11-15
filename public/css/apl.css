@@ -770,7 +770,7 @@
 
 .apl-key[data-zone='gold'] {
   --key-bg: var(--target-gold);
-  --key-bd: var(--target-gold);
+  --key-bd: var(--data-edge);
   --key-fg: var(--target-black);
 }
 
@@ -794,13 +794,13 @@
 
 .apl-key[data-zone='white'] {
   --key-bg: var(--target-white);
-  --key-bd: var(--target-white);
+  --key-bd: var(--data-edge);
   --key-fg: var(--target-black);
 }
 
 .apl-key[data-zone='miss'] {
   --key-bg: var(--score-miss);
-  --key-bd: var(--score-miss);
+  --key-bd: var(--data-edge);
   --key-fg: var(--target-black);
 }
 
@@ -812,19 +812,19 @@
 
 .apl-key[data-grade='2'] {
   --key-bg: var(--grade-2);
-  --key-bd: var(--grade-2);
+  --key-bd: var(--data-edge);
   --key-fg: var(--on-grade-dark);
 }
 
 .apl-key[data-grade='3'] {
   --key-bg: var(--grade-3);
-  --key-bd: var(--grade-3);
+  --key-bd: var(--data-edge);
   --key-fg: var(--on-grade-dark);
 }
 
 .apl-key[data-grade='4'] {
   --key-bg: var(--grade-4);
-  --key-bd: var(--grade-4);
+  --key-bd: var(--data-edge);
   --key-fg: var(--on-grade-dark);
 }
 

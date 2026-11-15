@@ -1,6 +1,6 @@
 # APL
 
-**Archery Performance Journal** — the design system of the APL app: a dark, phone-first interface for logging training sessions at the range. Derived from the "New session" setup screen.
+**Archery Performance Journal** — the design system of the APL app: a phone-first interface, dark by default with a matching light theme, for logging training sessions at the range. Derived from the "New session" setup screen.
 
 ## Principles
 
@@ -8,7 +8,7 @@
 - **One tap over typing.** Prefer chips and presets for common values (distances, arrows per end) and keep a compact −/+ stepper for anything in between. Dropdowns are a last resort.
 - **Remember the archer.** Lead forms with a "Same as last session" card and pre-select sensible defaults (e.g. the standard face for the chosen distance), marking them with a "Suggested" badge.
 - **Show, don't list.** When a choice has a visual meaning (a target face), show a live preview next to the controls.
-- **Quiet chrome, one accent.** Neutral dark surfaces; `accent` green marks only selection and the primary action.
+- **Quiet chrome, one accent.** Neutral surfaces in either theme; `accent` green marks only selection and the primary action.
 
 ## Content
 
@@ -24,7 +24,11 @@
 - Text: `ink` primary, `ink-soft` secondary values, `muted` for labels and captions.
 - **Selected** chip or segment: fill and border `accent`, text `on-accent`. **Unselected**: `surface` fill, `border`, `ink` text.
 - **Selected card** (radio-style list item): `accent-tint` fill, `accent` border, radio ring and dot `accent-bright`. Unselected ring `radio-off`.
-- Accent as text or icon on dark always uses `accent-bright`, never `accent` (too dark to read).
+- Accent as text or icon always uses `accent-bright` (mint in dark, deep green in light), never `accent`.
+
+### Themes
+
+Two themes share every token name: **Dark** (default, for indoor ranges and evenings) and **Light** (for outdoor ranges in daylight, where glare washes out dark screens). Switch with `data-theme="dark"|"light"` on `<html>`; follow `prefers-color-scheme` when the user picks System. Light keeps the same accent fill (`accent` #0b7a55, 5.3:1 with white), turns surfaces white on a soft grey `ground`, and uses darker borders (`border` 3.5:1) so controls stay visible in sunlight. `target-*` colours are identical in both themes — a target face never changes.
 - `target-*` colours are for drawing target faces and score data only — never for UI state. The red ring is not an error colour.
 
 ## Typography
@@ -55,4 +59,4 @@ Inline stroke icons, 20–22px, 2px stroke, round caps and joins, `currentColor`
 
 ## Accessibility
 
-Real `<button>` elements with `aria-pressed` for chips and segments; groups labelled with `role="group"` + `aria-label`. Text contrast ≥ 4.5:1 on its surface (`muted` on `surface` is 7.8:1; white on `accent` 5.6:1).
+Real `<button>` elements with `aria-pressed` for chips and segments; groups labelled with `role="group"` + `aria-label`. Text contrast ≥ 4.5:1 on its surface (`muted` on `surface`: 7.6:1 dark, 6.2:1 light; white on `accent`: 5.3:1).
