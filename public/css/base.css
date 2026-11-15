@@ -3782,6 +3782,31 @@ button.arrow-count:hover {
   background: #000000;
 }
 
+/* the score labels on it can be dragged: a finger on the picture must not scroll or select */
+.photo-preview.is-adjustable {
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+/* the scan result: only the picture and the buttons, so the picture gets the room */
+.confirm.is-bare {
+  width: min(760px, calc(100vw - 12px));
+  max-height: none;
+  border-radius: 18px;
+}
+
+/* the picture takes nearly the whole screen: what is left is the two buttons under it */
+.confirm.is-bare .photo-preview {
+  height: calc(100vh - 110px);
+  height: calc(100dvh - 110px);
+  max-height: none;
+}
+
+.confirm.is-bare .confirm-fields {
+  padding: 8px 8px 10px;
+}
+
 .end-totals {
   display: flex;
   gap: 8px;

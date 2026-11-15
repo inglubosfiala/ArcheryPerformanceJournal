@@ -14,9 +14,11 @@ import { icons } from '../icons.js';
  * @param {Node} [o.body]           extra content, e.g. form fields (the caller reads them after a true);
  *                                   Enter in a single-line field confirms, the first field gets the focus
  * @param {string} [o.icon]          icon name for the badge (default: trash when danger, help otherwise)
+ * @param {boolean} [o.bare]         only the body and the two buttons: no badge, title or message on
+ *                                   screen (the title is still the dialog's name for screen readers)
  * @returns {Promise<boolean>}
  */
-export function confirmDialog({ title, message = '', confirmLabel = 'OK', cancelLabel = 'Cancel', danger = false, body = null, icon = null }) {
+export function confirmDialog({ title, message = '', confirmLabel = 'OK', cancelLabel = 'Cancel', danger = false, body = null, icon = null, bare = false }) {
   return new Promise((resolve) => {
     const returnFocus = document.activeElement;
     let result = false;
@@ -25,14 +27,17 @@ export function confirmDialog({ title, message = '', confirmLabel = 'OK', cancel
     const okBtn = h('button', { type: 'button', class: ['btn', danger ? 'btn-danger' : 'btn-primary'], onClick: () => close(true) }, confirmLabel);
     const dialog = h(
       'dialog',
-      { class: ['confirm', danger && 'is-danger'], 'aria-labelledby': 'confirm-title', 'aria-describedby': message ? 'confirm-msg' : null },
-      h(
-        'div',
-        { class: 'confirm-body' },
-        h('div', { class: 'confirm-icon', 'aria-hidden': 'true' }, icons[icon || (danger ? 'trash' : 'help')]()),
-        h('h2', { class: 'confirm-title', id: 'confirm-title' }, title),
-        message ? h('p', { class: 'confirm-msg', id: 'confirm-msg' }, message) : null,
-      ),
+      bare
+        ? { class: ['confirm', 'is-bare'], 'aria-label': title }
+        : { class: ['confirm', danger && 'is-danger'], 'aria-labelledby': 'confirm-title', 'aria-describedby': message ? 'confirm-msg' : null },
+      !bare &&
+        h(
+          'div',
+          { class: 'confirm-body' },
+          h('div', { class: 'confirm-icon', 'aria-hidden': 'true' }, icons[icon || (danger ? 'trash' : 'help')]()),
+          h('h2', { class: 'confirm-title', id: 'confirm-title' }, title),
+          message ? h('p', { class: 'confirm-msg', id: 'confirm-msg' }, message) : null,
+        ),
       body ? h('div', { class: 'confirm-fields' }, body) : null,
       h('div', { class: 'confirm-actions' }, cancelBtn, okBtn),
     );

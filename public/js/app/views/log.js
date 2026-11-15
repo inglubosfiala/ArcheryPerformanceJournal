@@ -27,7 +27,7 @@ import { faceSheet, faceViewBox, VB } from './face.js';
 import { SESSION_TYPES, TYPE_LABELS, isScored, hourMinute, sessionType } from '../sessionTypes.js';
 import { emptyForm, formSections } from './sessionForms.js';
 import { detectArrows } from '../photoDetect.js';
-import { drawArrowMarks, liveScan } from './liveScan.js';
+import { arrowMarkLayout, drawArrowMarks, liveScan } from './liveScan.js';
 
 export function findActive(repo) {
   return repo.list('sessions', { filter: (x) => x.status === 'active' })[0] || null;
@@ -1015,40 +1015,131 @@ async function scoreFromPhoto(ctx, file) {
  * Use, enter the arrows into the end. Returns true when the question is settled (used, or nothing
  * to use), false when it was cancelled.
  */
-async function previewAndApply(ctx, canvas, res, { face, spotHint }, { cancelLabel = 'Cancel' } = {}) {
+async function previewAndApply(ctx, canvas, res, { face }, { cancelLabel = 'Cancel' } = {}) {
   const g = canvas.getContext('2d');
-  const line = Math.max(2, canvas.width / 220);
-  g.lineWidth = line;
-  g.strokeStyle = '#00e5ff';
-  for (const s of res.spots) {
-    g.beginPath();
-    g.ellipse(s.outer.cx, s.outer.cy, s.outer.rx, s.outer.ry, s.outer.angle, 0, Math.PI * 2);
-    g.stroke();
-  }
-  const values = res.arrows.map((a) => scoreFromPoint(a.x, a.y, face));
-  drawArrowMarks(g, res.spots, res.arrows, values);
+  // the clean photo is kept, so the marks can be drawn again when a label is dragged
+  const photo = document.createElement('canvas');
+  photo.width = canvas.width;
+  photo.height = canvas.height;
+  photo.getContext('2d').drawImage(canvas, 0, 0);
+  // the arrows as they will be used: dragging a label changes them
+  const arrows = res.arrows.map((a) => ({ ...a, image: { ...a.image } }));
+  let values = arrows.map((a) => scoreFromPoint(a.x, a.y, face));
+  let dragging = -1;
+  const redraw = () => {
+    g.drawImage(photo, 0, 0);
+    g.lineWidth = Math.max(2, canvas.width / 220);
+    g.strokeStyle = '#00e5ff';
+    for (const s of res.spots) {
+      g.beginPath();
+      g.ellipse(s.outer.cx, s.outer.cy, s.outer.rx, s.outer.ry, s.outer.angle, 0, Math.PI * 2);
+      g.stroke();
+    }
+    drawArrowMarks(g, res.spots, arrows, values, { active: dragging });
+  };
+  redraw();
+
+  // --- dragging a score label moves its arrow: the line's end is the point of impact, the label
+  // keeps its distance to it, and the score in the label follows the rings under the point
+  // a point of the picture → the face (relative to a spot's centre, spot radius 1)
+  const onFace = (o, p) => {
+    const cos = Math.cos(o.angle);
+    const sin = Math.sin(o.angle);
+    const vx = p.x - o.cx;
+    const vy = p.y - o.cy;
+    const u1 = (cos * vx + sin * vy) / o.rx;
+    const u2 = (-sin * vx + cos * vy) / o.ry;
+    return { x: cos * u1 - sin * u2, y: sin * u1 + cos * u2 };
+  };
+  const place = (a, p) => {
+    a.image = { x: Math.max(0, Math.min(canvas.width, p.x)), y: Math.max(0, Math.min(canvas.height, p.y)) };
+    // on a sheet of several spots (all in the picture) the arrow belongs to the spot it is nearest to
+    const single = res.partial || !isMultiSpot(face);
+    let at = single ? onFace(res.spots[0].outer, a.image) : null;
+    if (!single) {
+      res.spots.forEach((s, j) => {
+        const f = onFace(s.outer, a.image);
+        if (!at || Math.hypot(f.x, f.y) < Math.hypot(at.x, at.y)) {
+          at = f;
+          a.spot = j;
+        }
+      });
+    }
+    a.x = at.x;
+    a.y = at.y;
+  };
+  const pictureXY = (ev) => {
+    const r = canvas.getBoundingClientRect();
+    // the canvas is shown with object-fit: contain, so it may be letterboxed inside its box
+    const k = Math.max(canvas.width / r.width, canvas.height / r.height);
+    return {
+      x: (ev.clientX - (r.left + r.width / 2)) * k + canvas.width / 2,
+      y: (ev.clientY - (r.top + r.height / 2)) * k + canvas.height / 2,
+      k,
+    };
+  };
+  let grab = null; // { id, i, off } while a label is held
+  canvas.addEventListener('pointerdown', (ev) => {
+    if (!ev.isPrimary || ev.button > 0 || grab) return;
+    const p = pictureXY(ev);
+    // the nearest label (or its point of impact) within about a fingertip
+    let best = null;
+    arrows.forEach((a, i) => {
+      const m = arrowMarkLayout(canvas.width, canvas.height, res.spots, a);
+      const d = Math.min(Math.hypot(m.lx - p.x, m.ly - p.y) - m.r, Math.hypot(a.image.x - p.x, a.image.y - p.y));
+      if (d <= 26 * p.k && (!best || d < best.d)) best = { i, d };
+    });
+    if (!best) return;
+    ev.preventDefault();
+    try {
+      canvas.setPointerCapture(ev.pointerId);
+    } catch {
+      /* pointer already gone */
+    }
+    const a = arrows[best.i];
+    grab = { id: ev.pointerId, i: best.i, off: { x: a.image.x - p.x, y: a.image.y - p.y } };
+    dragging = best.i;
+    if (navigator.vibrate) navigator.vibrate(15);
+    redraw();
+  });
+  canvas.addEventListener('pointermove', (ev) => {
+    if (!grab || ev.pointerId !== grab.id) return;
+    const p = pictureXY(ev);
+    place(arrows[grab.i], { x: p.x + grab.off.x, y: p.y + grab.off.y });
+    values = arrows.map((a) => scoreFromPoint(a.x, a.y, face));
+    redraw();
+  });
+  const drop = (ev) => {
+    if (!grab || ev.pointerId !== grab.id) return;
+    grab = null;
+    dragging = -1;
+    redraw();
+  };
+  canvas.addEventListener('pointerup', drop);
+  canvas.addEventListener('pointercancel', drop);
+  canvas.classList.add('is-adjustable');
 
   const n = res.arrows.length;
-  const ok = await confirmDialog({
-    title: n ? `Found ${n} ${n === 1 ? 'arrow' : 'arrows'}` : 'No arrows found',
-    message: n
-      ? `${values.join(' · ')}. ${
-          res.partial && isMultiSpot(face)
-            ? `The photo shows one spot, so they go on spot ${spotHint + 1} of the sheet. `
-            : 'They fill the empty slots. '
-        }Drag any arrow on the target to correct it.`
-      : 'Try a photo taken straight at the target, close enough that the face fills the picture.',
-    confirmLabel: n ? 'Use' : 'OK',
-    cancelLabel,
-    icon: 'camera',
-    body: canvas,
-  });
+  // Just the picture with the found arrows and the two buttons. Only when nothing was found does
+  // the dialog say so (a picture without marks would explain nothing).
+  const ok = await confirmDialog(
+    n
+      ? { title: `Found arrows: ${values.join(', ')}`, bare: true, confirmLabel: 'Use', cancelLabel, body: canvas }
+      : {
+          title: 'No arrows found',
+          message: 'Try a photo taken straight at the target, close enough that the face fills the picture.',
+          confirmLabel: 'OK',
+          cancelLabel,
+          icon: 'camera',
+          body: canvas,
+        },
+  );
   if (!ok) return false;
   if (!n) return true;
   update(ctx, (cur) =>
-    res.arrows.reduce((s, a, i) => {
-      const onFace = Math.hypot(a.x, a.y) < 1.05;
-      return L.enterScore(s, values[i], onFace ? round3(a.x) : null, onFace ? round3(a.y) : null, a.spot);
+    arrows.reduce((s, a, i) => {
+      const inside = Math.hypot(a.x, a.y) < 1.05;
+      return L.enterScore(s, values[i], inside ? round3(a.x) : null, inside ? round3(a.y) : null, a.spot);
     }, { ...cur, pinned: false }),
   );
   return true;

@@ -20,34 +20,43 @@ const WINDOW_MS = 5000; // readings older than this are dropped
  * point of impact; beside it (on a thin line that ends on the point, away from the shaft) is a label
  * with the score read there.
  */
-export function drawArrowMarks(g, spots, arrows, labels, { hollow = false } = {}) {
+/** Where an arrow's score label sits on a picture of the given size: its centre and radius. */
+export function arrowMarkLayout(width, height, spots, a) {
+  const o = (spots[a.spot ?? 0] || spots[0]).outer;
+  const spotR = (o.rx + o.ry) / 2;
+  const p = a.image;
+  const r = Math.max(width / 45, Math.min(width / 18, 0.17 * spotR)); // the label's radius
+  // On the far side of the point from the shaft (the shaft leans one way, the label goes the
+  // other), so it never lies on the arrow. With no shaft seen: outwards from the spot's middle,
+  // and for an arrow in the very middle up and to the right.
+  let dx = p.x - o.cx;
+  let dy = p.y - o.cy;
+  const dist = Math.hypot(dx, dy);
+  if (a.lean) {
+    dx = -a.lean.x;
+    dy = -a.lean.y;
+  } else if (dist < 0.12 * spotR) {
+    dx = 0.7;
+    dy = -0.7;
+  } else {
+    dx /= dist;
+    dy /= dist;
+  }
+  const reach = r + Math.max(0.28 * spotR, 1.2 * r);
+  return {
+    r,
+    lx: Math.max(r + 2, Math.min(width - r - 2, p.x + dx * reach)),
+    ly: Math.max(r + 2, Math.min(height - r - 2, p.y + dy * reach)),
+  };
+}
+
+export function drawArrowMarks(g, spots, arrows, labels, { hollow = false, active = -1 } = {}) {
   const { width, height } = g.canvas;
   g.save();
   g.lineCap = 'round';
   arrows.forEach((a, i) => {
-    const o = (spots[a.spot ?? 0] || spots[0]).outer;
-    const spotR = (o.rx + o.ry) / 2;
     const p = a.image;
-    const r = Math.max(width / 45, Math.min(width / 18, 0.17 * spotR)); // the label's radius
-    // On the far side of the point from the shaft (the shaft leans one way, the label goes the
-    // other), so it never lies on the arrow. With no shaft seen: outwards from the spot's middle,
-    // and for an arrow in the very middle up and to the right.
-    let dx = p.x - o.cx;
-    let dy = p.y - o.cy;
-    const dist = Math.hypot(dx, dy);
-    if (a.lean) {
-      dx = -a.lean.x;
-      dy = -a.lean.y;
-    } else if (dist < 0.12 * spotR) {
-      dx = 0.7;
-      dy = -0.7;
-    } else {
-      dx /= dist;
-      dy /= dist;
-    }
-    const reach = r + Math.max(0.28 * spotR, 1.2 * r);
-    const lx = Math.max(r + 2, Math.min(width - r - 2, p.x + dx * reach));
-    const ly = Math.max(r + 2, Math.min(height - r - 2, p.y + dy * reach));
+    const { r, lx, ly } = arrowMarkLayout(width, height, spots, a);
     const thin = Math.max(1.5, width / 320);
     const stroke = (colour, w, path) => {
       g.beginPath();
@@ -63,6 +72,13 @@ export function drawArrowMarks(g, spots, arrows, labels, { hollow = false } = {}
     // white under pink, so the marks show on any ring colour
     stroke('#ffffff', thin * 2.4, leader);
     stroke('#E5007E', thin, leader);
+    if (i === active) {
+      // the label being dragged: a halo around it
+      g.beginPath();
+      g.arc(lx, ly, r * 1.45, 0, Math.PI * 2);
+      g.fillStyle = 'rgba(229, 0, 126, 0.3)';
+      g.fill();
+    }
     g.beginPath();
     g.arc(lx, ly, r, 0, Math.PI * 2);
     g.fillStyle = hollow ? 'rgba(229, 0, 126, 0.45)' : '#E5007E';
