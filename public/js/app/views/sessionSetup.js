@@ -31,7 +31,7 @@ const TYPE_HINTS = {
   manual: 'Type in the arrows or the duration afterwards',
 };
 
-const ARROW_PRESETS = [3, 4, 5, 6];
+const ARROW_PRESETS = [3, 6, 9, 12];
 const arrowsText = (n) => `${n} ${n === 1 ? 'arrow' : 'arrows'}/end`;
 
 /** Step 1: the session types. Tapping one opens its setup; the last one picked is tagged. */
