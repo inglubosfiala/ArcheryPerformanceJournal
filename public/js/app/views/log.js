@@ -353,7 +353,18 @@ function renderActive(ctx, session) {
             { class: 'saved-end-arrows' },
             e.arrows.map((a) => (a.v == null ? '–' : String(a.v))).join('  '),
           ),
-          h('div', { class: 'muted small' }, `M ${fmt(st.avgM)} · S ${fmt(st.avgS)} · LD ${e.cld}/${e.ld}`),
+          h(
+            'div',
+            { class: 'muted small end-facts' },
+            h('span', null, `Mental ${fmt(st.avgM)}`),
+            h('span', null, `Shooting ${fmt(st.avgS)}`),
+          ),
+          h(
+            'div',
+            { class: 'muted small end-facts' },
+            h('span', null, `Let-downs ${e.ld}`),
+            h('span', null, `Correct ${e.cld}`),
+          ),
         ),
         h(
           'div',

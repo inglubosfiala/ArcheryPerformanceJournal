@@ -420,6 +420,13 @@ textarea {
   text-overflow: ellipsis;
 }
 
+/* an end's grades and let-downs: pairs set apart by space, no separators */
+.end-facts {
+  display: flex;
+  flex-wrap: wrap;
+  column-gap: 14px;
+}
+
 .saved-end-score {
   display: flex;
   flex-direction: column;
