@@ -1,5 +1,5 @@
 // Generates public/css/apl-tokens.css from the APL design system's tokens.json (design/apl/) and
-// the app's own additions (design/apl/tokens.local.json). Run: npm run tokens
+// the app's own additions (design/apl/tokens.app.json). Run: npm run tokens
 // The token names are kept as they are in the design system: --accent, --surface, --space-5, ...
 import { readFileSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
@@ -24,7 +24,7 @@ const SUBSETS = [
 
 export function buildTokensCss(
   tokens = read('design/apl/tokens.json'),
-  local = read('design/apl/tokens.local.json'),
+  local = read('design/apl/tokens.app.json'),
 ) {
   const lines = [];
   const decl = (name, value) => lines.push(`  --${name}: ${value};`);
@@ -37,7 +37,7 @@ export function buildTokensCss(
 
   lines.push('  /* colour */');
   for (const t of tokens.color.tokens) decl(t.name, t.value);
-  lines.push('  /* app additions (design/apl/tokens.local.json) */');
+  lines.push('  /* app additions (design/apl/tokens.app.json) */');
   for (const t of local.color) decl(t.name, t.value);
   lines.push('  /* type */');
   for (const [name, family] of Object.entries(tokens.type.families)) decl(`font-${name}`, family);

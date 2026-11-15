@@ -1,0 +1,7 @@
+{
+  "about": "Tokens this app adds to APL (approved 2026-11-15). Not part of the APL design system: errors and destructive text, and data colours that are drawn but never mark UI state.",
+  "color": [
+    { "name": "danger", "value": "#ff8a80", "usage": "Error text and destructive text buttons only (7.6:1 on surface). Never a fill behind text, never next to a target face as a score colour." },
+    { "name": "on-danger", "value": "#0b0e10", "usage": "Text on a danger fill (the confirm button of a destructive dialog)." }
+  ]
+}
