@@ -241,23 +241,10 @@ p {
   align-self: flex-end;
 }
 
-.grid-2,
-.grid-3,
-.grid-4 {
+.grid-2 {
   display: grid;
   gap: 8px;
-}
-
-.grid-2 {
   grid-template-columns: repeat(2, minmax(0, 1fr));
-}
-
-.grid-3 {
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-}
-
-.grid-4 {
-  grid-template-columns: repeat(4, minmax(0, 1fr));
 }
 
 .plain-list {
@@ -291,19 +278,10 @@ p {
   font-weight: 700;
 }
 
-.section-label,
 .field-label {
   font-size: 12px;
-  font-weight: 700;
-  color: var(--muted);
-  text-transform: uppercase;
-  letter-spacing: 0.6px;
-}
-
-.field-label {
-  text-transform: none;
-  letter-spacing: 0;
   font-weight: 600;
+  color: var(--muted);
 }
 
 .muted {
@@ -487,38 +465,6 @@ p {
   height: 36px;
   border: 0;
   background: transparent;
-}
-
-/* chips (setup choices) */
-.chip {
-  min-height: 52px;
-  border-radius: 12px;
-  font-size: 17px;
-  font-weight: 700;
-  background: var(--surface);
-  color: var(--ink);
-  border: 2px solid var(--border);
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 2px;
-  padding: 4px;
-}
-
-.chip[aria-pressed='true'] {
-  background: var(--ink);
-  color: var(--surface);
-  border-color: var(--ink);
-}
-
-.chip-main {
-  font-size: 18px;
-}
-
-.chip-sub {
-  font-size: 12px;
-  font-weight: 500;
 }
 
 /* ---------------------------------------------------------------- zones & grades */
@@ -1340,10 +1286,6 @@ textarea {
   overflow-wrap: anywhere;
 }
 
-.grid-3 .chip {
-  font-size: 15px;
-}
-
 /* light banner keeps dark text and controls in both themes */
 .banner-warn .btn,
 .banner-warn .icon-btn {
@@ -1954,31 +1896,6 @@ button.saved-end {
   gap: 14px;
 }
 
-.setup-section {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.setup-card .chip {
-  min-height: 44px;
-  flex-direction: row;
-  gap: 6px;
-  font-size: 16px;
-}
-
-.setup-card .grid-3 .chip {
-  font-size: 15px;
-}
-
-.setup-card .chip-main {
-  font-size: 16px;
-}
-
-.setup-card .chip-sub {
-  font-size: 13px;
-}
-
 /* banners inside a page run edge to edge like the cards */
 .main .banner {
   margin-left: -16px;
@@ -1988,10 +1905,6 @@ button.saved-end {
   border-right: 0;
   padding-left: 16px;
   padding-right: 16px;
-}
-
-.setup-card .btn-xl {
-  margin-top: 4px;
 }
 
 /* more than 6 arrows per end: arrow list in two columns so the target keeps its size */
@@ -2195,20 +2108,6 @@ body {
   border-color: var(--accent);
 }
 
-.grid-5 {
-  display: grid;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
-  gap: 6px;
-}
-
-.setup-card .grid-5 .chip {
-  min-height: 40px;
-}
-
-.setup-card .grid-3 .chip {
-  font-size: 14px;
-}
-
 .type-badge {
   font-size: 11px;
   font-weight: 700;
@@ -2246,13 +2145,23 @@ body {
   color: #ffffff;
 }
 
+/* SPT drill: a surface card with its name, remove button, fields and timer */
 .drill-row {
   display: flex;
   flex-direction: column;
-  gap: 6px;
-  padding: 10px 12px;
-  border-radius: 12px;
-  background: var(--ground);
+  gap: var(--space-3);
+  padding: var(--space-4);
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--border);
+  background: var(--surface);
+}
+
+.drill-row-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  margin: -6px -10px -6px 0;
 }
 
 .input-suffix {
@@ -3249,54 +3158,12 @@ body {
   left: 2ch;
 }
 
-.arrow-count-row .timer-btn.timer-btn-lg {
-  height: 68px;
-  padding: 0 clamp(12px, 4vw, 20px);
-  border-radius: 34px;
-  gap: 8px;
-  font-size: var(--count-row-size);
-  flex: 0 1 auto;
-  min-width: 0;
-}
-
-/* the timer by itself (SPT page): at the right end, where it sits on the blank bale page */
-.arrow-count-row.timer-alone {
-  justify-content: flex-end;
-}
-
-/* on this row the dashed border and the play icon already say paused */
-.arrow-count-row .timer-btn.is-paused .timer-value::after {
-  content: none;
-}
-
-.arrow-count-row .timer-btn.timer-btn-lg svg {
-  width: 28px;
-  height: 28px;
-}
-
 .confirm-fields {
   display: flex;
   flex-direction: column;
   gap: 12px;
   padding: 0 20px 16px;
   text-align: left;
-}
-
-/* blank bale row: the timer has no pill border; a big pause / play icon shows its state */
-.arrow-count-row .timer-btn.timer-btn-lg {
-  border: 0;
-  background: transparent;
-  padding-right: 0;
-}
-
-.arrow-count-row .timer-btn.timer-btn-lg svg {
-  width: 44px;
-  height: 44px;
-  color: var(--accent);
-}
-
-.arrow-count-row .timer-btn.timer-btn-lg.is-paused {
-  color: var(--muted);
 }
 
 /* ---------------------------------------------------------------- running sessions (above the bottom bar) */
@@ -3709,17 +3576,6 @@ button.arrow-count:hover {
   background: transparent;
   color: #ffffff;
   border-color: rgba(255, 255, 255, 0.6);
-}
-
-/* ---------------------------------------------------------------- interval (Tabata) timer */
-.btn.drill-timer-btn {
-  min-height: 44px;
-  gap: 6px;
-}
-
-.btn.drill-timer-btn svg {
-  width: 18px;
-  height: 18px;
 }
 
 /* full screen; the whole screen takes the colour of the phase, so it reads from across the room */

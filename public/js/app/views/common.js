@@ -13,19 +13,9 @@ export const gradeBadge = (g, extra = '') => h('span', { class: `grade-badge g${
 
 export const card = (props, ...children) => h('section', { ...props, class: ['card', props?.class] }, ...children);
 
-export const sectionLabel = (text, id) => h('div', { class: 'section-label', id }, text);
-
 /** The back button, the same on every page: alone on its row, at the right (thumb side). */
 export const backBar = (href, label) =>
   h('div', { class: 'back-bar' }, h('a', { class: 'icon-btn', href, 'aria-label': label, dataset: { fk: 'back' } }, icons.back()));
-
-export function chip({ label, sub, pressed, onClick, fk }) {
-  return h(
-    'button',
-    { type: 'button', class: 'chip', 'aria-pressed': String(!!pressed), onClick, dataset: fk ? { fk } : undefined },
-    sub ? [h('span', { class: 'chip-main' }, label), h('span', { class: 'chip-sub' }, sub)] : label,
-  );
-}
 
 /** Bottom sheet with the full M/S rubric. */
 export function guideSheet(onClose) {

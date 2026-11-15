@@ -2,7 +2,16 @@
 import { h } from '../js/core/dom.js';
 import * as APL from '../js/ui/apl/index.js';
 
-const state = { distance: 18, size: 40, kind: 'triple', arrows: 3, bow: 'recurve', count: 30 };
+const state = {
+  distance: 18,
+  size: 40,
+  kind: 'triple',
+  arrows: 3,
+  bow: 'recurve',
+  count: 30,
+  timerOn: true,
+  techniques: ['Breathing'],
+};
 const KINDS = {
   40: ['full', 'six', 'triple', 'vegas'],
   60: ['full', 'six'],
@@ -153,6 +162,51 @@ function render() {
       APL.BottomBar({
         summary: `${state.distance} m · ${state.size} cm · ${state.arrows} arrows/end`,
         children: APL.Button({ children: 'Start session', trailingIcon: 'arrowRight' }),
+      }),
+    ),
+    h('h2', { class: 'apl-label' }, 'App additions'),
+    story(
+      'TextField',
+      APL.TextField({ label: 'Event', placeholder: 'e.g. Indoor Cup Bratislava', fk: 'tf-event' }),
+      h(
+        'div',
+        { class: 'apl-grid-2' },
+        APL.TextField({ label: 'Duration', type: 'number', inputmode: 'numeric', suffix: 'min', value: 45 }),
+        APL.TextField({ label: 'Arrows shot', type: 'number', inputmode: 'numeric', value: state.count }),
+      ),
+    ),
+    story('TextArea', APL.TextArea({ label: 'Note', placeholder: '…' })),
+    story(
+      'TimerButton',
+      h(
+        'div',
+        { class: 'demo-row' },
+        APL.TimerButton({
+          running: state.timerOn,
+          text: '12:34',
+          onToggle: () => set({ timerOn: !state.timerOn }),
+          fk: 'timer',
+        }),
+        APL.TimerButton({ running: false, text: '1:05:12', size: 'lg' }),
+      ),
+    ),
+    story(
+      'OptionPills (multiple)',
+      APL.OptionPills({
+        label: 'What you practised',
+        multiple: true,
+        value: state.techniques,
+        options: ['Visualisation', 'Breathing', 'Shot routine', 'Relaxation'].map((t) => ({
+          value: t,
+          label: t,
+        })),
+        onChange: (t) =>
+          set({
+            techniques: state.techniques.includes(t)
+              ? state.techniques.filter((x) => x !== t)
+              : [...state.techniques, t],
+          }),
+        fk: 'tech',
       }),
     ),
   );

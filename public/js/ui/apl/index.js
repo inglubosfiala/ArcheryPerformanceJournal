@@ -6,7 +6,7 @@
 // to give focus back to the same control after it redraws the page (main.js, renderNow).
 import { h, s } from '../../core/dom.js';
 
-/** @typedef {'back'|'repeat'|'calendar'|'clock'|'plus'|'arrowRight'|'target'|'bow'} IconName */
+/** @typedef {'back'|'repeat'|'calendar'|'clock'|'plus'|'arrowRight'|'target'|'bow'|'play'|'pause'|'close'} IconName */
 /** @typedef {'full'|'six'|'triple'|'vegas'} FaceKind */
 /** @typedef {{value: string|number, label: string}} Option */
 /** @typedef {Node|string|number|null|undefined|false} Child */
@@ -39,6 +39,10 @@ const PATHS = {
     ['path', { d: 'M6 3v18' }],
     ['path', { d: 'M3 12h17M17 9l3 3-3 3' }],
   ],
+  // app additions, drawn the same way (TimerButton, removing a row)
+  play: [['path', { d: 'M7 5l12 7-12 7z' }]],
+  pause: [['path', { d: 'M9 5v14M15 5v14' }]],
+  close: [['path', { d: 'M6 6l12 12M18 6L6 18' }]],
 };
 
 /** Inline 24-unit stroke icon, `currentColor`, hidden from assistive technology. */
@@ -153,7 +157,9 @@ export function ChipGrid({ label, options, value, onChange, columns = 4, numeric
 }
 
 /** Wrapping 44px pills for longer labels; show only the options valid here. */
-export function OptionPills({ label, options, value, onChange, fk }) {
+export function OptionPills({ label, options, value, onChange, fk, multiple = false }) {
+  // `multiple`: `value` is an array and each pill toggles on its own; onChange gets the tapped value
+  const isOn = (v) => (multiple ? (value || []).includes(v) : v === value);
   return h(
     'div',
     { class: 'apl apl-pills', role: 'group', 'aria-label': label },
@@ -163,7 +169,7 @@ export function OptionPills({ label, options, value, onChange, fk }) {
         {
           type: 'button',
           class: 'apl-pill',
-          'aria-pressed': String(o.value === value),
+          'aria-pressed': String(isOn(o.value)),
           onClick: () => onChange?.(o.value),
           dataset: fkData(fk && `${fk}-${o.value}`),
         },
@@ -389,5 +395,93 @@ export function BottomBar({ summary, children = [] }) {
     { class: 'apl apl-bar' },
     summary ? h('span', { class: 'apl-cap13', 'aria-live': 'polite' }, summary) : null,
     children,
+  );
+}
+
+// ---------------------------------------------------------------- app additions (approved 2026-11-15)
+// Built from the design system's tokens and principles; not part of APL itself.
+
+/**
+ * Text or number field: a caption label over a 56px surface box, with an optional unit after the
+ * value ("min"). `hideLabel` keeps the label for screen readers only (a column header shows it).
+ */
+export function TextField({
+  label,
+  value = '',
+  type = 'text',
+  inputmode,
+  min,
+  max,
+  placeholder,
+  suffix,
+  hideLabel = false,
+  autocomplete = 'off',
+  fk,
+  onInput,
+  onChange,
+}) {
+  return h(
+    'label',
+    { class: 'apl apl-textfield' },
+    h('span', { class: hideLabel ? 'sr-only' : 'apl-cap13' }, label),
+    h(
+      'span',
+      { class: 'apl-input' },
+      h('input', {
+        type,
+        inputmode,
+        min,
+        max,
+        placeholder,
+        autocomplete,
+        value: value ?? '',
+        dataset: fkData(fk),
+        onInput,
+        onChange,
+      }),
+      suffix ? h('span', { class: 'apl-input-suffix' }, suffix) : null,
+    ),
+  );
+}
+
+/** Multi-line text field, styled like TextField. */
+export function TextArea({ label, value = '', rows = 3, placeholder, hideLabel = false, fk, onInput }) {
+  return h(
+    'label',
+    { class: 'apl apl-textfield' },
+    h('span', { class: hideLabel ? 'sr-only' : 'apl-cap13' }, label),
+    h(
+      'span',
+      { class: 'apl-input apl-input--area' },
+      h('textarea', { rows, placeholder, value: value ?? '', dataset: fkData(fk), onInput }),
+    ),
+  );
+}
+
+/**
+ * Session timer pill: tap to pause or resume. `text` is the time shown now; the app's ticker keeps
+ * the `.timer-value` element current from its data attributes (elapsed ms, start while running).
+ * `size: 'lg'` is the 56px version that stands on its own on a page.
+ */
+export function TimerButton({ running, text, elapsedMs = 0, startedAt = null, onToggle, size = 'md', fk }) {
+  return h(
+    'button',
+    {
+      type: 'button',
+      class: ['apl', 'apl-timer', size === 'lg' && 'apl-timer--lg', !running && 'is-paused'],
+      'aria-label': running ? 'Pause the session timer' : 'Resume the session timer',
+      onClick: onToggle,
+      dataset: fkData(fk),
+    },
+    Icon({ name: running ? 'pause' : 'play', size: size === 'lg' ? 22 : 18 }),
+    h(
+      'span',
+      {
+        class: 'timer-value',
+        dataset: { elapsed: String(elapsedMs || 0), started: running ? startedAt : '' },
+      },
+      text,
+    ),
+    running ? null : h('span', { class: 'apl-timer-state' }, 'Paused'),
   );
 }

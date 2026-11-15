@@ -1,9 +1,7 @@
 // Log tab: new session setup → arrow-by-arrow logging with the M/S grading sheet (HANDOFF §3).
-import { h, s, todayIso } from '../../core/dom.js';
+import { h, s } from '../../core/dom.js';
 import { confirmDialog } from './confirm.js';
 import {
-  SETUP_FACES,
-  DEFAULT_ARROWS_PER_END,
   scoreFromPoint,
   locateOnSheet,
   sheetPoint,
@@ -15,13 +13,11 @@ import { sumArrows, computeStats, fmt } from '../stats.js';
 import * as L from '../sessionLogic.js';
 import { T } from '../strings.js';
 import { icons } from '../icons.js';
-import { card, sectionLabel, gearPicker, gearCard, sessionDates, backBar } from './common.js';
-import { datePicker, timePicker } from './pickers.js';
-import { gearChoices, gearForChoice } from '../gearFields.js';
+import { card, gearCard } from './common.js';
 import { faceSheet, faceViewBox, VB } from './face.js';
-import { SESSION_TYPES, TYPE_LABELS, isScored, hourMinute, sessionType, setupSummary, emptyCompetition } from '../sessionTypes.js';
-import { emptyForm, formSections } from './sessionForms.js';
-import { renderTypeChoice, renderScoredSetup } from './sessionSetup.js';
+import { SESSION_TYPES, TYPE_LABELS, isScored, sessionType, setupSummary } from '../sessionTypes.js';
+import { renderTypeChoice, renderScoredSetup, renderFormSetup } from './sessionSetup.js';
+import { startTimerTicker } from './timer.js';
 import { detectArrows } from '../photoDetect.js';
 import { drawArrowMarks, liveScan } from './liveScan.js';
 import { PREVIEW_MARGIN, spotsBox, resultOnCrop } from '../scanGeometry.js';
@@ -98,177 +94,12 @@ export function renderNewSession(ctx, params = []) {
   const type = params[0];
   if (!SESSION_TYPES.includes(type)) return renderTypeChoice(ctx);
   if (isScored(type)) return renderScoredSetup(ctx, type, ctx.running.get());
-  return renderSetup(ctx, type);
+  return renderFormSetup(ctx, type);
 }
 
 /** Apply a session transition to the running session; the page is drawn again when it changed. */
 function update(ctx, fn, { rerender = true } = {}) {
   if (ctx.running.apply(fn) && rerender) ctx.rerender();
-}
-
-// ---------------------------------------------------------------- new form session
-
-/** The setup of a form session (blank bale, SPT, mental, manual), saved straight to History. */
-function renderSetup(ctx, type) {
-  const settings = ctx.repo.getSettings();
-  // distance and face are remembered from the last session; arrows per end always start at the default
-  const last = settings.lastSetup;
-  // a face no longer offered (the single 40 cm 10–6 spot) falls back to the triple
-  const setup = ctx.ui.get().setup || {
-    distance: last.distance,
-    face: SETUP_FACES.includes(last.face) ? last.face : '40t',
-    arrowsPerEnd: DEFAULT_ARROWS_PER_END,
-    competition: emptyCompetition(),
-  };
-  const set = (patch) => ctx.ui.set({ setup: { ...setup, ...patch } });
-  // typing in a text field stores the draft without re-rendering, so the field keeps focus
-  const quiet = (patch) => ctx.ui.quietSet({ setup: Object.assign(setup, patch) });
-
-  // When: now by default; an earlier date / time logs the session afterwards (no running timer).
-  // Fields left untouched follow the clock, so a draft kept open is not dated when it was opened.
-  const when = setup.when || {};
-  const whenDate = when.date || todayIso();
-  const whenTime = when.time || hourMinute(new Date());
-  const past = L.isPastStart(whenDate, whenTime);
-  const setWhen = (patch) => set({ when: { ...when, ...patch } });
-  const whenSection = h(
-    'section',
-    // no "When" label: the date and the time speak for themselves. "Now" (back to the present)
-    // shows only after one of them was changed.
-    { class: 'setup-section', 'aria-label': 'When' },
-    when.date || when.time
-      ? h(
-          'div',
-          { class: 'spread align-center when-now-row' },
-          h('span', null),
-          h('button', { type: 'button', class: 'btn btn-text btn-sm', dataset: { fk: 'when-now' }, onClick: () => set({ when: null, pastMinutes: null }) }, 'Now'),
-        )
-      : null,
-    h(
-      'div',
-      { class: 'grid-2' },
-      datePicker({
-        label: 'Date',
-        value: whenDate,
-        max: todayIso(),
-        marks: sessionDates(ctx),
-        fk: 'when-date',
-        onChange: (date) => setWhen({ date }),
-      }),
-      timePicker({
-        label: 'Start time',
-        value: whenTime,
-        fk: 'when-time',
-        onChange: (time) => time && setWhen({ time }),
-      }),
-    ),
-    past ? h('p', { class: 'muted small' }, 'Logged afterwards: no running timer.') : null,
-  );
-
-  // equipment: the Gear tab's setup by default, or any saved setup (not asked for mental and SPT
-  // sessions: the bow's setup says nothing about them)
-  const snapshots = ctx.repo.list('gearSnapshots', { sort: (a, b) => b.createdAt.localeCompare(a.createdAt) });
-  const gearOpts = gearChoices({ settings, snapshots });
-  const gearChoice = gearOpts.options.some((o) => o[0] === setup.gear) ? setup.gear : gearOpts.value;
-  const chosenGear = () => gearForChoice(gearChoice, { settings, snapshots }) || { gear: null, gearSnapshotId: null };
-  const noGear = type === 'mental' || type === 'strength';
-  const gearSection =
-    noGear
-      ? null
-      : h(
-          'section',
-          { class: 'setup-section', 'aria-labelledby': 'lbl-gear' },
-          sectionLabel('Equipment', 'lbl-gear'),
-          gearPicker({
-            ...gearOpts,
-            value: gearChoice,
-            onChange: (v) => set({ gear: v }),
-          }),
-        );
-
-  // Form sessions (blank bale / strength / mental / manual): a form saved straight to History.
-  // The open form session (openFormSession.js) owns the timer, the kept draft, saving and
-  // discarding; this page holds the draft being typed and forwards the events.
-  // Opening gives a timed form its timer and, when the page has no draft yet, the kept one.
-  const opened = ctx.openForms.open(type, setup.forms?.[type] || null);
-  if (opened.draft && !setup.forms?.[type]) quiet({ forms: { ...setup.forms, [type]: opened.draft } });
-  const { timed, timer: formTimer } = opened;
-  const form = setup.forms?.[type] || emptyForm(type);
-  // the draft is read at call time: typing stores into `setup` without re-rendering
-  const currentForm = () => setup.forms?.[type] || emptyForm(type);
-  const changeForm = (update, { rerender = true } = {}) => {
-    const cur = currentForm();
-    const forms = { ...setup.forms, [type]: { ...cur, ...update(cur) } };
-    ctx.openForms.keepDraft(type, forms[type]);
-    if (rerender) set({ forms });
-    else quiet({ forms });
-  };
-  const toggleFormTimer = () => {
-    ctx.openForms.toggleTimer(type);
-    ctx.rerender();
-  };
-  // the form session is over: the page's draft goes too
-  const dropPageDraft = () => ctx.ui.quietSet({ setup: { ...setup, when: null, forms: { ...setup.forms, [type]: null } } });
-
-  const discardForm = async () => {
-    const res = await ctx.openForms.discard(type);
-    if (res.status !== 'discarded') return;
-    dropPageDraft();
-    ctx.navigate('home', { replace: true });
-  };
-
-  const saveForm = async () => {
-    const res = await ctx.openForms.save(type, {
-      fields: currentForm(),
-      date: whenDate,
-      time: whenTime,
-      past,
-      gear: noGear ? {} : chosenGear(),
-    });
-    if (res.status !== 'saved') return;
-    dropPageDraft();
-    ctx.navigate(`history/${res.session.id}`, { replace: true });
-  };
-
-  const body = [
-        whenSection,
-        // blank bale: the timer sits beside the arrow count (in the form), without a label
-        // SPT: the same big timer as on the blank bale page (no label, no border), on the right
-        timed && !past && type === 'strength'
-          ? h('div', { class: 'arrow-count-row timer-alone' }, timerButton(formTimer, toggleFormTimer, { large: true }))
-          : timed && !past && type !== 'blank'
-            ? h(
-                'div',
-                { class: 'spread align-center' },
-                h('span', { class: 'field-label' }, 'Timer'),
-                timerButton(formTimer, toggleFormTimer),
-              )
-            : null,
-        ...formSections(type, form, changeForm, {
-          live: timed && !past,
-          timer: type === 'blank' && timed && !past ? timerButton(formTimer, toggleFormTimer, { large: true }) : null,
-        }),
-        gearSection,
-        h('button', { type: 'button', class: 'btn btn-primary btn-xl', onClick: saveForm }, 'Save session'),
-        timed && !past
-          ? h('button', { type: 'button', class: 'btn btn-text danger', dataset: { fk: 'discard-form' }, onClick: discardForm }, 'Discard session')
-          : null,
-  ];
-
-  // a timed form whose start is not in the past: its timer runs, it is a running session
-  const running = timed && !past;
-  return {
-    content: h(
-      'div',
-      { class: 'stack' },
-      // no back button on a running SPT or blank bale session (Save or Discard end it; the tab bar
-      // leaves it running)
-      running && (type === 'strength' || type === 'blank') ? null : backBar('#/new', 'Back to session type'),
-      // no title on the SPT page and a running blank bale session: the room goes to the form
-      type === 'strength' || (running && type === 'blank') ? null : h('h1', { class: 'page-title sm' }, `${TYPE_LABELS[type]} session`),
-      card({ class: 'setup-card', 'aria-label': `${TYPE_LABELS[type]} session` }, body),
-    ),
-  };
 }
 
 /** Timer button (tap to pause / resume). The shown time is refreshed every second by the ticker. */
@@ -291,19 +122,6 @@ function timerButton(timer = null, onToggle, { large = false } = {}) {
       L.formatClock(L.timerElapsed(tm)),
     ),
   );
-}
-
-/** One ticker for the whole app: refreshes every visible session timer once a second. */
-let ticker = null;
-export function startTimerTicker() {
-  if (ticker) return;
-  ticker = setInterval(() => {
-    for (const el of document.querySelectorAll('.timer-value')) {
-      const started = el.dataset.started;
-      const timer = { running: !!started, startedAt: started || null, elapsedMs: Number(el.dataset.elapsed) || 0 };
-      el.textContent = L.formatClock(L.timerElapsed(timer));
-    }
-  }, 1000);
 }
 
 // ---------------------------------------------------------------- active session

@@ -468,3 +468,118 @@
 .picker-apl[aria-expanded='true'] {
   border-color: var(--accent);
 }
+
+/* ---------------------------------------------------------------- app additions (approved 2026-11-15) */
+
+/* TextField / TextArea */
+.apl-textfield {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  min-width: 0;
+}
+
+.apl-input {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: var(--tap-primary);
+  padding: 0 var(--space-4);
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--border);
+  background: var(--surface);
+}
+
+.apl-input:focus-within {
+  border-color: var(--accent-bright);
+}
+
+.apl-input input,
+.apl-input textarea {
+  flex: 1;
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--ink);
+  font: var(--type-body);
+  outline: none;
+}
+
+.apl-input input::placeholder,
+.apl-input textarea::placeholder {
+  color: var(--muted);
+}
+
+.apl-input--area {
+  align-items: stretch;
+  padding: var(--space-3) var(--space-4);
+}
+
+.apl-input textarea {
+  resize: vertical;
+}
+
+.apl-input-suffix {
+  font: var(--type-caption);
+  color: var(--muted);
+}
+
+/* TimerButton */
+.apl-timer {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  height: var(--tap-min);
+  padding: 0 var(--space-4);
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--ink);
+  font: var(--type-body-strong);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.apl-timer > svg {
+  color: var(--accent-bright);
+}
+
+.apl-timer--lg {
+  height: var(--tap-primary);
+  padding: 0 20px;
+  font: var(--type-value-lg);
+  font-variant-numeric: tabular-nums;
+}
+
+.apl-timer.is-paused {
+  border-style: dashed;
+  border-color: var(--border-dashed);
+  color: var(--ink-soft);
+}
+
+.apl-timer-state {
+  font: var(--type-caption);
+  font-weight: 600;
+  color: var(--muted);
+}
+
+/* form-session pages (sessionSetup.js) */
+.apl-grid-4 {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: var(--space-2);
+}
+
+.apl-screen-body--top {
+  padding-top: var(--space-5);
+}
+
+.apl-timer-row {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.apl-discard {
+  align-self: center;
+}

@@ -1,6 +1,7 @@
-// New session: the session types, and the setup of a scored session (training, competition), drawn
-// with the APL components after the design system's SessionSetup screen. The running-session module
-// owns starting the session; this page holds the setup being picked (ui state `setup`).
+// New session: the session types, the setup of a scored session (training, competition) and the
+// form of the other types (blank bale, SPT, mental, manual), drawn with the APL components after the
+// design system's SessionSetup screen. The running-session and open-form-session modules own
+// starting, saving and discarding; these pages hold what is being picked (ui state `setup`).
 import { h, formatDate, todayIso } from '../../core/dom.js';
 import * as APL from '../../ui/apl/index.js';
 import * as L from '../sessionLogic.js';
@@ -18,6 +19,8 @@ import { SESSION_TYPES, TYPE_LABELS, hourMinute, setupSummary, emptyCompetition 
 import { gearChoices, gearForChoice } from '../gearFields.js';
 import { sessionDates } from './common.js';
 import { datePicker, timePicker } from './pickers.js';
+import { emptyForm, formSections } from './sessionForms.js';
+import { sessionTimer } from './timer.js';
 import { faceParts, faceId, FACE_SIZES, kindsForSize, faceForSize } from './setupFaces.js';
 
 const TYPE_HINTS = {
@@ -79,8 +82,10 @@ export function renderTypeChoice(ctx) {
   };
 }
 
-/** Step 2 for a scored session: when, distance, face, arrows per end, (competition), equipment. */
-export function renderScoredSetup(ctx, type, active = null) {
+// ---------------------------------------------------------------- shared by both setups
+
+/** The setup being picked (ui state), starting from the last session's distance and face. */
+function setupState(ctx) {
   const settings = ctx.repo.getSettings();
   // distance and face are remembered from the last session; arrows per end always start at the default
   const last = settings.lastSetup;
@@ -92,33 +97,134 @@ export function renderScoredSetup(ctx, type, active = null) {
     arrowsPerEnd: DEFAULT_ARROWS_PER_END,
     competition: emptyCompetition(),
   };
-  const set = (patch) => ctx.ui.set({ setup: { ...setup, ...patch } });
-  // typing in a text field stores the draft without re-rendering, so the field keeps focus
-  const quiet = (patch) => ctx.ui.quietSet({ setup: Object.assign(setup, patch) });
+  return {
+    settings,
+    last,
+    lastFace,
+    setup,
+    set: (patch) => ctx.ui.set({ setup: { ...setup, ...patch } }),
+    // typing in a text field stores the draft without re-rendering, so the field keeps focus
+    quiet: (patch) => ctx.ui.quietSet({ setup: Object.assign(setup, patch) }),
+  };
+}
 
-  // When: now by default; an earlier date / time logs the session afterwards (no running timer).
-  // Fields left untouched follow the clock, so a draft kept open is not dated when it was opened.
+/**
+ * When: now by default; an earlier date / time logs the session afterwards (no running timer).
+ * Fields left untouched follow the clock, so a draft kept open is not dated when it was opened.
+ * `duration`: a scored session logged afterwards asks for its duration here.
+ */
+function whenSection(ctx, { setup, set, quiet }, { duration = false } = {}) {
   const when = setup.when || {};
   const whenDate = when.date || todayIso();
   const whenTime = when.time || hourMinute(new Date());
   const past = L.isPastStart(whenDate, whenTime);
   const setWhen = (patch) => set({ when: { ...when, ...patch } });
+  const section = APL.Section({
+    label: 'When',
+    id: 'setup-when',
+    // "Now" (back to the present) shows only after the date or the time was changed
+    accessory:
+      when.date || when.time
+        ? h(
+            'button',
+            {
+              type: 'button',
+              class: 'btn btn-text btn-sm',
+              dataset: { fk: 'when-now' },
+              onClick: () => set({ when: null, pastMinutes: null }),
+            },
+            'Now',
+          )
+        : null,
+    children: [
+      h(
+        'div',
+        { class: 'apl-grid-2' },
+        datePicker({
+          label: 'Date',
+          value: whenDate,
+          max: todayIso(),
+          marks: sessionDates(ctx),
+          fk: 'when-date',
+          apl: true,
+          onChange: (date) => setWhen({ date }),
+        }),
+        timePicker({
+          label: 'Start time',
+          value: whenTime,
+          fk: 'when-time',
+          hint: when.time ? 'Start time' : 'Now',
+          onChange: (time) => time && setWhen({ time }),
+        }),
+      ),
+      past && duration
+        ? APL.TextField({
+            label: 'Duration',
+            type: 'number',
+            inputmode: 'numeric',
+            min: 0,
+            suffix: 'min',
+            value: setup.pastMinutes ?? '',
+            fk: 'past-minutes',
+            onInput: (e) => {
+              const n = parseInt(e.target.value, 10);
+              quiet({ pastMinutes: Number.isFinite(n) && n >= 0 ? n : null });
+            },
+          })
+        : null,
+      past ? h('p', { class: 'apl-cap' }, 'Logged afterwards: no running timer.') : null,
+    ],
+  });
+  return { section, whenDate, whenTime, past };
+}
 
-  // equipment: the Gear tab's setup by default, or any saved setup
+/** Equipment: the Gear tab's setup by default, or any saved setup, as radio cards. */
+function equipmentSection(ctx, { settings, setup, set }) {
   const snapshots = ctx.repo.list('gearSnapshots', {
     sort: (a, b) => b.createdAt.localeCompare(a.createdAt),
   });
   const gearOpts = gearChoices({ settings, snapshots });
   const gearChoice = gearOpts.options.some((o) => o[0] === setup.gear) ? setup.gear : gearOpts.value;
-  const chosenGear = () =>
-    gearForChoice(gearChoice, { settings, snapshots }) || { gear: null, gearSnapshotId: null };
-  const gearDetail = (id) => {
+  const detail = (id) => {
     if (id === 'none') return 'Log without a bow setup';
     if (id === 'current') return 'From the Gear tab';
     const sn = snapshots.find((x) => x.id === id);
     return sn ? `Saved ${formatDate(sn.createdAt.slice(0, 10))}` : null;
   };
-  const gearName = gearChoice === 'none' ? null : gearOpts.options.find((o) => o[0] === gearChoice)?.[1];
+  const section = APL.Section({
+    label: 'Equipment',
+    id: 'setup-gear',
+    children: h(
+      'div',
+      { class: 'apl-list', role: 'group', 'aria-labelledby': 'setup-gear-label' },
+      gearOpts.options.map(([id, name]) =>
+        APL.SelectCard({
+          title: name,
+          detail: detail(id),
+          selected: id === gearChoice,
+          onClick: () => set({ gear: id }),
+          fk: `gear-${id}`,
+        }),
+      ),
+      APL.AddButton({ children: 'Add equipment', onClick: () => ctx.navigate('gear'), fk: 'gear-add' }),
+    ),
+  });
+  return {
+    section,
+    chosenGear: () =>
+      gearForChoice(gearChoice, { settings, snapshots }) || { gear: null, gearSnapshotId: null },
+    gearName: gearChoice === 'none' ? null : gearOpts.options.find((o) => o[0] === gearChoice)?.[1],
+  };
+}
+
+// ---------------------------------------------------------------- scored session
+
+/** Step 2 for a scored session: when, distance, face, arrows per end, (competition), equipment. */
+export function renderScoredSetup(ctx, type, active = null) {
+  const st = setupState(ctx);
+  const { last, lastFace, setup, set, quiet } = st;
+  const { section: when, whenDate, whenTime, past } = whenSection(ctx, st, { duration: true });
+  const { section: equipment, chosenGear, gearName } = equipmentSection(ctx, st);
 
   const start = async () => {
     // only one session runs at a time: the running-session module asks about the one in progress
@@ -145,17 +251,14 @@ export function renderScoredSetup(ctx, type, active = null) {
     ctx.navigate('new', { replace: true });
   };
 
-  const textField = (label, value, attrs, onInput) =>
-    h(
-      'label',
-      { class: 'field' },
-      h('span', { class: 'field-label' }, label),
-      h('input', { class: 'input', value, autocomplete: 'off', ...attrs, onInput }),
-    );
   const compField = (key, label, placeholder) =>
-    textField(label, setup.competition?.[key] || '', { placeholder, dataset: { fk: `comp-${key}` } }, (e) =>
-      quiet({ competition: { ...setup.competition, [key]: e.target.value } }),
-    );
+    APL.TextField({
+      label,
+      placeholder,
+      value: setup.competition?.[key] || '',
+      fk: `comp-${key}`,
+      onInput: (e) => quiet({ competition: { ...setup.competition, [key]: e.target.value } }),
+    });
 
   const lastArrows = last.arrowsPerEnd ?? DEFAULT_ARROWS_PER_END;
   const { size, kind } = faceParts(setup.face) || faceParts(lastFace);
@@ -178,72 +281,7 @@ export function renderScoredSetup(ctx, type, active = null) {
       onClick: () => set({ distance: last.distance, face: lastFace, arrowsPerEnd: lastArrows }),
       fk: 'setup-repeat',
     }),
-    APL.Section({
-      label: 'When',
-      id: 'setup-when',
-      // "Now" (back to the present) shows only after the date or the time was changed
-      accessory:
-        when.date || when.time
-          ? h(
-              'button',
-              {
-                type: 'button',
-                class: 'btn btn-text btn-sm',
-                dataset: { fk: 'when-now' },
-                onClick: () => set({ when: null, pastMinutes: null }),
-              },
-              'Now',
-            )
-          : null,
-      children: [
-        h(
-          'div',
-          { class: 'apl-grid-2' },
-          datePicker({
-            label: 'Date',
-            value: whenDate,
-            max: todayIso(),
-            marks: sessionDates(ctx),
-            fk: 'when-date',
-            apl: true,
-            onChange: (date) => setWhen({ date }),
-          }),
-          timePicker({
-            label: 'Start time',
-            value: whenTime,
-            fk: 'when-time',
-            hint: when.time ? 'Start time' : 'Now',
-            onChange: (time) => time && setWhen({ time }),
-          }),
-        ),
-        // logged afterwards: the duration is typed in, the timer stays stopped
-        past
-          ? h(
-              'label',
-              { class: 'field' },
-              h('span', { class: 'field-label' }, 'Duration'),
-              h(
-                'div',
-                { class: 'input-suffix' },
-                h('input', {
-                  class: 'input',
-                  type: 'number',
-                  inputmode: 'numeric',
-                  min: 0,
-                  value: setup.pastMinutes ?? '',
-                  dataset: { fk: 'past-minutes' },
-                  onInput: (e) => {
-                    const n = parseInt(e.target.value, 10);
-                    quiet({ pastMinutes: Number.isFinite(n) && n >= 0 ? n : null });
-                  },
-                }),
-                h('span', { class: 'muted small' }, 'min'),
-              ),
-            )
-          : null,
-        past ? h('p', { class: 'apl-cap' }, 'Logged afterwards: no running timer.') : null,
-      ],
-    }),
+    when,
     APL.Section({
       label: T.distance,
       id: 'setup-dist',
@@ -316,24 +354,7 @@ export function renderScoredSetup(ctx, type, active = null) {
           ],
         })
       : null,
-    APL.Section({
-      label: 'Equipment',
-      id: 'setup-gear',
-      children: h(
-        'div',
-        { class: 'apl-list', role: 'group', 'aria-labelledby': 'setup-gear-label' },
-        gearOpts.options.map(([id, name]) =>
-          APL.SelectCard({
-            title: name,
-            detail: gearDetail(id),
-            selected: id === gearChoice,
-            onClick: () => set({ gear: id }),
-            fk: `gear-${id}`,
-          }),
-        ),
-        APL.AddButton({ children: 'Add equipment', onClick: () => ctx.navigate('gear'), fk: 'gear-add' }),
-      ),
-    }),
+    equipment,
   );
 
   return {
@@ -354,6 +375,125 @@ export function renderScoredSetup(ctx, type, active = null) {
           onClick: start,
           fk: 'setup-start',
         }),
+      }),
+    ),
+  };
+}
+
+// ---------------------------------------------------------------- form session
+
+/** The form of a blank bale, SPT, mental or manual session, saved straight to History. */
+export function renderFormSetup(ctx, type) {
+  const st = setupState(ctx);
+  const { setup, set, quiet } = st;
+  const { section: when, whenDate, whenTime, past } = whenSection(ctx, st);
+  // equipment is not asked for mental and SPT sessions: the bow's setup says nothing about them
+  const noGear = type === 'mental' || type === 'strength';
+  const equipment = noGear ? null : equipmentSection(ctx, st);
+
+  // The open form session (openFormSession.js) owns the timer, the kept draft, saving and
+  // discarding; this page holds the draft being typed and forwards the events.
+  // Opening gives a timed form its timer and, when the page has no draft yet, the kept one.
+  const opened = ctx.openForms.open(type, setup.forms?.[type] || null);
+  if (opened.draft && !setup.forms?.[type]) quiet({ forms: { ...setup.forms, [type]: opened.draft } });
+  const { timed, timer: formTimer } = opened;
+  const form = setup.forms?.[type] || emptyForm(type);
+  // the draft is read at call time: typing stores into `setup` without re-rendering
+  const currentForm = () => setup.forms?.[type] || emptyForm(type);
+  const changeForm = (update, { rerender = true } = {}) => {
+    const cur = currentForm();
+    const forms = { ...setup.forms, [type]: { ...cur, ...update(cur) } };
+    ctx.openForms.keepDraft(type, forms[type]);
+    if (rerender) set({ forms });
+    else quiet({ forms });
+  };
+  const toggleFormTimer = () => {
+    ctx.openForms.toggleTimer(type);
+    ctx.rerender();
+  };
+  // the form session is over: the page's draft goes too
+  const dropPageDraft = () =>
+    ctx.ui.quietSet({ setup: { ...setup, when: null, forms: { ...setup.forms, [type]: null } } });
+
+  const discardForm = async () => {
+    const res = await ctx.openForms.discard(type);
+    if (res.status !== 'discarded') return;
+    dropPageDraft();
+    ctx.navigate('home', { replace: true });
+  };
+
+  const saveForm = async () => {
+    const res = await ctx.openForms.save(type, {
+      fields: currentForm(),
+      date: whenDate,
+      time: whenTime,
+      past,
+      gear: noGear ? {} : equipment.chosenGear(),
+    });
+    if (res.status !== 'saved') return;
+    dropPageDraft();
+    ctx.navigate(`history/${res.session.id}`, { replace: true });
+  };
+
+  // a timed form whose start is not in the past: its timer runs, it is a running session
+  const running = timed && !past;
+  // blank bale: the timer sits beside the arrow count (in the form); SPT: the same timer, on its own
+  // at the right; mental, manual: a "Timer" row
+  const timerRow =
+    running && type === 'strength'
+      ? h('div', { class: 'apl-timer-row' }, sessionTimer(formTimer, toggleFormTimer, { size: 'lg' }))
+      : running && type !== 'blank'
+        ? h(
+            'div',
+            { class: 'apl-section-head' },
+            h('h2', { class: 'apl-label' }, 'Timer'),
+            sessionTimer(formTimer, toggleFormTimer),
+          )
+        : null;
+
+  // no back button on a running SPT or blank bale session (Save or Discard end it; the tab bar
+  // leaves it running); no title on the SPT page and a running blank bale session: the room goes
+  // to the form
+  const back = !(running && (type === 'strength' || type === 'blank'));
+  const title = type === 'strength' || (running && type === 'blank') ? '' : `${TYPE_LABELS[type]} session`;
+
+  return {
+    content: h(
+      'div',
+      { class: 'apl-screen' },
+      back || title
+        ? APL.ScreenHeader({
+            title,
+            onBack: back ? () => ctx.navigate('new') : null,
+            backLabel: 'Back to session type',
+          })
+        : null,
+      h(
+        'div',
+        { class: ['apl-screen-body', !back && !title && 'apl-screen-body--top'] },
+        when,
+        timerRow,
+        ...formSections(type, form, changeForm, {
+          live: running,
+          timer:
+            type === 'blank' && running ? sessionTimer(formTimer, toggleFormTimer, { size: 'lg' }) : null,
+        }),
+        equipment?.section,
+        running
+          ? h(
+              'button',
+              {
+                type: 'button',
+                class: 'btn btn-text danger apl-discard',
+                dataset: { fk: 'discard-form' },
+                onClick: discardForm,
+              },
+              'Discard session',
+            )
+          : null,
+      ),
+      APL.BottomBar({
+        children: APL.Button({ children: 'Save session', onClick: saveForm, fk: 'form-save' }),
       }),
     ),
   };

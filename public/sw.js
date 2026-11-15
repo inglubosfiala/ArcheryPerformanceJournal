@@ -67,6 +67,7 @@ const SHELL = [
   './js/app/views/log.js',
   './js/app/views/sessionSetup.js',
   './js/app/views/setupFaces.js',
+  './js/app/views/timer.js',
   './js/ui/apl/index.js',
   './js/app/views/history.js',
   './js/app/views/gear.js',
