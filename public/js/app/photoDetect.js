@@ -151,7 +151,7 @@ function orderSpots(spots, face) {
  * centre (as stored for logged arrows; `spot` is null on single faces), or { error } when no face
  * was found.
  */
-export function detectArrows(img, face, maxArrows, { debug = false, spotHint = 0 } = {}) {
+export function detectArrows(img, face, maxArrows, { debug = false, spotHint = 0, shaftGap = null } = {}) {
   const { width, height, data } = img;
   const n = width * height;
   const cls = new Array(n);
@@ -229,7 +229,7 @@ export function detectArrows(img, face, maxArrows, { debug = false, spotHint = 0
   //    transform (every dark pixel votes for the lines through it), so old holes (scattered dots)
   //    and the ring lines (curved) do not count. The arrow is at the end of the line inside a face.
   const rejects = debug ? [] : null;
-  const shafts = findShafts({ width, height, data, nearest, spotPx, face, odd, cls, rejects });
+  const shafts = findShafts({ width, height, data, nearest, spotPx, face, cls, rejects, shaftGap });
 
   // 2) Nocks / fletchings seen head-on: big compact blobs of colour that does not belong to the ring
   //    under it (only used for arrows the shafts did not account for).
@@ -326,7 +326,7 @@ function distToSegment(x, y, a, b) {
  * Arrow shafts as straight dark lines near the spots. Returns [{ a, b, length, tip, tipAt }]: the
  * dark run along the line (a–b) and its end inside a face (the arrow's entry point).
  */
-function findShafts({ width, height, data, nearest, spotPx, face, odd, cls, rejects = null }) {
+function findShafts({ width, height, data, nearest, spotPx, face, cls, rejects = null, shaftGap = null }) {
   const bright = (i) => Math.max(data[i * 4], data[i * 4 + 1], data[i * 4 + 2]);
   // How bright each ring colour is in this photo (the median of its pixels). A shaft over a ring is
   // "dark" when it is clearly darker than that ring, even if it is brownish rather than black
@@ -412,8 +412,7 @@ function findShafts({ width, height, data, nearest, spotPx, face, odd, cls, reje
       for (let ox = -1; ox <= 1; ox++) {
         const xx = xi + ox;
         const yy = yi + oy;
-        // dark, or not the ring's colour: a shaft is often lighter near its point
-        if (xx >= 0 && yy >= 0 && xx < width && yy < height && (dark[yy * width + xx] || odd[yy * width + xx])) return true;
+        if (xx >= 0 && yy >= 0 && xx < width && yy < height && dark[yy * width + xx]) return true;
       }
     }
     return false;
@@ -425,6 +424,9 @@ function findShafts({ width, height, data, nearest, spotPx, face, odd, cls, reje
     return d > 0.56 && d < 0.84;
   };
 
+  // small breaks in a shaft (glare, a pale stretch) are bridged; a real gap, like the distance to an
+  // old hole further along the line, ends it. Tuned on real photos: 4 px, a little more on big spots.
+  const maxGap = shaftGap ?? Math.max(4, Math.round(0.03 * spotPx));
   const minRun = 0.45 * spotPx;
   const found = [];
   for (let tries = 0; tries < 120 && found.length < 12; tries++) {
@@ -468,7 +470,9 @@ function findShafts({ width, height, data, nearest, spotPx, face, odd, cls, reje
         // a dark shaft cannot be seen on a full face's black rings: the line carries on across them
       } else if (cur) {
         gap++;
-        if (gap > 5) {
+        // a shaft is one unbroken line: a wider gap ends it, so the run does not carry on over old
+        // holes that happen to lie beyond the point
+        if (gap > maxGap) {
           if (!run || cur.u1 - cur.u0 > run.u1 - run.u0) run = cur;
           cur = null;
           gap = 0;
@@ -533,4 +537,34 @@ export function matchArrows(prev, cur, tol = 0.1) {
     map.push(best);
   }
   return map;
+}
+
+/**
+ * Live view: the reading most of the recent frames agree on. `frames` is a list of arrow lists
+ * (oldest first). Returns { arrows, count, oldest } — the agreed arrows at their average place over
+ * the agreeing frames, how many frames agree, and the index of the oldest of them — or null when
+ * there are no frames. A frame that reads something else now and then does not reset anything.
+ */
+export function consensus(frames, tol = 0.1) {
+  let best = null;
+  frames.forEach((ref, i) => {
+    const members = [];
+    frames.forEach((f, j) => {
+      const map = i === j ? ref.map((_, k) => k) : matchArrows(ref, f, tol);
+      if (map) members.push({ j, map });
+    });
+    // the most agreed; among equals the most recent
+    if (ref.length && (!best || members.length >= best.members.length)) best = { ref, members };
+  });
+  if (!best) return null;
+  const n = best.members.length;
+  return {
+    count: n,
+    oldest: Math.min(...best.members.map((m) => m.j)),
+    arrows: best.ref.map((a, k) => ({
+      ...a,
+      x: best.members.reduce((sum, m) => sum + frames[m.j][m.map[k]].x, 0) / n,
+      y: best.members.reduce((sum, m) => sum + frames[m.j][m.map[k]].y, 0) / n,
+    })),
+  };
 }

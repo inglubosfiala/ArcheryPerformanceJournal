@@ -906,12 +906,46 @@ async function scoreLive(ctx) {
       await scoreFromPhoto(ctx, got.file);
       return;
     }
-    const preview = h('canvas', { class: 'photo-preview' });
-    preview.width = got.canvas.width;
-    preview.height = got.canvas.height;
-    preview.getContext('2d').drawImage(got.canvas, 0, 0);
-    if (await previewAndApply(ctx, preview, got.res, sc, { cancelLabel: 'Back to camera' })) return;
+    const shown = cropToSpots(got.canvas, got.res);
+    if (await previewAndApply(ctx, shown.canvas, shown.res, sc, { cancelLabel: 'Back to camera' })) return;
   }
+}
+
+/**
+ * The preview of a live frame shows just the sheet: the picture cut to the box around the spots
+ * (the camera frame is mostly background), with the result's picture coordinates moved to match.
+ */
+function cropToSpots(source, res) {
+  let x0 = Infinity;
+  let y0 = Infinity;
+  let x1 = -Infinity;
+  let y1 = -Infinity;
+  for (const s of res.spots) {
+    const rad = Math.max(s.outer.rx, s.outer.ry) * 1.25;
+    x0 = Math.min(x0, s.outer.cx - rad);
+    y0 = Math.min(y0, s.outer.cy - rad);
+    x1 = Math.max(x1, s.outer.cx + rad);
+    y1 = Math.max(y1, s.outer.cy + rad);
+  }
+  x0 = Math.max(0, Math.floor(x0));
+  y0 = Math.max(0, Math.floor(y0));
+  x1 = Math.min(source.width, Math.ceil(x1));
+  y1 = Math.min(source.height, Math.ceil(y1));
+  const w = Math.max(1, x1 - x0);
+  const hgt = Math.max(1, y1 - y0);
+  const k = Math.min(3, PHOTO_MAX / Math.max(w, hgt));
+  const canvas = h('canvas', { class: 'photo-preview' });
+  canvas.width = Math.round(w * k);
+  canvas.height = Math.round(hgt * k);
+  canvas.getContext('2d').drawImage(source, x0, y0, w, hgt, 0, 0, canvas.width, canvas.height);
+  return {
+    canvas,
+    res: {
+      ...res,
+      spots: res.spots.map((s) => ({ outer: { ...s.outer, cx: (s.outer.cx - x0) * k, cy: (s.outer.cy - y0) * k, rx: s.outer.rx * k, ry: s.outer.ry * k } })),
+      arrows: res.arrows.map((a) => ({ ...a, image: { x: (a.image.x - x0) * k, y: (a.image.y - y0) * k } })),
+    },
+  };
 }
 
 async function scoreFromPhoto(ctx, file) {
@@ -931,12 +965,48 @@ async function scoreFromPhoto(ctx, file) {
   canvas.height = Math.round(bitmap.height * k);
   const g = canvas.getContext('2d', { willReadFrequently: true });
   g.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
-  bitmap.close();
-  const res = detectArrows(g.getImageData(0, 0, canvas.width, canvas.height), face, empty, { spotHint });
+  let res = detectArrows(g.getImageData(0, 0, canvas.width, canvas.height), face, empty, { spotHint });
   if (res.error) {
+    bitmap.close();
     ctx.toast(res.error);
     return;
   }
+  // Second look, at just the sheet: the box around the spots is taken from the full-size photo, so
+  // the same number of analysed pixels shows the target in much more detail. Kept when it finds
+  // the face again.
+  let x0 = Infinity;
+  let y0 = Infinity;
+  let x1 = -Infinity;
+  let y1 = -Infinity;
+  for (const s of res.spots) {
+    const rad = (Math.max(s.outer.rx, s.outer.ry) * 1.3) / k;
+    x0 = Math.min(x0, s.outer.cx / k - rad);
+    y0 = Math.min(y0, s.outer.cy / k - rad);
+    x1 = Math.max(x1, s.outer.cx / k + rad);
+    y1 = Math.max(y1, s.outer.cy / k + rad);
+  }
+  x0 = Math.max(0, Math.floor(x0));
+  y0 = Math.max(0, Math.floor(y0));
+  x1 = Math.min(bitmap.width, Math.ceil(x1));
+  y1 = Math.min(bitmap.height, Math.ceil(y1));
+  const bw = x1 - x0;
+  const bh = y1 - y0;
+  if (bw > 16 && bh > 16 && bw * bh < 0.8 * bitmap.width * bitmap.height) {
+    const k2 = Math.min(1, PHOTO_MAX / Math.max(bw, bh));
+    const close = document.createElement('canvas');
+    close.width = Math.round(bw * k2);
+    close.height = Math.round(bh * k2);
+    const g2 = close.getContext('2d', { willReadFrequently: true });
+    g2.drawImage(bitmap, x0, y0, bw, bh, 0, 0, close.width, close.height);
+    const res2 = detectArrows(g2.getImageData(0, 0, close.width, close.height), face, empty, { spotHint });
+    if (!res2.error && res2.spots.length >= res.spots.length) {
+      canvas.width = close.width;
+      canvas.height = close.height;
+      canvas.getContext('2d').drawImage(close, 0, 0);
+      res = res2;
+    }
+  }
+  bitmap.close();
   await previewAndApply(ctx, canvas, res, sc);
 }
 
@@ -956,8 +1026,10 @@ async function previewAndApply(ctx, canvas, res, { face, spotHint }, { cancelLab
     g.stroke();
   }
   const values = res.arrows.map((a) => scoreFromPoint(a.x, a.y, face));
+  // markers sized to the spots, so they do not cover a small target
+  const spotR = res.spots.reduce((sum, s) => sum + (s.outer.rx + s.outer.ry) / 2, 0) / Math.max(1, res.spots.length);
   res.arrows.forEach((a, i) => {
-    const r = Math.max(9, canvas.width / 40);
+    const r = Math.max(canvas.width / 70, Math.min(canvas.width / 26, 0.14 * spotR));
     g.beginPath();
     g.arc(a.image.x, a.image.y, r, 0, Math.PI * 2);
     g.fillStyle = '#E5007E';

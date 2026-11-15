@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { detectArrows, colourClass, expectedColour, matchArrows } from '../public/js/app/photoDetect.js';
+import { detectArrows, colourClass, expectedColour, matchArrows, consensus } from '../public/js/app/photoDetect.js';
 import { spotCentres, isSpotFace, scoreFromPoint } from '../public/js/app/scoring.js';
 
 const RGB = {
@@ -145,6 +145,20 @@ describe('photo arrow detection', () => {
     }
   });
 
+  it('ends a shaft at its point even with old holes lying further along the same line', () => {
+    const shaft = { x: 0.1, y: 0, dx: 1.4, dy: 0 }; // enters at (0.1, 0), leans out to the right
+    // holes on the same line, a tenth of the radius and more beyond the entry point
+    const holes = [
+      { x: -0.06, y: 0 },
+      { x: -0.16, y: 0 },
+      { x: -0.3, y: 0 },
+    ];
+    const img = photo('122', [], { shafts: [shaft, ...holes.map((h) => ({ ...h, dx: 0.035, dy: 0 }))], squash: 1 });
+    const res = detectArrows(img, '122', 1);
+    expect(res.arrows).toHaveLength(1);
+    expect(Math.hypot(res.arrows[0].x - shaft.x, res.arrows[0].y - shaft.y)).toBeLessThan(0.08);
+  });
+
   it('uses a photo of one spot for a three-spot sheet, on the hinted spot', () => {
     const img = photo('40s', [{ x: 0.2, y: -0.1 }], { scale: 150 });
     const res = detectArrows(img, '40t', 3, { spotHint: 2 });
@@ -167,5 +181,22 @@ describe('photo arrow detection', () => {
     expect(matchArrows(a, [{ x: 0.1, y: 0.1, spot: 2 }, { x: -0.3, y: 0.2, spot: 1 }])).toBeNull();
     expect(matchArrows(a, [a[0]])).toBeNull();
     expect(matchArrows([], [])).toBeNull();
+  });
+
+  it('finds the reading most live frames agree on, ignoring the odd frame', () => {
+    const good = (dx) => [
+      { x: 0.1 + dx, y: 0.1, spot: 0 },
+      { x: -0.3, y: 0.2 + dx, spot: 1 },
+    ];
+    const odd = [
+      { x: 0.6, y: 0.1, spot: 0 },
+      { x: -0.3, y: 0.2, spot: 1 },
+    ];
+    const res = consensus([good(0), odd, good(0.02), good(-0.02), [{ x: 0, y: 0, spot: 0 }], good(0.04)]);
+    expect(res.count).toBe(4);
+    expect(res.oldest).toBe(0);
+    expect(res.arrows[0].x).toBeCloseTo(0.11, 5);
+    expect(res.arrows[1].y).toBeCloseTo(0.21, 5);
+    expect(consensus([])).toBeNull();
   });
 });
