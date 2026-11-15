@@ -731,7 +731,7 @@ export function DataTable({ label, columns, rows, rowProps = null }) {
 
 /**
  * A session in a list: when, a neutral type badge, the setup line, and for a scored session its score
- * (`score`: { total, max }) with the M / S figures (`stats`: [label, value] pairs). With `href` the row
+ * (`score`: { total, max }; max is optional) with the M / S figures (`stats`: [label, value] pairs). With `href` the row
  * is a link; `actions` (buttons) go at the bottom (Recently deleted).
  */
 export function SessionRow({
@@ -764,7 +764,7 @@ export function SessionRow({
             'span',
             { class: 'apl-big' },
             String(score.total),
-            h('span', { class: 'apl-sessionrow-max' }, ` / ${score.max}`),
+            score.max != null ? h('span', { class: 'apl-sessionrow-max' }, ` / ${score.max}`) : null,
           ),
           stats.length
             ? h(

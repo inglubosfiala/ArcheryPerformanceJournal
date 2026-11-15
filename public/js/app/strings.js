@@ -77,7 +77,7 @@ export const T = {
   confirmLoadSnap: (n) => `Replace the current setup with "${n}"?`,
   confirmDeleteSnap: (n) => `Delete snapshot "${n}"?`,
   sightMarks: 'Sight marks',
-  addDistance: '+ Add distance',
+  addDistance: 'Add distance',
   competitionLog: 'Competition log',
   addCompetition: 'Add competition',
   confirmDeleteComp: (n) => `Delete "${n}"?`,

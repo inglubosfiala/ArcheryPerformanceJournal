@@ -319,14 +319,6 @@ p {
   padding: 0 14px;
 }
 
-.btn-dashed {
-  min-height: 44px;
-  border: 1px dashed #a9aeb3;
-  background: transparent;
-  font-weight: 600;
-  font-size: 14px;
-}
-
 .btn-text {
   background: transparent;
   font-weight: 600;
@@ -897,63 +889,6 @@ textarea {
 
 .table-scroll {
   overflow-x: auto;
-}
-
-/* ---------------------------------------------------------------- forms (gear, sights) */
-.form-row {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-  gap: 10px;
-  align-items: center;
-}
-
-.form-row.wide {
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr);
-}
-
-.form-row label {
-  font-size: 14px;
-  color: var(--ink-2);
-}
-
-.list-row {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 8px 0;
-  border-top: 1px solid var(--subtle);
-}
-
-.tag {
-  margin-left: 8px;
-  font-size: 11px;
-  font-weight: 700;
-  padding: 2px 8px;
-  border-radius: 10px;
-  background: var(--subtle);
-  color: var(--muted);
-}
-
-.sight-grid {
-  display: grid;
-  grid-template-columns: 64px repeat(3, minmax(0, 1fr));
-  gap: 6px;
-}
-
-.sight-grid .input {
-  padding: 0 8px;
-}
-
-.sight-head {
-  font-size: 11px;
-  font-weight: 700;
-  color: var(--muted);
-  text-transform: uppercase;
-  letter-spacing: 0.4px;
-}
-
-.comp-card {
-  gap: 4px;
 }
 
 /* ---------------------------------------------------------------- settings */
