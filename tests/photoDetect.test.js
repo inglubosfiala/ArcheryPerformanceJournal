@@ -145,6 +145,20 @@ describe('photo arrow detection', () => {
     }
   });
 
+  it('follows a shaft that crosses the middle of the spot to its point on the far side', () => {
+    for (const face of ['40s', '122']) {
+      for (const sh of [
+        { x: 0.3, y: 0.2, dx: -1.5, dy: -1.05 },
+        { x: 0.6, y: 0.05, dx: -1.7, dy: -0.3 },
+        { x: -0.2, y: 0.25, dx: 0.9, dy: -1.2 },
+      ]) {
+        const res = detectArrows(photo(face, [], { shafts: [sh], squash: 0.95, scale: 110 }), face, 3);
+        expect(res.arrows, `${face} ${sh.x},${sh.y}`).toHaveLength(1);
+        expect(Math.hypot(res.arrows[0].x - sh.x, res.arrows[0].y - sh.y), `${face} ${sh.x},${sh.y}`).toBeLessThan(0.09);
+      }
+    }
+  });
+
   it('ends a shaft at its point even with old holes lying further along the same line', () => {
     const shaft = { x: 0.1, y: 0, dx: 1.4, dy: 0 }; // enters at (0.1, 0), leans out to the right
     // holes on the same line, a tenth of the radius and more beyond the entry point

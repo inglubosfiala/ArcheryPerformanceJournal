@@ -229,7 +229,7 @@ export function detectArrows(img, face, maxArrows, { debug = false, spotHint = 0
   //    transform (every dark pixel votes for the lines through it), so old holes (scattered dots)
   //    and the ring lines (curved) do not count. The arrow is at the end of the line inside a face.
   const rejects = debug ? [] : null;
-  const shafts = findShafts({ width, height, data, nearest, spotPx, face, cls, rejects, shaftGap });
+  const shafts = findShafts({ width, height, data, nearest, spotPx, face, rejects, shaftGap });
 
   // 2) Nocks / fletchings seen head-on: big compact blobs of colour that does not belong to the ring
   //    under it (only used for arrows the shafts did not account for).
@@ -326,14 +326,19 @@ function distToSegment(x, y, a, b) {
  * Arrow shafts as straight dark lines near the spots. Returns [{ a, b, length, tip, tipAt }]: the
  * dark run along the line (a–b) and its end inside a face (the arrow's entry point).
  */
-function findShafts({ width, height, data, nearest, spotPx, face, cls, rejects = null, shaftGap = null }) {
+function findShafts({ width, height, data, nearest, spotPx, face, rejects = null, shaftGap = null }) {
   const bright = (i) => Math.max(data[i * 4], data[i * 4 + 1], data[i * 4 + 2]);
-  // How bright each ring colour is in this photo (the median of its pixels). A shaft over a ring is
-  // "dark" when it is clearly darker than that ring, even if it is brownish rather than black
-  // (carbon in the light, wood): otherwise the line would stop where the shaft enters the gold.
+  // How bright each ring is in this photo (the median of the pixels where the ring should be, so
+  // it does not depend on the light: a blue ring in a dim hall is not "blue" by its colour). A shaft
+  // over a ring is "dark" when it is clearly darker than that ring, even if it is brownish rather
+  // than black (carbon in the light, wood): otherwise the line would stop where the shaft enters
+  // the gold.
   const hist = { gold: new Int32Array(256), red: new Int32Array(256), blue: new Int32Array(256), white: new Int32Array(256) };
+  const dist = new Float32Array(width * height);
   for (let i = 0; i < width * height; i++) {
-    const hgram = hist[cls[i]];
+    const d = nearest(i % width, (i / width) | 0).d;
+    dist[i] = d;
+    const hgram = d < 1 ? hist[expectedColour(d, face, 0.03)] : null;
     if (hgram) hgram[bright(i)]++;
   }
   const refs = {};
@@ -352,12 +357,18 @@ function findShafts({ width, height, data, nearest, spotPx, face, cls, rejects =
   const raw = new Uint8Array(width * height);
   for (let i = 0; i < width * height; i++) {
     const v = bright(i);
-    if (v <= 125) raw[i] = 1;
-    else if (v <= 0.78 * maxRef) {
-      const d = nearest(i % width, (i / width) | 0).d;
-      const zone = d < 1 ? expectedColour(d, face, 0.03) : null;
-      if (zone && refs[zone] && v <= 0.78 * refs[zone]) raw[i] = 1;
+    if (v > Math.max(125, 0.78 * maxRef)) continue;
+    const d = dist[i];
+    if (d >= 1) {
+      if (v <= 125) raw[i] = 1; // off the faces: plainly dark
+      continue;
     }
+    // On a face, dark means clearly darker than the ring under it. In dim light a whole ring (the
+    // blue) can be darker than any fixed limit, and the shaft would vanish on it. On a ring line
+    // the colour under the shaft is one of the two rings: it must be darker than both, or the line
+    // would break at every ring it crosses.
+    const ref = Math.min(...[d - 0.03, d + 0.03].map((dd) => (dd >= 1 ? Infinity : (refs[expectedColour(Math.max(0, dd), face, 0)] ?? 160))));
+    if (v <= 0.78 * ref) raw[i] = 1;
   }
   // dark pixels on or around the faces (the sheet), but not on a full face's black rings
   const isDarkPx = (i) => raw[i] === 1;
@@ -428,6 +439,71 @@ function findShafts({ width, height, data, nearest, spotPx, face, cls, rejects =
   // old hole further along the line, ends it. Tuned on real photos: 4 px, a little more on big spots.
   const maxGap = shaftGap ?? Math.max(4, Math.round(0.03 * spotPx));
   const minRun = 0.45 * spotPx;
+  /** The longest dark run on the line through (px, py) along the unit vector (dx, dy). */
+  const longestRun = (px, py, dx, dy) => {
+    let run = null;
+    let cur = null;
+    let gap = 0;
+    for (let u = -D; u <= D; u++) {
+      const x = px + u * dx;
+      const y = py + u * dy;
+      if (x < 0 || y < 0 || x >= width || y >= height) continue;
+      if (isDark(x, y)) {
+        if (!cur) cur = { u0: u, u1: u };
+        cur.u1 = u;
+        gap = 0;
+      } else if (cur && blackZone(x, y)) {
+        // a dark shaft cannot be seen on a full face's black rings: the line carries on across them
+      } else if (cur) {
+        gap++;
+        // a shaft is one unbroken line: a wider gap ends it, so the run does not carry on over old
+        // holes that happen to lie beyond the point
+        if (gap > maxGap) {
+          if (!run || cur.u1 - cur.u0 > run.u1 - run.u0) run = cur;
+          cur = null;
+          gap = 0;
+        }
+      }
+    }
+    if (cur && (!run || cur.u1 - cur.u0 > run.u1 - run.u0)) run = cur;
+    if (!run) return null;
+    return {
+      a: { x: px + run.u0 * dx, y: py + run.u0 * dy },
+      b: { x: px + run.u1 * dx, y: py + run.u1 * dy },
+      length: run.u1 - run.u0,
+    };
+  };
+  /** Least-squares line through the dark pixels within a few px of the segment a-b. */
+  const fitLine = (a, b) => {
+    const reach = 3;
+    let m = 0;
+    let sx = 0;
+    let sy = 0;
+    let sxx = 0;
+    let sxy = 0;
+    let syy = 0;
+    const x1 = Math.max(0, Math.floor(Math.min(a.x, b.x) - reach));
+    const x2 = Math.min(width - 1, Math.ceil(Math.max(a.x, b.x) + reach));
+    const y1 = Math.max(0, Math.floor(Math.min(a.y, b.y) - reach));
+    const y2 = Math.min(height - 1, Math.ceil(Math.max(a.y, b.y) + reach));
+    for (let y = y1; y <= y2; y++) {
+      for (let x = x1; x <= x2; x++) {
+        if (!dark[y * width + x] || distToSegment(x, y, a, b) > reach) continue;
+        m++;
+        sx += x;
+        sy += y;
+        sxx += x * x;
+        sxy += x * y;
+        syy += y * y;
+      }
+    }
+    if (m < 8) return null;
+    const mx = sx / m;
+    const my = sy / m;
+    const angle = 0.5 * Math.atan2(2 * (sxy / m - mx * my), sxx / m - mx * mx - (syy / m - my * my));
+    return { x: mx, y: my, dx: Math.cos(angle), dy: Math.sin(angle) };
+  };
+
   const found = [];
   for (let tries = 0; tries < 120 && found.length < 12; tries++) {
     // strongest remaining line
@@ -453,39 +529,21 @@ function findShafts({ width, height, data, nearest, spotPx, face, cls, rejects =
     // walk along the line and take its longest dark run (gaps of a few px allowed)
     const c = cosT[t];
     const sn = sinT[t];
-    const x0 = rho * c;
-    const y0 = rho * sn;
-    let run = null;
-    let cur = null;
-    let gap = 0;
-    for (let u = -D; u <= D; u++) {
-      const x = x0 - u * sn;
-      const y = y0 + u * c;
-      if (x < 0 || y < 0 || x >= width || y >= height) continue;
-      if (isDark(x, y)) {
-        if (!cur) cur = { u0: u, u1: u };
-        cur.u1 = u;
-        gap = 0;
-      } else if (cur && blackZone(x, y)) {
-        // a dark shaft cannot be seen on a full face's black rings: the line carries on across them
-      } else if (cur) {
-        gap++;
-        // a shaft is one unbroken line: a wider gap ends it, so the run does not carry on over old
-        // holes that happen to lie beyond the point
-        if (gap > maxGap) {
-          if (!run || cur.u1 - cur.u0 > run.u1 - run.u0) run = cur;
-          cur = null;
-          gap = 0;
-        }
-      }
+    let seg = longestRun(rho * c, rho * sn, -sn, c);
+    // The 1° / 1 px grid line drifts off a long shaft and then ends short of its point: fit a line
+    // to the shaft's own pixels and walk again, so the run follows the shaft to its end.
+    for (let pass = 0; pass < 2 && seg; pass++) {
+      const fit = fitLine(seg.a, seg.b);
+      const again = fit && longestRun(fit.x, fit.y, fit.dx, fit.dy);
+      if (!again || again.length <= seg.length) break;
+      seg = again;
     }
-    if (cur && (!run || cur.u1 - cur.u0 > run.u1 - run.u0)) run = cur;
-    if (!run || run.u1 - run.u0 < minRun) {
-      rejects?.push({ why: 'short', votes: bestV, t, rho, run: run ? run.u1 - run.u0 : 0 });
+    if (!seg || seg.length < minRun) {
+      rejects?.push({ why: 'short', votes: bestV, t, rho, run: seg ? seg.length : 0 });
       continue;
     }
-    const a = { x: x0 - run.u0 * sn, y: y0 + run.u0 * c };
-    const b = { x: x0 - run.u1 * sn, y: y0 + run.u1 * c };
+    const { a, b } = seg;
+    const run = { u0: 0, u1: seg.length };
     const atA = nearest(a.x, a.y);
     const atB = nearest(b.x, b.y);
     // the entry point is the end inside a face; the other end leans out (towards the camera)
@@ -494,17 +552,23 @@ function findShafts({ width, height, data, nearest, spotPx, face, cls, rejects =
       rejects?.push({ why: 'ends', votes: bestV, t, rho, tip: +tipAt.d.toFixed(2), out: +out.d.toFixed(2), a, b });
       continue;
     }
-    // one arrow per shaft: another line along the same shaft (nearly the same direction, and this
-    // tip lies on it) is the same arrow; the tip further into the face is kept
+    // one arrow per shaft. Lines a few degrees off cut across the same shaft and end short of its
+    // point, anywhere along it: of the lines along one shaft the longest is the shaft itself. (Not
+    // the one ending nearest the middle of the spot: a shaft can cross the middle and enter on the
+    // far side.)
     const line = { a, b, length: run.u1 - run.u0, tip, tipAt, t };
+    const near = 0.15 * spotPx;
     const same = found.findIndex((f) => {
       const da = Math.min(Math.abs(f.t - t), T - Math.abs(f.t - t));
-      const near = Math.hypot(f.tip.x - tip.x, f.tip.y - tip.y);
+      const apart = Math.hypot(f.tip.x - tip.x, f.tip.y - tip.y);
       // also a line of any direction ending at the same point: the shaft's shadow starts there too
-      return near < 0.15 * spotPx || (da <= 12 && (distToSegment(tip.x, tip.y, f.a, f.b) < 0.15 * spotPx || near < 0.3 * spotPx));
+      if (apart < near) return true;
+      if (da > 12) return false;
+      const on = (p, q) => distToSegment(p.x, p.y, q.a, q.b) < near;
+      return on(a, f) || on(b, f) || on(f.a, line) || on(f.b, line);
     });
     if (same >= 0) {
-      if (tipAt.d < found[same].tipAt.d) found[same] = { ...line, length: Math.max(line.length, found[same].length) };
+      if (line.length > found[same].length) found[same] = line;
       continue;
     }
     found.push(line);
