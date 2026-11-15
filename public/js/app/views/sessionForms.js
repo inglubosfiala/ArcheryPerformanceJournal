@@ -85,21 +85,38 @@ export function formSections(type, value, change, { live = false, timer = null }
       }),
     );
 
-  if (type === 'blank' && live) {
-    // counted while shooting: the count is a big label, tapped up with +1 / +3 / +6. Taps do not
-    // re-render the page; the label is updated in place and pops, and a floating "+n" rises from it.
+  if (type === 'blank') {
+    // The count is a big number, changed with −1 / +1 / +3 / +6; tapping the number lets you type it
+    // (a total from memory, or a larger correction). Changes do not re-render the page: the number
+    // is updated in place and pops, and a floating "+n" rises from it.
+    // Shot now (`live`): the timer sits beside the count; duration and note are asked on Save (log.js).
+    // Logged afterwards or edited in History: Duration and Note fields follow.
     const count = h(
-      'output',
-      { class: 'arrow-count', 'aria-live': 'polite', dataset: { fk: 'arrows-count' } },
+      'button',
+      {
+        type: 'button',
+        class: 'arrow-count',
+        'aria-label': `${value.arrows || 0} arrows shot. Tap to type the number`,
+        dataset: { fk: 'arrows-count' },
+        onClick: () => editCount(),
+      },
       String(value.arrows || 0),
     );
-    const countBox = h('div', { class: 'arrow-count-box' }, count, h('span', { class: 'arrow-count-unit' }, 'arrows'));
+    // no visible unit (the big number is self-explanatory); screen readers still hear "arrows"
+    const status = h('span', { class: 'sr-only', 'aria-live': 'polite' });
+    const countBox = h('div', { class: 'arrow-count-box' }, count, status);
     const replay = (el, cls) => {
       el.classList.remove(cls);
       void el.offsetWidth; // restart the animation on quick repeated taps
       el.classList.add(cls);
     };
     let minusBtn;
+    const show = (n) => {
+      count.textContent = String(n);
+      count.setAttribute('aria-label', `${n} arrows shot. Tap to type the number`);
+      status.textContent = `${n} arrows`;
+      minusBtn.disabled = n === 0;
+    };
     const add = (n, btn) => {
       let next = 0;
       let applied = 0;
@@ -111,8 +128,7 @@ export function formSections(type, value, change, { live = false, timer = null }
         },
         { rerender: false },
       );
-      count.textContent = String(next);
-      minusBtn.disabled = next === 0;
+      show(next);
       if (!applied) return;
       replay(count, applied > 0 ? 'is-bumped' : 'is-dropped');
       replay(btn, applied > 0 ? 'is-flashed' : 'is-flashed-minus');
@@ -121,6 +137,44 @@ export function formSections(type, value, change, { live = false, timer = null }
       countBox.append(fly);
       if (navigator.vibrate) navigator.vibrate(15);
     };
+    // the number turns into a field; Enter or leaving it keeps the typed value, Escape keeps the old one
+    function editCount() {
+      const input = h('input', {
+        class: 'input arrow-count-input',
+        type: 'number',
+        inputmode: 'numeric',
+        min: 0,
+        value: count.textContent,
+        'aria-label': 'Arrows shot',
+        dataset: { fk: 'arrows-count-input' },
+      });
+      let done = false;
+      const finish = (keep) => {
+        if (done) return;
+        done = true;
+        const n = toInt(input.value);
+        if (keep && n != null) {
+          change(() => ({ arrows: n }), { rerender: false });
+          show(n);
+        }
+        input.replaceWith(count);
+        count.focus({ preventScroll: true });
+      };
+      input.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') {
+          e.preventDefault();
+          finish(true);
+        } else if (e.key === 'Escape') {
+          e.preventDefault();
+          e.stopPropagation();
+          finish(false);
+        }
+      });
+      input.addEventListener('blur', () => finish(true));
+      count.replaceWith(input);
+      input.focus();
+      input.select();
+    }
     minusBtn = h(
       'button',
       {
@@ -133,62 +187,32 @@ export function formSections(type, value, change, { live = false, timer = null }
       },
       '−1',
     );
-    return [
+    const counter = h(
+      'section',
+      { class: 'setup-section arrow-counter', 'aria-label': 'Arrows shot' },
+      timer ? h('div', { class: 'arrow-count-row' }, countBox, timer) : [sectionLabel('Arrows shot'), countBox],
       h(
-        'section',
-        { class: 'setup-section arrow-counter', 'aria-label': 'Arrows shot' },
-        h('div', { class: 'arrow-count-row' }, countBox, timer),
-        h(
-          'div',
-          { class: 'arrow-add-row' },
-          minusBtn,
-          [1, 3, 6].map((n) =>
-            h(
-              'button',
-              {
-                type: 'button',
-                class: 'btn btn-outline arrow-add-btn',
-                'aria-label': `Add ${n} ${n === 1 ? 'arrow' : 'arrows'}`,
-                dataset: { fk: `arrows-add-${n}` },
-                onClick: (e) => add(n, e.currentTarget),
-              },
-              `+${n}`,
-            ),
+        'div',
+        { class: 'arrow-add-row' },
+        minusBtn,
+        [1, 3, 6].map((n) =>
+          h(
+            'button',
+            {
+              type: 'button',
+              class: 'btn btn-outline arrow-add-btn',
+              'aria-label': `Add ${n} ${n === 1 ? 'arrow' : 'arrows'}`,
+              dataset: { fk: `arrows-add-${n}` },
+              onClick: (e) => add(n, e.currentTarget),
+            },
+            `+${n}`,
           ),
         ),
       ),
-      // duration and note are asked when the session is saved (see saveForm in log.js)
-    ];
-  }
-
-  if (type === 'blank') {
-    // only the number of arrows: no score, no target face
-    return [
-      h(
-        'section',
-        { class: 'setup-section', 'aria-label': 'Arrows' },
-        numberField('Arrows shot', 'arrows', 'arrows'),
-        h(
-          'div',
-          { class: 'grid-4' },
-          [3, 6, 12, 30].map((n) =>
-            h(
-              'button',
-              {
-                type: 'button',
-                class: 'btn btn-outline btn-sm',
-                'aria-label': `Add ${n} arrows`,
-                dataset: { fk: `arrows-add-${n}` },
-                onClick: () => change((cur) => ({ arrows: (cur.arrows || 0) + n })),
-              },
-              `+${n}`,
-            ),
-          ),
-        ),
-      ),
-      numberField('Duration', 'minutes', 'minutes', { suffix: 'min' }),
-      noteField('What you worked on, how it felt…'),
-    ];
+    );
+    return live
+      ? [counter]
+      : [counter, numberField('Duration', 'minutes', 'minutes', { suffix: 'min' }), noteField('…')];
   }
 
   if (type === 'manual') {
@@ -200,7 +224,7 @@ export function formSections(type, value, change, { live = false, timer = null }
         numberField('Arrows shot', 'arrows', 'arrows'),
         numberField('Duration', 'minutes', 'minutes', { suffix: 'min' }),
       ),
-      noteField('What you worked on, how it felt…'),
+      noteField('…'),
     ];
   }
 
@@ -280,7 +304,7 @@ export function formSections(type, value, change, { live = false, timer = null }
       ),
       numberField('Duration', 'minutes', 'minutes', { suffix: 'min' }),
       scale(`Effort (1–${EFFORT_MAX})`, 'effort', EFFORT_MAX, 'effort'),
-      noteField('How it felt, what you changed…'),
+      noteField('…'),
     ];
   }
 

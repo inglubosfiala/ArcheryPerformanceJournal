@@ -3,6 +3,8 @@ export const APP_ID = 'archery-performance-journal';
 export const SCHEMA_VERSION = 5;
 export const APP_VERSION = '__APP_VERSION__';
 export const BACKUP_REMINDER_DAYS = 30;
+// deleted sessions stay in Recently deleted (History) this long before they are removed for good
+export const TRASH_DAYS = 7;
 
 // Environment, stamped by the deploy workflow: 'prod' (main) or 'test' (main-test, served under /test/).
 // Unstamped (local development) it still contains the placeholder text and counts as 'dev'.

@@ -3,6 +3,7 @@ import {
   APP_ID,
   APP_ENV,
   STORAGE_KEY,
+  TRASH_DAYS,
   SCHEMA_VERSION,
   GOOGLE_CLIENT_ID,
   DRIVE_SCOPE,
@@ -24,8 +25,10 @@ import { createSyncService } from './sync/syncService.js';
 import { createSyncController } from './sync/syncController.js';
 import { T } from './app/strings.js';
 import { icons } from './app/icons.js';
+import * as L from './app/sessionLogic.js';
+import { TYPE_LABELS, sessionType } from './app/sessionTypes.js';
 import { guideSheet } from './app/views/common.js';
-import { renderLog, renderNewSession, logSubtitle } from './app/views/log.js';
+import { renderLog, renderNewSession, logSubtitle, findActive, openFormSessions, startTimerTicker } from './app/views/log.js';
 import { renderDashboard } from './app/views/dashboard.js';
 import { renderInsights } from './app/views/insights.js';
 import { renderHistory } from './app/views/history.js';
@@ -113,9 +116,11 @@ function buildShell() {
   const toast = h('div', { class: 'toast-root', role: 'status', 'aria-live': 'polite' });
   // the test build (main-test, /test/) is marked on every screen so it is never mistaken for the real journal
   const envBadge = APP_ENV === 'test' ? h('div', { class: 'env-badge', 'aria-label': 'Test environment' }, 'TEST') : null;
-  const app = h('div', { class: ['app', APP_ENV === 'test' && 'env-test'] }, envBadge, header, banner, main, nav, overlay, toast);
+  // sessions still running, shown on every page above the bottom bar (see renderRunning)
+  const running = h('div', { class: 'running-bars' });
+  const app = h('div', { class: ['app', APP_ENV === 'test' && 'env-test'] }, envBadge, header, banner, main, running, nav, overlay, toast);
   document.getElementById('app').replaceChildren(app);
-  return { app, header, sub, main, banner, nav, tabButtons, overlay, toast };
+  return { app, header, sub, main, banner, running, nav, tabButtons, overlay, toast };
 }
 
 function renderNow({ scrollTop = false } = {}) {
@@ -145,6 +150,7 @@ function renderNow({ scrollTop = false } = {}) {
   shell.main.replaceChildren(result.content);
   if (scrollTop) shell.main.scrollTop = 0;
   renderBanners();
+  renderRunning();
 
   // overlays: the grading sheet comes from the view; the guide is global
   const st = ui.get();
@@ -162,7 +168,7 @@ function renderOverlay(overlay) {
   const returnFocus = !overlay && lastOverlayKey;
   lastOverlayKey = overlay ? overlay.key : null;
   overlayClose = overlay ? overlay.onClose : null;
-  for (const el of [shell.main, shell.nav, shell.banner]) el.inert = !!overlay;
+  for (const el of [shell.main, shell.nav, shell.banner, shell.running]) el.inert = !!overlay;
   shell.header.inert = !!overlay;
   if (!overlay) {
     shell.overlay.replaceChildren();
@@ -179,6 +185,62 @@ function renderOverlay(overlay) {
   shell.overlay.replaceChildren(backdrop, overlay.node);
   const first = overlay.node.querySelector('[data-autofocus]') || overlay.node.querySelector('button');
   if (first && (opened || !overlay.node.contains(document.activeElement))) first.focus({ preventScroll: true });
+}
+
+/**
+ * A strip per session still running (a scored session, or an open blank bale / strength / mental
+ * one), on every page except that session's own, so it can always be reopened.
+ */
+function renderRunning() {
+  const items = [];
+  const bar = ({ href, title, detail, timer, fk }) => {
+    const tm = timer || { running: false, startedAt: null, elapsedMs: 0 };
+    return h(
+      'a',
+      { class: ['running-bar', !tm.running && 'is-paused'], href, dataset: { fk } },
+      h('span', { class: 'running-dot', 'aria-hidden': 'true' }),
+      h('span', { class: 'running-text' }, h('span', { class: 'running-title' }, title), detail ? h('span', { class: 'running-detail' }, detail) : null),
+      h(
+        'span',
+        { class: 'timer-value running-time', dataset: { elapsed: String(tm.elapsedMs || 0), started: tm.running ? tm.startedAt : '' } },
+        L.formatClock(L.timerElapsed(tm)),
+      ),
+      h('span', { class: 'running-go' }, 'Continue', icons.forward()),
+    );
+  };
+  const active = findActive(repo);
+  if (active && route.name !== 'log') {
+    items.push(
+      bar({
+        href: '#/log',
+        title: `${TYPE_LABELS[sessionType(active)]} running`,
+        detail: `${active.distance} m · ${active.ends.length} ${active.ends.length === 1 ? 'end' : 'ends'}`,
+        timer: active.timer,
+        fk: 'running-log',
+      }),
+    );
+  }
+  for (const f of openFormSessions(repo.getSettings())) {
+    if (route.name === 'new' && route.params[0] === f.type) continue;
+    const arrows = f.draft?.arrows || 0;
+    items.push(
+      bar({
+        href: `#/new/${f.type}`,
+        title: `${TYPE_LABELS[f.type]} running`,
+        detail: f.type === 'blank' ? `${arrows} ${arrows === 1 ? 'arrow' : 'arrows'}` : null,
+        timer: f.timer,
+        fk: `running-${f.type}`,
+      }),
+    );
+  }
+  if (items.length) startTimerTicker();
+  // on the Dashboard, New session sits here too, under the running sessions
+  if (route.name === 'home') {
+    items.push(
+      h('div', { class: 'dock-new' }, h('a', { class: 'btn btn-primary btn-xl', href: '#/new', dataset: { fk: 'new-session' } }, icons.plus(), T.newSession)),
+    );
+  }
+  shell.running.replaceChildren(...items);
 }
 
 function renderBanners() {
@@ -218,10 +280,12 @@ const ctx = {
   repo,
   ui,
   rerender: () => renderNow(),
-  navigate: (path) => router.navigate(path),
+  navigate: (path, opts) => router.navigate(path, opts),
   toast,
   save: (name, record) => guard(() => repo.save(name, record)),
   remove: (name, id) => guard(() => (repo.remove(name, id), true)),
+  trash: (name, id) => guard(() => (repo.trash(name, id), true)),
+  restore: (name, id) => guard(() => (repo.restore(name, id), true)),
   saveSettings: (patch) => guard(() => repo.saveSettings(patch)),
   env: APP_ENV,
   sync: {
@@ -373,6 +437,12 @@ async function boot() {
     return;
   }
   seed();
+  // sessions in Recently deleted for longer than TRASH_DAYS are removed for good
+  try {
+    repo.purgeTrash('sessions', TRASH_DAYS * 24 * 3600 * 1000);
+  } catch (e) {
+    console.error(e);
+  }
   shell = buildShell();
   applyTheme();
   repo.subscribe((c) => {

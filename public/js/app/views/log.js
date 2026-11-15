@@ -23,11 +23,24 @@ import { card, chip, sectionLabel, gearPicker, gearCard, sessionDates } from './
 import { datePicker, timePicker } from './pickers.js';
 import { gearChoices, gearForChoice } from '../gearFields.js';
 import { faceSheet, faceViewBox } from './face.js';
-import { SESSION_TYPES, TYPE_LABELS, isScored, hourMinute } from '../sessionTypes.js';
+import { SESSION_TYPES, TYPE_LABELS, isScored, hourMinute, sessionType } from '../sessionTypes.js';
 import { emptyForm, formSections } from './sessionForms.js';
 
 export function findActive(repo) {
   return repo.list('sessions', { filter: (x) => x.status === 'active' })[0] || null;
+}
+
+/**
+ * Blank bale / strength / mental sessions open on this device (opened, not saved or discarded, and
+ * touched recently): their type, timer and kept draft.
+ */
+export function openFormSessions(settings, now = new Date()) {
+  const timers = settings.formTimers || {};
+  return SESSION_TYPES.filter((t) => !isScored(t) && t !== 'manual' && L.isFormTimerLive(timers[t], now)).map((t) => ({
+    type: t,
+    timer: timers[t],
+    draft: settings.formDrafts?.[t] || null,
+  }));
 }
 
 export function logSubtitle(repo) {
@@ -247,7 +260,7 @@ function renderSetup(ctx, type, active = null) {
       ...chosenGear(),
     });
     ctx.ui.quietSet({ setup: null });
-    if (ctx.save('sessions', session)) ctx.navigate('log');
+    if (ctx.save('sessions', session)) ctx.navigate('log', { replace: true });
   };
 
   const compField = (key, label, placeholder) =>
@@ -266,12 +279,20 @@ function renderSetup(ctx, type, active = null) {
     );
 
   // strength / mental: a form saved straight to History
+  // Timed forms keep their draft (e.g. the blank bale count) in this device's settings too, so it
+  // survives leaving the page or the app being closed; it is taken back while its timer is live.
+  const timedType = !isScored(type) && type !== 'manual';
+  const keptDraft = settings.formDrafts?.[type];
+  if (timedType && !setup.forms?.[type] && keptDraft && L.isFormTimerLive(settings.formTimers?.[type])) {
+    quiet({ forms: { ...setup.forms, [type]: keptDraft } });
+  }
   const form = setup.forms?.[type] || emptyForm(type);
   // the draft is read at call time: typing stores into `setup` without re-rendering
   const currentForm = () => setup.forms?.[type] || emptyForm(type);
   const changeForm = (update, { rerender = true } = {}) => {
     const cur = currentForm();
     const forms = { ...setup.forms, [type]: { ...cur, ...update(cur) } };
+    if (timedType) ctx.repo.saveSettings({ formDrafts: { ...(ctx.repo.getSettings().formDrafts || {}), [type]: forms[type] } });
     if (rerender) set({ forms });
     else quiet({ forms });
   };
@@ -280,7 +301,7 @@ function renderSetup(ctx, type, active = null) {
   const formTimers = settings.formTimers || {};
   // A timer left behind by a form that was opened but never saved starts again after some hours.
   // Manual sessions are typed in afterwards and have no timer.
-  const timed = !isScored(type) && type !== 'manual';
+  const timed = timedType;
   let formTimer = formTimers[type];
   if (timed) {
     const opened = L.openFormTimer(formTimer);
@@ -302,65 +323,58 @@ function renderSetup(ctx, type, active = null) {
 
   const formTimerRunning = () => !!(ctx.repo.getSettings().formTimers || {})[type]?.running;
 
-  // Blank bale shot now: the duration (from the timer, editable) and the note are asked on Save.
-  // The timer is paused while the dialog is open, and runs on again if it is cancelled.
-  const askBlankDetails = async () => {
-    const wasRunning = formTimerRunning();
+  // Save asks only OK / Cancel; the duration (from the timer) and the note are then edited on the
+  // session's History page, which opens next. The timer is paused while the question is open and
+  // runs on again if it is cancelled.
+  const confirmSave = async () => {
+    const wasRunning = timed && !past && formTimerRunning();
     if (wasRunning) toggleFormTimer();
     const fields = currentForm();
-    const minutesInput = h('input', {
-      class: 'input',
-      type: 'number',
-      inputmode: 'numeric',
-      min: 0,
-      max: 1440,
-      value: fields.minutes ?? timerMinutes() ?? '',
-      dataset: { fk: 'save-minutes' },
-    });
-    const noteInput = h('textarea', {
-      rows: 3,
-      class: 'review-text',
-      placeholder: 'What you worked on, how it felt…',
-      value: fields.note || '',
-      dataset: { fk: 'save-note' },
-    });
+    const minutes = fields.minutes ?? timerMinutes();
+    const facts = [
+      type === 'blank' || type === 'manual' ? `${fields.arrows || 0} ${fields.arrows === 1 ? 'arrow' : 'arrows'}` : null,
+      minutes != null ? `${minutes} min` : null,
+    ].filter(Boolean);
     const ok = await confirmDialog({
-      title: 'Save session',
-      message: `${fields.arrows || 0} ${fields.arrows === 1 ? 'arrow' : 'arrows'} at the blank bale.`,
-      confirmLabel: 'Save',
+      title: 'Save session?',
+      message: `${TYPE_LABELS[type]}${facts.length ? ` · ${facts.join(' · ')}` : ''}. The duration and a note can be changed on the next page.`,
+      confirmLabel: 'OK',
       icon: 'check',
-      body: [
-        h('label', { class: 'field' }, h('span', { class: 'field-label' }, 'Duration'), h('div', { class: 'input-suffix' }, minutesInput, h('span', { class: 'muted small' }, 'min'))),
-        h('label', { class: 'field' }, h('span', { class: 'field-label' }, 'Note'), noteInput),
-      ],
     });
-    if (!ok) {
-      if (wasRunning && !formTimerRunning()) toggleFormTimer();
-      return null;
-    }
-    const n = parseInt(minutesInput.value, 10);
-    return { minutes: Number.isFinite(n) && n >= 0 ? n : null, note: noteInput.value };
+    if (!ok && wasRunning && !formTimerRunning()) toggleFormTimer();
+    return ok;
+  };
+
+  // drop the open session without saving it: timer, kept draft and page draft
+  const discardForm = async () => {
+    const ok = await confirmDialog({
+      title: 'Discard session?',
+      message: `This ${TYPE_LABELS[type].toLowerCase()} session is not saved, and its timer stops.`,
+      confirmLabel: 'Discard',
+      danger: true,
+    });
+    if (!ok) return;
+    const { formTimers: all = {}, formDrafts = {} } = ctx.repo.getSettings();
+    ctx.repo.saveSettings({ formTimers: { ...all, [type]: null }, formDrafts: { ...formDrafts, [type]: null } });
+    ctx.ui.quietSet({ setup: { ...setup, when: null, forms: { ...setup.forms, [type]: null } } });
+    ctx.navigate('home', { replace: true });
   };
 
   const saveForm = async () => {
-    let fields = currentForm();
-    let minutes;
-    if (type === 'blank' && timed && !past) {
-      const details = await askBlankDetails();
-      if (!details) return;
-      fields = { ...fields, ...details };
-      minutes = details.minutes;
-    } else {
-      // minutes typed by hand win over the timer
-      minutes = fields.minutes ?? timerMinutes();
-    }
+    if (!(await confirmSave())) return;
+    const fields = currentForm();
+    // minutes typed by hand win over the timer
+    const minutes = fields.minutes ?? timerMinutes();
     const all = ctx.repo.getSettings().formTimers || {};
     const gear = type === 'mental' ? {} : chosenGear();
     const saved = ctx.save('sessions', { type, status: 'finished', ...fields, date: whenDate, time: whenTime, minutes, ...gear });
     if (!saved) return;
-    if (timed) ctx.repo.saveSettings({ formTimers: { ...all, [type]: null } });
+    if (timed) {
+      const { formDrafts = {} } = ctx.repo.getSettings();
+      ctx.repo.saveSettings({ formTimers: { ...all, [type]: null }, formDrafts: { ...formDrafts, [type]: null } });
+    }
     ctx.ui.quietSet({ setup: { ...setup, when: null, forms: { ...setup.forms, [type]: null } } });
-    ctx.navigate(`history/${saved.id}`);
+    ctx.navigate(`history/${saved.id}`, { replace: true });
   };
 
   const body = isScored(type)
@@ -446,6 +460,9 @@ function renderSetup(ctx, type, active = null) {
         }),
         gearSection,
         h('button', { type: 'button', class: 'btn btn-primary btn-xl', onClick: saveForm }, 'Save session'),
+        timed && !past
+          ? h('button', { type: 'button', class: 'btn btn-text danger', dataset: { fk: 'discard-form' }, onClick: discardForm }, 'Discard session')
+          : null,
       ];
 
   return {
@@ -530,7 +547,7 @@ function timerButton(timer = null, onToggle, { large = false } = {}) {
 
 /** One ticker for the whole app: refreshes every visible session timer once a second. */
 let ticker = null;
-function startTimerTicker() {
+export function startTimerTicker() {
   if (ticker) return;
   ticker = setInterval(() => {
     for (const el of document.querySelectorAll('.timer-value')) {
@@ -691,13 +708,29 @@ function renderActive(ctx, session) {
 
   const canSave = L.canSaveEnd(session);
   const canFinish = L.canFinish(session);
-  const finish = () => {
+  // Finish asks OK / Cancel first; the timer is paused meanwhile and runs on if it is cancelled
+  const finish = async () => {
+    const before = findActive(ctx.repo);
+    if (!before || !L.canFinish(before)) return;
+    const wasRunning = !!before.timer?.running;
+    if (wasRunning) update(ctx, (c) => L.pauseTimer(c));
+    const n = before.ends.length;
+    const ok = await confirmDialog({
+      title: 'Finish session?',
+      message: `${TYPE_LABELS[sessionType(before)]} · ${n} ${n === 1 ? 'end' : 'ends'} saved${L.canSaveEnd(before) ? ' (the unsaved end is dropped)' : ''}. The session opens in History.`,
+      confirmLabel: 'OK',
+      icon: 'check',
+    });
     const cur = findActive(ctx.repo);
+    if (!ok) {
+      if (wasRunning && cur && !cur.timer?.running) update(ctx, (c) => L.resumeTimer(c));
+      return;
+    }
     if (!cur || !L.canFinish(cur)) return;
     const done = L.finishSession(cur);
     if (ctx.save('sessions', done)) {
       ctx.sync?.now(); // put the finished session in Drive right away (no-op when sync is off)
-      ctx.navigate(`history/${done.id}`);
+      ctx.navigate(`history/${done.id}`, { replace: true });
     }
   };
   const discard = async () => {

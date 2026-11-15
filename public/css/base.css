@@ -2179,7 +2179,8 @@ button.saved-end {
   padding: 14px;
   border-radius: 14px;
   border: 0;
-  background: var(--ground);
+  background: var(--surface);
+  box-shadow: var(--shadow);
   color: var(--ink);
   text-align: left;
   font: inherit;
@@ -3411,6 +3412,8 @@ html.theme-switching * {
 
 /* blank bale: arrow count on the left, timer on the right, one row */
 .arrow-count-row {
+  /* the count and the timer digits share one size, so they read as one line */
+  --count-row-size: clamp(36px, 12vw, 48px);
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -3418,19 +3421,17 @@ html.theme-switching * {
 }
 
 .arrow-count-row .arrow-count-box {
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 0;
+  align-items: center;
   padding: 0;
 }
 
+/* the number fills the same 68px height as the timer pill beside it, centred on the same line */
 .arrow-count-row .arrow-count {
-  font-size: clamp(48px, 16vw, 64px);
-}
-
-.arrow-count-row .arrow-count-unit {
-  font-size: 14px;
-  padding-left: 4px;
+  display: flex;
+  align-items: center;
+  height: 68px;
+  font-size: var(--count-row-size);
+  line-height: 1;
 }
 
 .arrow-count-row .arrow-count-fly {
@@ -3442,7 +3443,7 @@ html.theme-switching * {
   padding: 0 clamp(12px, 4vw, 20px);
   border-radius: 34px;
   gap: 8px;
-  font-size: clamp(28px, 9.5vw, 38px);
+  font-size: var(--count-row-size);
   flex: 0 1 auto;
   min-width: 0;
 }
@@ -3463,4 +3464,201 @@ html.theme-switching * {
   gap: 12px;
   padding: 0 20px 16px;
   text-align: left;
+}
+
+/* blank bale row: the timer has no pill border; a big pause / play icon shows its state */
+.arrow-count-row .timer-btn.timer-btn-lg {
+  border: 0;
+  background: transparent;
+  padding-right: 0;
+}
+
+.arrow-count-row .timer-btn.timer-btn-lg svg {
+  width: 44px;
+  height: 44px;
+  color: var(--accent);
+}
+
+.arrow-count-row .timer-btn.timer-btn-lg.is-paused {
+  color: var(--muted);
+}
+
+/* ---------------------------------------------------------------- running sessions (above the bottom bar) */
+.running-bars {
+  flex: none;
+  display: flex;
+  flex-direction: column;
+}
+
+.running-bars:empty {
+  display: none;
+}
+
+.running-bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 52px;
+  padding: 8px 16px;
+  background: var(--accent);
+  color: var(--on-accent);
+  text-decoration: none;
+  border-top: 1px solid color-mix(in srgb, var(--on-accent) 18%, transparent);
+  animation: running-in 200ms ease-out;
+}
+
+@keyframes running-in {
+  from {
+    transform: translateY(8px);
+    opacity: 0;
+  }
+}
+
+.running-dot {
+  width: 10px;
+  height: 10px;
+  flex: none;
+  border-radius: 50%;
+  background: currentColor;
+  animation: running-pulse 1.4s ease-in-out infinite;
+}
+
+.running-bar.is-paused .running-dot {
+  animation: none;
+  opacity: 0.5;
+}
+
+@keyframes running-pulse {
+  50% {
+    opacity: 0.25;
+    transform: scale(0.75);
+  }
+}
+
+.running-text {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  line-height: 1.2;
+}
+
+.running-title {
+  font-weight: 700;
+  font-size: 15px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.running-detail {
+  font-size: 12px;
+  opacity: 0.8;
+}
+
+.running-time {
+  font-family: var(--font-display);
+  font-size: 20px;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+
+.running-go {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.running-go svg {
+  width: 18px;
+  height: 18px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .running-bar,
+  .running-dot {
+    animation: none;
+  }
+}
+
+/* the count is a button (tap to type the number) */
+button.arrow-count {
+  border: 0;
+  background: transparent;
+  padding: 0 4px;
+  border-radius: 12px;
+  cursor: text;
+}
+
+button.arrow-count:hover {
+  background: var(--subtle);
+}
+
+.arrow-count-input.input {
+  width: 6ch;
+  height: 68px;
+  font-family: var(--font-display);
+  font-size: 40px;
+  font-weight: 800;
+  text-align: center;
+}
+
+
+/* Dashboard: New session docked above the tab bar */
+.dock-new {
+  padding: 10px 16px;
+  background: var(--surface);
+  border-top: 1px solid var(--divider);
+}
+
+.dock-new .btn {
+  width: 100%;
+}
+
+/* Dashboard tiles sit straight on the page (no card behind them), like every other card */
+.card.hub-card {
+  background: transparent;
+  box-shadow: none;
+  padding: 0;
+}
+
+/* dark: the header is a panel like the tab bar (in light mode it stays the dark brand bar) */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) .app-header {
+    background: var(--surface);
+    border-bottom: 1px solid var(--divider);
+  }
+}
+
+:root[data-theme='dark'] .app-header {
+  background: var(--surface);
+  border-bottom: 1px solid var(--divider);
+}
+
+/* History → Recently deleted */
+.trash-link {
+  align-self: center;
+  gap: 8px;
+  color: var(--muted);
+}
+
+/* History → a session: back button alone on the right, then the title card */
+.detail-top {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.detail-head {
+  gap: 4px;
+}
+
+.card-title.detail-title {
+  font-size: 20px;
+}
+
+.detail-when {
+  font-weight: 600;
+  color: var(--ink-2);
 }

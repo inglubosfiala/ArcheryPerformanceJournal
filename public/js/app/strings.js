@@ -74,7 +74,7 @@ export const T = {
   reviewHowPh: 'Drills, cues, a plan for the next session…',
   ends: 'Ends',
   deleteSession: 'Delete session',
-  confirmDeleteSession: 'Delete this session permanently? This cannot be undone.',
+  confirmDeleteSession: 'It moves to Recently deleted, where you can restore it for 7 days.',
   equipment: 'Equipment',
   snapshots: 'Setup snapshots',
   snapshotName: 'Snapshot name',

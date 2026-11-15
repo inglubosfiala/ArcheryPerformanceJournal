@@ -10,6 +10,7 @@ import { VB, faceRings, faceSheet, faceViewBox } from './face.js';
 import { TYPE_LABELS, isScored, sessionType, formSummary, newestFirst } from '../sessionTypes.js';
 import { formSections } from './sessionForms.js';
 import { formatDuration } from '../sessionLogic.js';
+import { TRASH_DAYS } from '../../config.js';
 
 const finished = (repo) =>
   repo.list('sessions', {
@@ -19,6 +20,7 @@ const finished = (repo) =>
 
 export function renderHistory(ctx, params) {
   const id = params[0];
+  if (id === 'deleted') return renderTrash(ctx);
   if (id) {
     const session = ctx.repo.get('sessions', id);
     if (session && session.status === 'finished') return renderDetail(ctx, session);
@@ -47,6 +49,7 @@ function formListCard(ss) {
 
 function renderList(ctx) {
   const sessions = finished(ctx.repo);
+  const binned = ctx.repo.listTrash('sessions').length;
   return {
     content: h(
       'div',
@@ -98,8 +101,27 @@ function renderList(ctx) {
           );
         }),
       ),
+      binned
+        ? h('a', { class: 'btn btn-text trash-link', href: '#/history/deleted', dataset: { fk: 'trash-link' } }, icons.trash(), `Recently deleted (${binned})`)
+        : null,
     ),
   };
+}
+
+/**
+ * Top of a session's page: the back button alone on the right, then a card with the session type
+ * as its title and the date / time (and, for scored sessions, the setup line) under it.
+ */
+function detailHeader(ss, detail) {
+  return [
+    h('div', { class: 'detail-top' }, h('a', { class: 'icon-btn', href: '#/history', 'aria-label': T.backToLog }, icons.back())),
+    card(
+      { class: 'detail-head', 'aria-labelledby': 'detail-title' },
+      h('h1', { class: 'card-title detail-title', id: 'detail-title' }, `${TYPE_LABELS[sessionType(ss)]} session`),
+      h('div', { class: 'detail-when' }, formatDate(ss.date, { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }), ss.time ? ` · ${ss.time}` : ''),
+      detail ? h('div', { class: 'muted small' }, detail) : null,
+    ),
+  ];
 }
 
 /** Strength / mental session: its form (editable, saved as you go), the review and delete. */
@@ -111,24 +133,15 @@ function renderFormDetail(ctx, ss) {
   const del = async () => {
     const ok = await confirmDialog({ title: 'Delete session?', message: T.confirmDeleteSession, confirmLabel: T.delete, danger: true });
     if (!ok) return;
-    ctx.remove('sessions', ss.id);
-    ctx.navigate('history');
+    if (!ctx.trash('sessions', ss.id)) return;
+    ctx.toast('Moved to Recently deleted.');
+    ctx.navigate('history', { replace: true });
   };
   return {
     content: h(
       'div',
       { class: 'stack' },
-      h(
-        'div',
-        { class: 'row align-center' },
-        h('a', { class: 'icon-btn', href: '#/history', 'aria-label': T.backToLog }, icons.back()),
-        h(
-          'div',
-          { class: 'grow' },
-          h('h1', { class: 'page-title sm' }, formatDate(ss.date, { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }), ss.time ? ` · ${ss.time}` : ''),
-          h('div', { class: 'muted small' }, `${TYPE_LABELS[ss.type]} session`),
-        ),
-      ),
+      ...detailHeader(ss, null),
       card({ class: 'setup-card', 'aria-label': `${TYPE_LABELS[ss.type]} session` }, formSections(ss.type, ss, change)),
       whenCard(ctx, ss),
       ss.type === 'mental' ? null : gearCard(ctx, ss),
@@ -184,24 +197,18 @@ function renderDetail(ctx, ss) {
   const del = async () => {
     const ok = await confirmDialog({ title: 'Delete session?', message: T.confirmDeleteSession, confirmLabel: T.delete, danger: true });
     if (!ok) return;
-    ctx.remove('sessions', ss.id);
-    ctx.navigate('history');
+    if (!ctx.trash('sessions', ss.id)) return;
+    ctx.toast('Moved to Recently deleted.');
+    ctx.navigate('history', { replace: true });
   };
 
   return {
     content: h(
       'div',
       { class: 'stack' },
-      h(
-        'div',
-        { class: 'row align-center' },
-        h('a', { class: 'icon-btn', href: '#/history', 'aria-label': T.backToLog }, icons.back()),
-        h(
-          'div',
-          { class: 'grow' },
-          h('h1', { class: 'page-title sm' }, formatDate(ss.date, { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }), ss.time ? ` · ${ss.time}` : ''),
-          h('div', { class: 'muted small' }, `${TYPE_LABELS[sessionType(ss)]} · ${ss.distance} m · ${faceLabel(ss.face)} · ${st.arrows} arrows${ss.minutes != null ? ` · ${formatDuration(ss.minutes)}` : ''}${snapshot ? ` · ${snapshot.name}` : ''}`),
-        ),
+      ...detailHeader(
+        ss,
+        `${ss.distance} m · ${faceLabel(ss.face)} · ${st.arrows} arrows${ss.minutes != null ? ` · ${formatDuration(ss.minutes)}` : ''}${snapshot ? ` · ${snapshot.name}` : ''}`,
       ),
       h(
         'dl',
@@ -372,4 +379,75 @@ function groupFace({ viewBox, face, points, centres, label }) {
       ),
     ),
   );
+}
+
+/** Recently deleted: sessions kept TRASH_DAYS after Delete, to restore or delete for good. */
+function renderTrash(ctx) {
+  const items = ctx.repo.listTrash('sessions');
+  const DAY = 24 * 3600 * 1000;
+  const left = (ss) => {
+    const days = Math.max(0, Math.ceil((Date.parse(ss.trashedAt) + TRASH_DAYS * DAY - Date.now()) / DAY));
+    return days <= 1 ? 'Removed within a day' : `Removed in ${days} days`;
+  };
+  const summary = (ss) =>
+    isScored(ss.type)
+      ? `${ss.distance} m · ${faceLabel(ss.face)} · ${ss.ends.length} ends · ${computeStats(ss.ends).total} points`
+      : formSummary(ss) || '—';
+  const restore = (ss) => {
+    if (!ctx.restore('sessions', ss.id)) return;
+    ctx.toast('Session restored.');
+    ctx.rerender();
+  };
+  const purge = async (ss) => {
+    const ok = await confirmDialog({
+      title: 'Delete for good?',
+      message: 'The session is removed permanently. This cannot be undone.',
+      confirmLabel: T.delete,
+      danger: true,
+    });
+    if (!ok) return;
+    ctx.remove('sessions', ss.id);
+    ctx.rerender();
+  };
+  return {
+    content: h(
+      'div',
+      { class: 'stack' },
+      h(
+        'div',
+        { class: 'row align-center' },
+        h('a', { class: 'icon-btn', href: '#/history', 'aria-label': 'Back to history' }, icons.back()),
+        h('h1', { class: 'page-title sm grow' }, 'Recently deleted'),
+      ),
+      h('p', { class: 'muted small' }, `Deleted sessions are kept here for ${TRASH_DAYS} days, then removed for good.`),
+      items.length ? null : card(null, h('p', { class: 'muted' }, 'Nothing here.')),
+      h(
+        'ul',
+        { class: 'plain-list stack-sm' },
+        items.map((ss) =>
+          h(
+            'li',
+            null,
+            card(
+              { class: 'trash-card' },
+              h(
+                'div',
+                { class: 'spread' },
+                h('strong', null, formatDate(ss.date, { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' }), ss.time ? ` · ${ss.time}` : ''),
+                typeBadge(ss),
+              ),
+              h('div', { class: 'muted small' }, summary(ss)),
+              h('div', { class: 'muted xsmall' }, left(ss)),
+              h(
+                'div',
+                { class: 'row' },
+                h('button', { type: 'button', class: 'btn btn-primary grow-1', dataset: { fk: `restore-${ss.id}` }, onClick: () => restore(ss) }, 'Restore'),
+                h('button', { type: 'button', class: 'btn btn-text danger', onClick: () => purge(ss) }, 'Delete now'),
+              ),
+            ),
+          ),
+        ),
+      ),
+    ),
+  };
 }
