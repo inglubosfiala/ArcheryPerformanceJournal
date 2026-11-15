@@ -19,6 +19,9 @@ export const STORAGE_KEY = APP_ENV === 'test' ? 'apj-test.v1' : 'apj.v1';
 // The page where people can tip the author (Ko-fi, Buy Me a Coffee, PayPal.Me). Empty = no support card
 // in Settings. The landing page (public/welcome/index.html) has its own copy of the link.
 export const SUPPORT_URL = 'https://ko-fi.com/archeryjournal';
+// QR code of SUPPORT_URL, shown under the button so someone else can scan it. Regenerate it when the
+// link changes; empty = no QR code.
+export const SUPPORT_QR = './icons/support-qr.svg';
 
 // ---------------------------------------------------------------- Google Drive sync (optional)
 // OAuth client ID of type "Web application" from Google Cloud (public, no secret). Empty = sync hidden.

@@ -16,4 +16,11 @@ describe('Settings support card', () => {
     expect(link.textContent).toContain('Buy me a coffee');
     expect(node.textContent).toContain('Support the journal');
   });
+
+  it('shows the QR code of the support page when there is one', () => {
+    const img = supportCard('https://ko-fi.com/example', './icons/qr.svg').querySelector('.support-qr img');
+    expect(img.getAttribute('src')).toBe('./icons/qr.svg');
+    expect(img.alt).toBeTruthy();
+    expect(supportCard('https://ko-fi.com/example', '').querySelector('.support-qr')).toBeNull();
+  });
 });

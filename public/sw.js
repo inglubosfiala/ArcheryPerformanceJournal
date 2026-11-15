@@ -23,6 +23,7 @@ const SHELL = [
   './fonts/inter-latin-700-normal.woff2',
   './fonts/inter-latin-ext-700-normal.woff2',
   './icons/icon.svg',
+  './icons/support-qr.svg',
   './icons/icon-192.png',
   './icons/icon-512.png',
   './icons/maskable-512.png',

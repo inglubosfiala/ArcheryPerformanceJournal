@@ -3,7 +3,7 @@
 import { h } from '../../core/dom.js';
 import * as APL from '../../ui/apl/index.js';
 import { confirmDialog } from './confirm.js';
-import { APP_VERSION, SUPPORT_URL } from '../../config.js';
+import { APP_VERSION, SUPPORT_URL, SUPPORT_QR } from '../../config.js';
 import { exportBackup, parseBackup } from '../../backup/backup.js';
 import { checkForUpdate, storageInfo } from '../../pwa/updates.js';
 import { card } from './common.js';
@@ -238,10 +238,11 @@ export function renderSettings(ctx) {
 // ---------------------------------------------------------------- Support
 
 /**
- * The "Support the journal" card: a link that opens the tip page in the browser. Nothing when no
- * link is set. The app stays free; this is only an offer.
+ * The "Support the journal" card: a link that opens the tip page in the browser and, when there is
+ * one, a QR code of that page for another phone to scan. Nothing when no link is set. The app stays
+ * free; this is only an offer.
  */
-export function supportCard(url = SUPPORT_URL) {
+export function supportCard(url = SUPPORT_URL, qr = SUPPORT_QR) {
   if (!url) return null;
   return sectionCard('set-support', 'Support the journal', [
     caption(
@@ -258,6 +259,14 @@ export function supportCard(url = SUPPORT_URL) {
       },
       '☕ Buy me a coffee',
     ),
+    qr
+      ? h(
+          'figure',
+          { class: 'support-qr' },
+          h('img', { src: qr, alt: 'QR code of the support page', width: 180, height: 180 }),
+          h('figcaption', { class: 'apl-cap13' }, 'Or let a friend scan this to tip from their phone.'),
+        )
+      : null,
   ]);
 }
 
