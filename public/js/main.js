@@ -28,8 +28,9 @@ import { icons } from './app/icons.js';
 import * as L from './app/sessionLogic.js';
 import { TYPE_LABELS, sessionType } from './app/sessionTypes.js';
 import { guideSheet } from './app/views/common.js';
-import { renderLog, renderNewSession, logSubtitle, askAboutRunningSession, openFormSessions, startTimerTicker } from './app/views/log.js';
+import { renderLog, renderNewSession, logSubtitle, askAboutRunningSession, askAboutOpenFormSession, startTimerTicker } from './app/views/log.js';
 import { createRunningSession } from './app/runningSession.js';
+import { createOpenFormSessions } from './app/openFormSession.js';
 import { renderDashboard } from './app/views/dashboard.js';
 import { renderInsights } from './app/views/insights.js';
 import { renderHistory } from './app/views/history.js';
@@ -221,7 +222,7 @@ function renderRunning() {
       }),
     );
   }
-  for (const f of openFormSessions(repo.getSettings())) {
+  for (const f of ctx.openForms.list()) {
     if (route.name === 'new' && route.params[0] === f.type) continue;
     const arrows = f.draft?.arrows || 0;
     items.push(
@@ -310,6 +311,14 @@ ctx.running = createRunningSession({
   saveSettings: ctx.saveSettings,
   confirm: askAboutRunningSession,
   requestSync: () => ctx.sync.now(), // a finished session goes to Drive right away (no-op when sync is off)
+  onChange: () => ctx.rerender(),
+});
+// the open form sessions (blank bale / strength / mental): timer, kept draft, saving and discarding
+ctx.openForms = createOpenFormSessions({
+  repo,
+  save: ctx.save,
+  saveSettings: ctx.saveSettings,
+  confirm: askAboutOpenFormSession,
   onChange: () => ctx.rerender(),
 });
 

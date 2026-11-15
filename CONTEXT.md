@@ -19,6 +19,9 @@ _Avoid_: Arrow session
 **Form session**:
 A blank bale, strength, mental or manual session, recorded on a form instead of arrow by arrow.
 
+**Open form session**:
+A form session that has been opened and not yet saved or discarded; its timer and draft are kept on the device.
+
 **Running session**:
 The one scored session in progress. Only one runs at a time; it ends by being finished or discarded.
 _Avoid_: Active session, session in progress, current session

@@ -56,16 +56,31 @@ export function askAboutRunningSession(q) {
 }
 
 /**
- * Blank bale / strength / mental sessions open on this device (opened, not saved or discarded, and
- * touched recently): their type, timer and kept draft.
+ * The open form session's questions to the archer, as dialogs (the `confirm` adapter of
+ * openFormSession.js).
  */
-export function openFormSessions(settings, now = new Date()) {
-  const timers = settings.formTimers || {};
-  return SESSION_TYPES.filter((t) => !isScored(t) && t !== 'manual' && L.isFormTimerLive(timers[t], now)).map((t) => ({
-    type: t,
-    timer: timers[t],
-    draft: settings.formDrafts?.[t] || null,
-  }));
+export function askAboutOpenFormSession(q) {
+  if (q.kind === 'save') {
+    // Save asks only OK / Cancel; the duration (from the timer) and the note are then edited on the
+    // session's History page, which opens next.
+    const { type, fields, minutes } = q;
+    const facts = [
+      type === 'blank' || type === 'manual' ? `${fields.arrows || 0} ${fields.arrows === 1 ? 'arrow' : 'arrows'}` : null,
+      minutes != null ? `${minutes} min` : null,
+    ].filter(Boolean);
+    return confirmDialog({
+      title: 'Save session?',
+      message: `${TYPE_LABELS[type]}${facts.length ? ` · ${facts.join(' · ')}` : ''}. The duration and a note can be changed on the next page.`,
+      confirmLabel: 'OK',
+      icon: 'check',
+    });
+  }
+  return confirmDialog({
+    title: 'Discard session?',
+    message: `This ${TYPE_LABELS[q.type].toLowerCase()} session is not saved, and its timer stops.`,
+    confirmLabel: 'Discard',
+    danger: true,
+  });
 }
 
 export function logSubtitle(a) {
@@ -280,103 +295,48 @@ function renderSetup(ctx, type, active = null) {
       }),
     );
 
-  // strength / mental: a form saved straight to History
-  // Timed forms keep their draft (e.g. the blank bale count) in this device's settings too, so it
-  // survives leaving the page or the app being closed; it is taken back while its timer is live.
-  const timedType = !isScored(type) && type !== 'manual';
-  const keptDraft = settings.formDrafts?.[type];
-  if (timedType && !setup.forms?.[type] && keptDraft && L.isFormTimerLive(settings.formTimers?.[type])) {
-    quiet({ forms: { ...setup.forms, [type]: keptDraft } });
-  }
+  // Form sessions (blank bale / strength / mental / manual): a form saved straight to History.
+  // The open form session (openFormSession.js) owns the timer, the kept draft, saving and
+  // discarding; this page holds the draft being typed and forwards the events.
+  // Opening gives a timed form its timer and, when the page has no draft yet, the kept one.
+  const opened = ctx.openForms.open(type, setup.forms?.[type] || null);
+  if (opened.draft && !setup.forms?.[type]) quiet({ forms: { ...setup.forms, [type]: opened.draft } });
+  const { timed, timer: formTimer } = opened;
   const form = setup.forms?.[type] || emptyForm(type);
   // the draft is read at call time: typing stores into `setup` without re-rendering
   const currentForm = () => setup.forms?.[type] || emptyForm(type);
   const changeForm = (update, { rerender = true } = {}) => {
     const cur = currentForm();
     const forms = { ...setup.forms, [type]: { ...cur, ...update(cur) } };
-    if (timedType) ctx.repo.saveSettings({ formDrafts: { ...(ctx.repo.getSettings().formDrafts || {}), [type]: forms[type] } });
+    ctx.openForms.keepDraft(type, forms[type]);
     if (rerender) set({ forms });
     else quiet({ forms });
   };
-  // Blank bale / strength / mental: a timer starts when the form opens. It is kept in this device's
-  // settings (not synced), so it survives the app being closed, and fills in the duration on save.
-  const formTimers = settings.formTimers || {};
-  // A timer left behind by a form that was opened but never saved starts again after some hours.
-  // Manual sessions are typed in afterwards and have no timer.
-  const timed = timedType;
-  let formTimer = formTimers[type];
-  if (timed) {
-    const opened = L.openFormTimer(formTimer);
-    if (opened !== formTimer) ctx.repo.saveSettings({ formTimers: { ...formTimers, [type]: opened } });
-    formTimer = opened;
-  }
   const toggleFormTimer = () => {
-    const all = ctx.repo.getSettings().formTimers || {};
-    const cur = { timer: all[type] };
-    const next = cur.timer?.running ? L.pauseTimer(cur) : L.resumeTimer(cur);
-    ctx.saveSettings({ formTimers: { ...all, [type]: { ...next.timer, touchedAt: new Date().toISOString() } } });
+    ctx.openForms.toggleTimer(type);
     ctx.rerender();
   };
+  // the form session is over: the page's draft goes too
+  const dropPageDraft = () => ctx.ui.quietSet({ setup: { ...setup, when: null, forms: { ...setup.forms, [type]: null } } });
 
-  const timerMinutes = () => {
-    const all = ctx.repo.getSettings().formTimers || {};
-    return timed && !past && all[type] ? Math.round(L.timerElapsed(all[type]) / 60000) : null;
-  };
-
-  const formTimerRunning = () => !!(ctx.repo.getSettings().formTimers || {})[type]?.running;
-
-  // Save asks only OK / Cancel; the duration (from the timer) and the note are then edited on the
-  // session's History page, which opens next. The timer is paused while the question is open and
-  // runs on again if it is cancelled.
-  const confirmSave = async () => {
-    const wasRunning = timed && !past && formTimerRunning();
-    if (wasRunning) toggleFormTimer();
-    const fields = currentForm();
-    const minutes = fields.minutes ?? timerMinutes();
-    const facts = [
-      type === 'blank' || type === 'manual' ? `${fields.arrows || 0} ${fields.arrows === 1 ? 'arrow' : 'arrows'}` : null,
-      minutes != null ? `${minutes} min` : null,
-    ].filter(Boolean);
-    const ok = await confirmDialog({
-      title: 'Save session?',
-      message: `${TYPE_LABELS[type]}${facts.length ? ` · ${facts.join(' · ')}` : ''}. The duration and a note can be changed on the next page.`,
-      confirmLabel: 'OK',
-      icon: 'check',
-    });
-    if (!ok && wasRunning && !formTimerRunning()) toggleFormTimer();
-    return ok;
-  };
-
-  // drop the open session without saving it: timer, kept draft and page draft
   const discardForm = async () => {
-    const ok = await confirmDialog({
-      title: 'Discard session?',
-      message: `This ${TYPE_LABELS[type].toLowerCase()} session is not saved, and its timer stops.`,
-      confirmLabel: 'Discard',
-      danger: true,
-    });
-    if (!ok) return;
-    const { formTimers: all = {}, formDrafts = {} } = ctx.repo.getSettings();
-    ctx.repo.saveSettings({ formTimers: { ...all, [type]: null }, formDrafts: { ...formDrafts, [type]: null } });
-    ctx.ui.quietSet({ setup: { ...setup, when: null, forms: { ...setup.forms, [type]: null } } });
+    const res = await ctx.openForms.discard(type);
+    if (res.status !== 'discarded') return;
+    dropPageDraft();
     ctx.navigate('home', { replace: true });
   };
 
   const saveForm = async () => {
-    if (!(await confirmSave())) return;
-    const fields = currentForm();
-    // minutes typed by hand win over the timer
-    const minutes = fields.minutes ?? timerMinutes();
-    const all = ctx.repo.getSettings().formTimers || {};
-    const gear = type === 'mental' ? {} : chosenGear();
-    const saved = ctx.save('sessions', { type, status: 'finished', ...fields, date: whenDate, time: whenTime, minutes, ...gear });
-    if (!saved) return;
-    if (timed) {
-      const { formDrafts = {} } = ctx.repo.getSettings();
-      ctx.repo.saveSettings({ formTimers: { ...all, [type]: null }, formDrafts: { ...formDrafts, [type]: null } });
-    }
-    ctx.ui.quietSet({ setup: { ...setup, when: null, forms: { ...setup.forms, [type]: null } } });
-    ctx.navigate(`history/${saved.id}`, { replace: true });
+    const res = await ctx.openForms.save(type, {
+      fields: currentForm(),
+      date: whenDate,
+      time: whenTime,
+      past,
+      gear: type === 'mental' ? {} : chosenGear(),
+    });
+    if (res.status !== 'saved') return;
+    dropPageDraft();
+    ctx.navigate(`history/${res.session.id}`, { replace: true });
   };
 
   const body = isScored(type)
