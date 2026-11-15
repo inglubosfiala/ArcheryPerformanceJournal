@@ -13,7 +13,6 @@ import {
   locateOnSheet,
   sheetPoint,
   isMultiSpot,
-  isSpotFace,
   spotCentres,
   zoneOf,
 } from '../scoring.js';
@@ -25,11 +24,12 @@ import { card, chip, sectionLabel, gearPicker, gearCard, sessionDates, backBar }
 import { datePicker, timePicker } from './pickers.js';
 import { gearChoices, gearForChoice } from '../gearFields.js';
 import { faceSheet, faceViewBox, VB } from './face.js';
-import { SESSION_TYPES, TYPE_LABELS, isScored, hourMinute, sessionType } from '../sessionTypes.js';
+import { SESSION_TYPES, TYPE_LABELS, isScored, hourMinute, sessionType, setupSummary, emptyCompetition } from '../sessionTypes.js';
 import { emptyForm, formSections } from './sessionForms.js';
 import { detectArrows } from '../photoDetect.js';
-import { arrowMarkLayout, drawArrowMarks, liveScan } from './liveScan.js';
-import { PREVIEW_MARGIN, CLOSE_UP_MARGIN, spotsBox, isCloseUp, keepCloseUp, resultOnCrop, moveArrow } from '../scanGeometry.js';
+import { drawArrowMarks, liveScan } from './liveScan.js';
+import { PREVIEW_MARGIN, spotsBox, resultOnCrop } from '../scanGeometry.js';
+import { PHOTO_MAX, canScan, createScan } from '../scan.js';
 
 /**
  * The running session's questions to the archer, as dialogs (the `confirm` adapter of
@@ -85,7 +85,7 @@ export function askAboutOpenFormSession(q) {
 
 export function logSubtitle(a) {
   return a
-    ? `${a.type === 'competition' ? 'Competition · ' : ''}${a.distance} m · ${faceLabel(a.face)} · ${a.arrowsPerEnd} arrows/end`
+    ? `${a.type === 'competition' ? 'Competition · ' : ''}${setupSummary(a, `${a.arrowsPerEnd} arrows/end`)}`
     : T.sub.logIdle;
 }
 
@@ -167,7 +167,7 @@ function renderSetup(ctx, type, active = null) {
     distance: last.distance,
     face: SETUP_FACES.includes(last.face) ? last.face : '40t',
     arrowsPerEnd: DEFAULT_ARROWS_PER_END,
-    competition: { event: '', round: '', conditions: '' },
+    competition: emptyCompetition(),
   };
   const set = (patch) => ctx.ui.set({ setup: { ...setup, ...patch } });
   // typing in a text field stores the draft without re-rendering, so the field keeps focus
@@ -272,7 +272,7 @@ function renderSetup(ctx, type, active = null) {
       distance,
       face,
       arrowsPerEnd,
-      competition: type === 'competition' ? { ...setup.competition, placement: '' } : null,
+      competition: type === 'competition' ? { ...emptyCompetition(), ...setup.competition } : null,
       ...chosenGear(),
     });
     if (res.status === 'cancelled') return;
@@ -440,7 +440,7 @@ function renderSetup(ctx, type, active = null) {
             h(
               'span',
               null,
-              T.inProgress(`${active.distance} m · ${faceLabel(active.face)}`, active.ends.length),
+              T.inProgress(setupSummary(active), active.ends.length),
             ),
             h('a', { class: 'btn btn-primary btn-sm', href: '#/log' }, T.continueSession),
           )
@@ -792,14 +792,12 @@ function renderActive(ctx, session) {
   };
 }
 
-// ---------------------------------------------------------------- arrows from a photo
-
-const PHOTO_MAX = 640; // the photo is scaled down to this many pixels on its long side before detection
+// ---------------------------------------------------------------- the Scan
 
 /**
  * Camera button: scan the target with the live camera (or take / pick a photo from there); arrows
- * found fill the empty slots of the end after a preview. Best effort: wrong ones are dragged on
- * the face afterwards. Pictures are only used in memory and are never stored.
+ * found fill the end after a preview. Best effort: wrong ones are dragged on the picture
+ * afterwards. Pictures are only used in memory and are never stored.
  */
 function photoButton(ctx, session) {
   return h(
@@ -809,37 +807,37 @@ function photoButton(ctx, session) {
       class: 'btn btn-outline end-step-btn',
       'aria-label': 'Score arrows with the camera',
       dataset: { fk: 'photo' },
-      disabled: L.viewIndex(session) !== session.ends.length,
-      onClick: () => scoreLive(ctx),
+      disabled: !canScan(session),
+      onClick: () => scanTarget(ctx),
     },
     icons.camera(),
     'Scan',
   );
 }
 
-/** What a scan needs from the running session (it reads the whole end anew), or null without one. */
-function scanContext(ctx) {
-  return ctx.running.scanRoom();
-}
-
-/** Live camera: the result locks by itself (or Take now); Cancel in the preview goes back to the camera. */
-async function scoreLive(ctx) {
-  // Scan on a full end means "the next end": the full one is saved, a new end starts and the
-  // camera opens for it. On an end with room the scan reads that end anew (and replaces it).
-  const session = ctx.running.get();
-  if (session && session.view == null && L.shownEnd(session).arrows.every((a) => a.v != null)) update(ctx, L.nextEnd);
-  for (;;) {
-    const sc = scanContext(ctx);
-    if (!sc) return;
-    const got = await liveScan({ face: sc.face, maxArrows: sc.empty, spotHint: sc.spotHint });
-    if (!got) return;
-    if (got.file) {
-      await scoreFromPhoto(ctx, got.file);
-      return;
-    }
-    const shown = cropToSpots(got.canvas, got.res);
-    if (await previewAndApply(ctx, shown.canvas, shown.res, sc, { cancelLabel: 'Back to camera' })) return;
-  }
+/**
+ * Scan the target into the shown end. The sequence (a full end first, the two looks at a photo,
+ * the found arrows, Use) is scan.js's; this page lends it the camera, the photo, the detector and
+ * the preview dialog.
+ */
+async function scanTarget(ctx) {
+  const scan = createScan({
+    running: ctx.running,
+    // the live camera locks by itself (or Take now); its frame is previewed cut to the sheet
+    camera: async (room) => {
+      const got = await liveScan({ face: room.face, maxArrows: room.empty, spotHint: room.spotHint });
+      return got && !got.file ? cropToSpots(got.canvas, got.res) : got;
+    },
+    openPhoto,
+    detect: (canvas, room) =>
+      detectArrows(canvas.getContext('2d').getImageData(0, 0, canvas.width, canvas.height), room.face, room.empty, { spotHint: room.spotHint }),
+    preview: ({ found, picture, again }) => previewFound(picture, found, { cancelLabel: again ? 'Back to camera' : 'Cancel' }),
+    onChange: () => ctx.rerender(),
+  });
+  const res = await scan.start();
+  if (res.status === 'used') ctx.rerender();
+  else if (res.status === 'unreadable') ctx.toast('Could not open the photo.');
+  else if (res.status === 'no-target') ctx.toast(res.error);
 }
 
 /**
@@ -855,96 +853,62 @@ function cropToSpots(source, res) {
   canvas.width = Math.round(w * k);
   canvas.height = Math.round(hgt * k);
   canvas.getContext('2d').drawImage(source, box.x, box.y, w, hgt, 0, 0, canvas.width, canvas.height);
-  return { canvas, res: resultOnCrop(res, box, k) };
+  return { picture: canvas, res: resultOnCrop(res, box, k) };
 }
 
-async function scoreFromPhoto(ctx, file) {
-  const sc = scanContext(ctx);
-  if (!sc) return;
-  const { face, empty, spotHint } = sc;
+/** A photo opened for the Scan: a part of it is drawn on a canvas of its own (see createScan). */
+async function openPhoto(file) {
   let bitmap;
   try {
     bitmap = await createImageBitmap(file);
   } catch {
-    ctx.toast('Could not open the photo.');
-    return;
+    return null;
   }
-  const k = Math.min(1, PHOTO_MAX / Math.max(bitmap.width, bitmap.height));
-  const canvas = h('canvas', { class: 'photo-preview' });
-  canvas.width = Math.round(bitmap.width * k);
-  canvas.height = Math.round(bitmap.height * k);
-  const g = canvas.getContext('2d', { willReadFrequently: true });
-  g.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
-  let res = detectArrows(g.getImageData(0, 0, canvas.width, canvas.height), face, empty, { spotHint });
-  if (res.error) {
-    bitmap.close();
-    ctx.toast(res.error);
-    return;
-  }
-  // Second look, at just the sheet: the box around the spots is taken from the full-size photo, so
-  // the same number of analysed pixels shows the target in much more detail. Kept when it finds
-  // the face again.
-  const whole = { x: 0, y: 0, w: bitmap.width, h: bitmap.height };
-  const box = spotsBox(res.spots, { margin: CLOSE_UP_MARGIN, bounds: whole, scale: k });
-  if (isCloseUp(box, whole)) {
-    const k2 = Math.min(1, PHOTO_MAX / Math.max(box.w, box.h));
-    const close = document.createElement('canvas');
-    close.width = Math.round(box.w * k2);
-    close.height = Math.round(box.h * k2);
-    const g2 = close.getContext('2d', { willReadFrequently: true });
-    g2.drawImage(bitmap, box.x, box.y, box.w, box.h, 0, 0, close.width, close.height);
-    const res2 = detectArrows(g2.getImageData(0, 0, close.width, close.height), face, empty, { spotHint });
-    if (keepCloseUp(res, res2)) {
-      canvas.width = close.width;
-      canvas.height = close.height;
-      canvas.getContext('2d').drawImage(close, 0, 0);
-      res = res2;
-    }
-  }
-  bitmap.close();
-  await previewAndApply(ctx, canvas, res, sc);
+  return {
+    width: bitmap.width,
+    height: bitmap.height,
+    draw(box, scale) {
+      const canvas = h('canvas', { class: 'photo-preview' });
+      canvas.width = Math.round(box.w * scale);
+      canvas.height = Math.round(box.h * scale);
+      canvas
+        .getContext('2d', { willReadFrequently: true })
+        .drawImage(bitmap, box.x, box.y, box.w, box.h, 0, 0, canvas.width, canvas.height);
+      return canvas;
+    },
+    close: () => bitmap.close(),
+  };
 }
 
 /**
- * Show the picture with what was found (the face edge, each arrow numbered with its score) and, on
- * Use, enter the arrows into the end. Returns true when the question is settled (used, or nothing
- * to use), false when it was cancelled.
+ * Show the picture with what was found (the face's rings, each arrow numbered with its score);
+ * dragging a score label moves its arrow. Resolves with the archer's answer (Use / OK, or not).
  */
-async function previewAndApply(ctx, canvas, res, { face }, { cancelLabel = 'Cancel' } = {}) {
+async function previewFound(canvas, found, { cancelLabel }) {
   const g = canvas.getContext('2d');
   // the clean photo is kept, so the marks can be drawn again when a label is dragged
   const photo = document.createElement('canvas');
   photo.width = canvas.width;
   photo.height = canvas.height;
   photo.getContext('2d').drawImage(canvas, 0, 0);
-  // the arrows as they will be used: dragging a label changes them
-  const arrows = res.arrows.map((a) => ({ ...a, image: { ...a.image } }));
-  let values = arrows.map((a) => scoreFromPoint(a.x, a.y, face));
-  let dragging = -1;
-  // Where the detector thinks the scoring rings are, as fractions of the spot's radius (the X ring
-  // first): drawn over the photo, so a ring that does not sit on the printed one shows at a glance.
-  const rings = isSpotFace(face) ? [0.1, 0.2, 0.4, 0.6, 0.8, 1] : [0.05, ...Array.from({ length: 10 }, (_, k) => (k + 1) / 10)];
+  // Where the detector thinks the scoring rings are: drawn over the photo, so a ring that does not
+  // sit on the printed one shows at a glance.
   const ringPath = (o, f) => g.ellipse(o.cx, o.cy, o.rx * f, o.ry * f, o.angle, 0, Math.PI * 2);
   const redraw = () => {
     g.drawImage(photo, 0, 0);
     // while an arrow is dragged, the ring it is in right now is tinted
-    const held = dragging >= 0 ? arrows[dragging] : null;
+    const held = found.heldRing();
     if (held) {
-      const d = Math.hypot(held.x, held.y);
-      const k = rings.findIndex((f) => d <= f);
-      if (k >= 0) {
-        const o = (res.spots[res.partial ? 0 : (held.spot ?? 0)] || res.spots[0]).outer;
-        g.beginPath();
-        ringPath(o, rings[k]);
-        if (k > 0) ringPath(o, rings[k - 1]);
-        g.fillStyle = 'rgba(0, 229, 255, 0.38)';
-        g.fill('evenodd');
-      }
+      g.beginPath();
+      ringPath(held.outer, held.edge);
+      if (held.inner > 0) ringPath(held.outer, held.inner);
+      g.fillStyle = 'rgba(0, 229, 255, 0.38)';
+      g.fill('evenodd');
     }
     const line = Math.max(2, canvas.width / 220);
     g.strokeStyle = '#00e5ff';
-    for (const s of res.spots) {
-      rings.forEach((f) => {
+    for (const s of found.spots) {
+      found.rings.forEach((f) => {
         // the outer edge as before; the rings inside it thinner, so the photo stays readable
         g.lineWidth = f === 1 ? line : Math.max(1, line * 0.45);
         g.globalAlpha = f === 1 ? 1 : 0.8;
@@ -954,7 +918,7 @@ async function previewAndApply(ctx, canvas, res, { face }, { cancelLabel = 'Canc
       });
     }
     g.globalAlpha = 1;
-    drawArrowMarks(g, res.spots, arrows, values, { active: dragging, long: true });
+    drawArrowMarks(g, found.spots, found.arrows, found.scores(), { active: found.held, long: true });
   };
   redraw();
 
@@ -970,53 +934,42 @@ async function previewAndApply(ctx, canvas, res, { face }, { cancelLabel = 'Canc
       k,
     };
   };
-  let grab = null; // { id, i, off } while a label is held
+  let pointer = null; // the pointer holding a label
   canvas.addEventListener('pointerdown', (ev) => {
-    if (!ev.isPrimary || ev.button > 0 || grab) return;
+    if (!ev.isPrimary || ev.button > 0 || pointer !== null) return;
     const p = pictureXY(ev);
     // the nearest label (or its point of impact) within about a fingertip
-    let best = null;
-    arrows.forEach((a, i) => {
-      const m = arrowMarkLayout(canvas.width, canvas.height, res.spots, a, { long: true });
-      const d = Math.min(Math.hypot(m.lx - p.x, m.ly - p.y) - m.r, Math.hypot(a.image.x - p.x, a.image.y - p.y));
-      if (d <= 26 * p.k && (!best || d < best.d)) best = { i, d };
-    });
-    if (!best) return;
+    if (!found.grab(p, 26 * p.k)) return;
     ev.preventDefault();
     try {
       canvas.setPointerCapture(ev.pointerId);
     } catch {
       /* pointer already gone */
     }
-    const a = arrows[best.i];
-    grab = { id: ev.pointerId, i: best.i, off: { x: a.image.x - p.x, y: a.image.y - p.y } };
-    dragging = best.i;
+    pointer = ev.pointerId;
     if (navigator.vibrate) navigator.vibrate(15);
     redraw();
   });
   canvas.addEventListener('pointermove', (ev) => {
-    if (!grab || ev.pointerId !== grab.id) return;
-    const p = pictureXY(ev);
-    arrows[grab.i] = moveArrow(arrows[grab.i], { x: p.x + grab.off.x, y: p.y + grab.off.y }, res, face, canvas);
-    values = arrows.map((a) => scoreFromPoint(a.x, a.y, face));
+    if (pointer === null || ev.pointerId !== pointer) return;
+    found.drag(pictureXY(ev));
     redraw();
   });
   const drop = (ev) => {
-    if (!grab || ev.pointerId !== grab.id) return;
-    grab = null;
-    dragging = -1;
+    if (pointer === null || ev.pointerId !== pointer) return;
+    pointer = null;
+    found.drop();
     redraw();
   };
   canvas.addEventListener('pointerup', drop);
   canvas.addEventListener('pointercancel', drop);
   canvas.classList.add('is-adjustable');
 
-  const n = res.arrows.length;
   // Just the picture with the found arrows and the two buttons. Only when nothing was found does
   // the dialog say so (a picture without marks would explain nothing).
-  const ok = await confirmDialog(
-    n
-      ? { title: `Found arrows: ${values.join(', ')}`, bare: true, confirmLabel: 'Use', cancelLabel, body: canvas }
+  return confirmDialog(
+    found.arrows.length
+      ? { title: `Found arrows: ${found.scores().join(', ')}`, bare: true, confirmLabel: 'Use', cancelLabel, body: canvas }
       : {
           title: 'No arrows found',
           message: 'Try a photo taken straight at the target, close enough that the face fills the picture.',
@@ -1026,10 +979,6 @@ async function previewAndApply(ctx, canvas, res, { face }, { cancelLabel = 'Canc
           body: canvas,
         },
   );
-  if (!ok) return false;
-  if (!n) return true;
-  if (ctx.running.applyScan(arrows.map((a, i) => ({ v: values[i], x: a.x, y: a.y, spot: a.spot })))) ctx.rerender();
-  return true;
 }
 
 function findSightMark(repo, distance) {

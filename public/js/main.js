@@ -31,9 +31,10 @@ import { guideSheet } from './app/views/common.js';
 import { renderLog, renderNewSession, logSubtitle, askAboutRunningSession, askAboutOpenFormSession, startTimerTicker } from './app/views/log.js';
 import { createRunningSession } from './app/runningSession.js';
 import { createOpenFormSessions } from './app/openFormSession.js';
+import { createFinishedSessions } from './app/finishedSession.js';
 import { renderDashboard } from './app/views/dashboard.js';
 import { renderInsights } from './app/views/insights.js';
-import { renderHistory } from './app/views/history.js';
+import { renderHistory, askAboutFinishedSession } from './app/views/history.js';
 import { renderGear } from './app/views/gear.js';
 import { renderSights } from './app/views/sights.js';
 import { renderSettings } from './app/views/settings.js';
@@ -320,6 +321,15 @@ ctx.openForms = createOpenFormSessions({
   saveSettings: ctx.saveSettings,
   confirm: askAboutOpenFormSession,
   onChange: () => ctx.rerender(),
+});
+// the finished sessions (History): edits, Recently deleted, restoring and deleting for good
+ctx.finished = createFinishedSessions({
+  repo,
+  save: ctx.save,
+  trash: ctx.trash,
+  restore: ctx.restore,
+  remove: ctx.remove,
+  confirm: askAboutFinishedSession,
 });
 
 const router = createRouter((r) => {

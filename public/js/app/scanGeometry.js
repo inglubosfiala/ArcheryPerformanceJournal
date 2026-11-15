@@ -1,5 +1,6 @@
 // The geometry of a Scan: boxes around the spots found in a picture, moving a detection result
-// between pictures (a crop, another size), picture ↔ face points, and moving a found arrow.
+// between pictures (a crop, another size), picture ↔ face points, where a found arrow's label sits
+// and moving a found arrow.
 // Plain numbers and plain objects in, plain objects out: no DOM, no canvas.
 //
 // A detection result is { spots: [{ outer }], arrows: [{ x, y, spot, image }], partial } (see
@@ -113,6 +114,42 @@ export function withArrows(res, arrows) {
   return {
     ...res,
     arrows: arrows.map((a) => ({ ...a, image: pictureFromFace((res.spots[a.spot ?? 0] || res.spots[0]).outer, a) })),
+  };
+}
+
+/**
+ * Where a found arrow's score label sits on a picture of the given size: its centre and radius.
+ * The label lies beside the point of impact, on a thin line that ends on the point, away from the
+ * shaft, so the hit itself stays visible.
+ */
+export function arrowMarkLayout(width, height, spots, a, { long = false } = {}) {
+  const o = (spots[a.spot ?? 0] || spots[0]).outer;
+  const spotR = (o.rx + o.ry) / 2;
+  const p = a.image;
+  const r = Math.max(width / 45, Math.min(width / 18, 0.17 * spotR)); // the label's radius
+  // On the far side of the point from the shaft (the shaft leans one way, the label goes the
+  // other), so it never lies on the arrow. With no shaft seen: outwards from the spot's middle,
+  // and for an arrow in the very middle up and to the right.
+  let dx = p.x - o.cx;
+  let dy = p.y - o.cy;
+  const dist = Math.hypot(dx, dy);
+  if (a.lean) {
+    dx = -a.lean.x;
+    dy = -a.lean.y;
+  } else if (dist < 0.12 * spotR) {
+    dx = 0.7;
+    dy = -0.7;
+  } else {
+    dx /= dist;
+    dy /= dist;
+  }
+  // `long`: where the labels are dragged by finger, the line is long enough that the finger on the
+  // label does not cover the point of impact
+  const reach = r + (long ? Math.max(0.75 * spotR, 3.4 * r) : Math.max(0.28 * spotR, 1.2 * r));
+  return {
+    r,
+    lx: Math.max(r + 2, Math.min(width - r - 2, p.x + dx * reach)),
+    ly: Math.max(r + 2, Math.min(height - r - 2, p.y + dy * reach)),
   };
 }
 

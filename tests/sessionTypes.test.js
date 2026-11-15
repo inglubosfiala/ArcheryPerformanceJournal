@@ -2,7 +2,8 @@ import { describe, it, expect } from 'vitest';
 import { collections } from '../public/js/app/collections.js';
 import { migrate, migrations } from '../public/js/storage/migrations.js';
 import * as L from '../public/js/app/sessionLogic.js';
-import { isScored, formSummary, emptyDrill, newestFirst } from '../public/js/app/sessionTypes.js';
+import { isScored, formSummary, setupSummary, emptyDrill, newestFirst } from '../public/js/app/sessionTypes.js';
+import { faceLabel } from '../public/js/app/scoring.js';
 
 const validate = (r) => collections.sessions.validate({ id: 'a', ...r });
 const strength = (extra = {}) => ({
@@ -119,5 +120,13 @@ describe('session order', () => {
     const b = { id: 'b', date: '2026-11-10', time: '07:30', createdAt: '2026-11-12T10:00:00Z' };
     const c = { id: 'c', date: '2026-11-11', createdAt: '2026-11-11T08:00:00Z' };
     expect([b, a, c].sort(newestFirst).map((x) => x.id)).toEqual(['c', 'a', 'b']);
+  });
+});
+
+describe('setup line of a scored session', () => {
+  const ss = { type: 'training', distance: 18, face: '40t', ends: [] };
+  it('gives the distance and the face, then the parts asked for', () => {
+    expect(setupSummary(ss)).toBe(`18 m · ${faceLabel('40t')}`);
+    expect(setupSummary(ss, '4 ends', '', null, '60 min')).toBe(`18 m · ${faceLabel('40t')} · 4 ends · 60 min`);
   });
 });

@@ -1,34 +1,52 @@
 // History tab: training log list → session detail (HANDOFF §6).
 import { h, s, formatDate } from '../../core/dom.js';
 import { confirmDialog } from './confirm.js';
-import { faceLabel, sheetPoint, isMultiSpot, spotCentres } from '../scoring.js';
+import { sheetPoint, isMultiSpot, spotCentres } from '../scoring.js';
 import { computeStats, sumArrows, fmt } from '../stats.js';
 import { T } from '../strings.js';
 import { icons } from '../icons.js';
 import { card, gearCard, whenCard, backBar } from './common.js';
 import { VB, faceRings, faceSheet, faceViewBox } from './face.js';
-import { TYPE_LABELS, isScored, sessionType, formSummary, newestFirst } from '../sessionTypes.js';
+import { TYPE_LABELS, isScored, sessionType, formSummary, setupSummary } from '../sessionTypes.js';
 import { formSections } from './sessionForms.js';
 import { formatDuration } from '../sessionLogic.js';
 import { TRASH_DAYS } from '../../config.js';
 
-const finished = (repo) =>
-  repo.list('sessions', {
-    filter: (x) => x.status === 'finished',
-    sort: newestFirst,
-  });
+/** The finished session's questions to the archer (the `confirm` adapter of ctx.finished). */
+export function askAboutFinishedSession(q) {
+  if (q.kind === 'purge') {
+    return confirmDialog({
+      title: 'Delete for good?',
+      message: 'The session is removed permanently. This cannot be undone.',
+      confirmLabel: T.delete,
+      danger: true,
+    });
+  }
+  return confirmDialog({ title: 'Delete session?', message: T.confirmDeleteSession, confirmLabel: T.delete, danger: true });
+}
 
 export function renderHistory(ctx, params) {
   const id = params[0];
   if (id === 'deleted') return renderTrash(ctx);
   if (id) {
-    const session = ctx.repo.get('sessions', id);
-    if (session && session.status === 'finished') return renderDetail(ctx, session);
+    const session = ctx.finished.get(id);
+    if (session) return renderDetail(ctx, session);
   }
   return renderList(ctx);
 }
 
 const typeBadge = (ss) => h('span', { class: `type-badge type-${sessionType(ss)}` }, TYPE_LABELS[sessionType(ss)]);
+
+/** Date and start time on a list card: "Thu, 12 Nov 2026 · 18:00". */
+const listWhen = (ss) => [formatDate(ss.date, { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' }), ss.time ? ` · ${ss.time}` : ''];
+
+/** Delete on a session's page: after a yes it goes to Recently deleted and the page returns to the log. */
+async function deleteSession(ctx, ss) {
+  const { status } = await ctx.finished.moveToDeleted(ss.id);
+  if (status === 'deleted') ctx.toast('Moved to Recently deleted.');
+  // gone already (e.g. deleted on another device): back to the log as well
+  if (status === 'deleted' || status === 'none') ctx.navigate('history', { replace: true });
+}
 
 /** List card of a strength or mental session. */
 function formListCard(ss) {
@@ -39,7 +57,7 @@ function formListCard(ss) {
     h(
       'div',
       { class: 'spread' },
-      h('strong', null, formatDate(ss.date, { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' }), ss.time ? ` · ${ss.time}` : ''),
+      h('strong', null, ...listWhen(ss)),
       typeBadge(ss),
     ),
     h('div', { class: 'muted small' }, formSummary(ss) || '—'),
@@ -48,8 +66,8 @@ function formListCard(ss) {
 }
 
 function renderList(ctx) {
-  const sessions = finished(ctx.repo);
-  const binned = ctx.repo.listTrash('sessions').length;
+  const sessions = ctx.finished.list();
+  const binned = ctx.finished.deleted().length;
   return {
     content: h(
       'div',
@@ -71,17 +89,13 @@ function renderList(ctx) {
               h(
                 'div',
                 { class: 'spread' },
-                h('strong', null, formatDate(ss.date, { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' }), ss.time ? ` · ${ss.time}` : ''),
+                h('strong', null, ...listWhen(ss)),
                 typeBadge(ss),
               ),
               h(
                 'div',
                 { class: 'muted small' },
-                [
-                  ss.competition?.event,
-                  `${ss.distance} m · ${faceLabel(ss.face)} · ${ss.ends.length} ends`,
-                  ss.minutes != null ? formatDuration(ss.minutes) : '',
-                ]
+                [ss.competition?.event, setupSummary(ss, `${ss.ends.length} ends`, ss.minutes != null ? formatDuration(ss.minutes) : '')]
                   .filter(Boolean)
                   .join(' · '),
               ),
@@ -127,15 +141,7 @@ function detailHeader(ss, detail) {
 /** Strength / mental session: its form (editable, saved as you go), the review and delete. */
 function renderFormDetail(ctx, ss) {
   const change = (update, { rerender = true } = {}) => {
-    const cur = ctx.repo.get('sessions', ss.id);
-    if (cur && ctx.save('sessions', { ...cur, ...update(cur) }) && rerender) ctx.rerender();
-  };
-  const del = async () => {
-    const ok = await confirmDialog({ title: 'Delete session?', message: T.confirmDeleteSession, confirmLabel: T.delete, danger: true });
-    if (!ok) return;
-    if (!ctx.trash('sessions', ss.id)) return;
-    ctx.toast('Moved to Recently deleted.');
-    ctx.navigate('history', { replace: true });
+    if (ctx.finished.change(ss.id, update).status === 'saved' && rerender) ctx.rerender();
   };
   return {
     content: h(
@@ -144,9 +150,9 @@ function renderFormDetail(ctx, ss) {
       ...detailHeader(ss, null),
       card({ class: 'setup-card', 'aria-label': `${TYPE_LABELS[ss.type]} session` }, formSections(ss.type, ss, change)),
       whenCard(ctx, ss),
-      ss.type === 'mental' ? null : gearCard(ctx, ss),
+      ss.type === 'mental' ? null : gearCard(ctx, ss, finishedGear(ctx, ss)),
       reviewCard(ctx, ss),
-      h('button', { type: 'button', class: 'btn btn-text danger', onClick: del }, T.deleteSession),
+      h('button', { type: 'button', class: 'btn btn-text danger', onClick: () => deleteSession(ctx, ss) }, T.deleteSession),
     ),
   };
 }
@@ -164,10 +170,7 @@ function competitionCard(ctx, ss) {
         placeholder,
         autocomplete: 'off',
         dataset: { fk: `comp-${key}` },
-        onInput: (e) => {
-          const cur = ctx.repo.get('sessions', ss.id);
-          if (cur) ctx.save('sessions', { ...cur, competition: { event: '', round: '', conditions: '', placement: '', ...cur.competition, [key]: e.target.value } });
-        },
+        onInput: (e) => ctx.finished.setCompetition(ss.id, key, e.target.value),
       }),
     );
   return card(
@@ -194,22 +197,11 @@ function renderDetail(ctx, ss) {
     ['M1–2 %', st.programPct == null ? '–' : `${st.programPct}%`],
   ];
 
-  const del = async () => {
-    const ok = await confirmDialog({ title: 'Delete session?', message: T.confirmDeleteSession, confirmLabel: T.delete, danger: true });
-    if (!ok) return;
-    if (!ctx.trash('sessions', ss.id)) return;
-    ctx.toast('Moved to Recently deleted.');
-    ctx.navigate('history', { replace: true });
-  };
-
   return {
     content: h(
       'div',
       { class: 'stack' },
-      ...detailHeader(
-        ss,
-        `${ss.distance} m · ${faceLabel(ss.face)} · ${st.arrows} arrows${ss.minutes != null ? ` · ${formatDuration(ss.minutes)}` : ''}${snapshot ? ` · ${snapshot.name}` : ''}`,
-      ),
+      ...detailHeader(ss, setupSummary(ss, `${st.arrows} arrows`, ss.minutes != null ? formatDuration(ss.minutes) : '', snapshot?.name)),
       h(
         'dl',
         { class: 'tiles' },
@@ -217,7 +209,7 @@ function renderDetail(ctx, ss) {
       ),
       sessionType(ss) === 'competition' ? competitionCard(ctx, ss) : null,
       whenCard(ctx, ss),
-      gearCard(ctx, ss),
+      gearCard(ctx, ss, finishedGear(ctx, ss)),
       reviewCard(ctx, ss),
       sessionGroup(ss),
       card(
@@ -276,10 +268,15 @@ function renderDetail(ctx, ss) {
           ),
         ),
       ),
-      h('button', { type: 'button', class: 'btn btn-text danger', onClick: del }, T.deleteSession),
+      h('button', { type: 'button', class: 'btn btn-text danger', onClick: () => deleteSession(ctx, ss) }, T.deleteSession),
     ),
   };
 }
+
+/** The equipment picker's choice, stored on the finished session (the page is drawn again when it changed). */
+const finishedGear = (ctx, ss) => (choice) => {
+  if (ctx.finished.setGear(ss.id, choice).status === 'saved') ctx.rerender();
+};
 
 /** What went well / what to work on: free text, saved as you type. */
 function reviewCard(ctx, ss) {
@@ -294,10 +291,7 @@ function reviewCard(ctx, ss) {
         placeholder,
         value: ss.review?.[key] || '',
         dataset: { fk: `review-${key}` },
-        onInput: (e) => {
-          const cur = ctx.repo.get('sessions', ss.id);
-          if (cur) ctx.save('sessions', { ...cur, review: { good: '', workOn: '', how: '', ...cur.review, [key]: e.target.value } });
-        },
+        onInput: (e) => ctx.finished.setReview(ss.id, key, e.target.value),
       }),
     );
   return card(
@@ -383,31 +377,18 @@ function groupFace({ viewBox, face, points, centres, label }) {
 
 /** Recently deleted: sessions kept TRASH_DAYS after Delete, to restore or delete for good. */
 function renderTrash(ctx) {
-  const items = ctx.repo.listTrash('sessions');
-  const DAY = 24 * 3600 * 1000;
-  const left = (ss) => {
-    const days = Math.max(0, Math.ceil((Date.parse(ss.trashedAt) + TRASH_DAYS * DAY - Date.now()) / DAY));
-    return days <= 1 ? 'Removed within a day' : `Removed in ${days} days`;
-  };
+  const items = ctx.finished.deleted();
+  const left = (days) => (days <= 1 ? 'Removed within a day' : `Removed in ${days} days`);
   const summary = (ss) =>
-    isScored(ss.type)
-      ? `${ss.distance} m · ${faceLabel(ss.face)} · ${ss.ends.length} ends · ${computeStats(ss.ends).total} points`
-      : formSummary(ss) || '—';
+    isScored(ss.type) ? setupSummary(ss, `${ss.ends.length} ends`, `${computeStats(ss.ends).total} points`) : formSummary(ss) || '—';
   const restore = (ss) => {
-    if (!ctx.restore('sessions', ss.id)) return;
-    ctx.toast('Session restored.');
-    ctx.rerender();
+    const { status } = ctx.finished.restore(ss.id);
+    if (status === 'restored') ctx.toast('Session restored.');
+    if (status === 'restored' || status === 'none') ctx.rerender();
   };
   const purge = async (ss) => {
-    const ok = await confirmDialog({
-      title: 'Delete for good?',
-      message: 'The session is removed permanently. This cannot be undone.',
-      confirmLabel: T.delete,
-      danger: true,
-    });
-    if (!ok) return;
-    ctx.remove('sessions', ss.id);
-    ctx.rerender();
+    const { status } = await ctx.finished.purge(ss.id);
+    if (status === 'purged' || status === 'none') ctx.rerender();
   };
   return {
     content: h(
@@ -420,20 +401,15 @@ function renderTrash(ctx) {
       h(
         'ul',
         { class: 'plain-list stack-sm' },
-        items.map((ss) =>
+        items.map(({ session: ss, daysLeft }) =>
           h(
             'li',
             null,
             card(
               { class: 'trash-card' },
-              h(
-                'div',
-                { class: 'spread' },
-                h('strong', null, formatDate(ss.date, { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' }), ss.time ? ` · ${ss.time}` : ''),
-                typeBadge(ss),
-              ),
+              h('div', { class: 'spread' }, h('strong', null, ...listWhen(ss)), typeBadge(ss)),
               h('div', { class: 'muted small' }, summary(ss)),
-              h('div', { class: 'muted xsmall' }, left(ss)),
+              h('div', { class: 'muted xsmall' }, left(daysLeft)),
               h(
                 'div',
                 { class: 'row' },

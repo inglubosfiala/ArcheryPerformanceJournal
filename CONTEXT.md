@@ -67,4 +67,4 @@ One of the small faces on a triple or Vegas sheet.
 An arrow's position is kept only when it lies on its spot or just off its edge; further out the arrow keeps its score alone.
 
 **Scan**:
-Reading arrows from the camera or a photo of the target to fill the empty slots of the shown end.
+Reading arrows from the camera or a photo of the target into the end being shot. On a full end the scan saves it and fills the next end; on an end with room it reads that end anew and replaces it. An earlier end opened for editing is never scanned.

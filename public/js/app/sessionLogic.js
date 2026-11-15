@@ -5,6 +5,8 @@
 // shown on screen: null = the current end, a number = a saved end (it can be edited in place).
 // `cursor` / `pinned` select an arrow inside the shown end.
 
+import { emptyCompetition } from './sessionTypes.js';
+
 export function emptyArrow() {
   return { v: null, m: null, s: null, x: null, y: null };
 }
@@ -29,7 +31,7 @@ export function createSession({
 }) {
   return {
     type,
-    ...(type === 'competition' ? { competition: competition || { event: '', round: '', conditions: '', placement: '' } } : {}),
+    ...(type === 'competition' ? { competition: competition || emptyCompetition() } : {}),
     date,
     ...(time ? { time } : {}),
     distance,

@@ -4,16 +4,9 @@
 import { h } from '../../core/dom.js';
 import { icons } from '../icons.js';
 import { card } from './common.js';
-import { newestFirst } from '../sessionTypes.js';
-
-const lastFinished = (repo) =>
-  repo.list('sessions', {
-    filter: (x) => x.status === 'finished',
-    sort: newestFirst,
-  });
 
 export function renderDashboard(ctx) {
-  const finished = lastFinished(ctx.repo);
+  const finished = ctx.finished.list();
 
   // --- feature tiles
   const tile = (props, icon, title, sub) =>

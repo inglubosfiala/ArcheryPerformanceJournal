@@ -1,4 +1,5 @@
 // Session types (training, blank bale, competition, strength, mental) and the fields of the non-scored ones.
+import { faceLabel } from './scoring.js';
 
 export const SESSION_TYPES = ['training', 'blank', 'competition', 'strength', 'mental', 'manual'];
 
@@ -56,6 +57,20 @@ export const FOCUS_MAX = 5;
 
 export function emptyDrill(kind) {
   return { kind, sets: 1, reps: 10, holdSec: DRILLS.find((d) => d.id === kind)?.hold ? 10 : null };
+}
+
+/** A session's review: what went well, what to work on, how. */
+export const emptyReview = () => ({ good: '', workOn: '', how: '' });
+
+/** A competition session's details (placement is usually known only after the event). */
+export const emptyCompetition = () => ({ event: '', round: '', conditions: '', placement: '' });
+
+/**
+ * One line describing a scored session's setup: "18 m · face", then the `more` parts given (ends,
+ * arrows, duration…; empty ones are left out). Used wherever a scored session is described in a line.
+ */
+export function setupSummary(session, ...more) {
+  return [`${session.distance} m`, faceLabel(session.face), ...more].filter(Boolean).join(' · ');
 }
 
 /** One line describing a strength or mental session (History list, Dashboard). */

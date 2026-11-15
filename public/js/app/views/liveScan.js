@@ -1,58 +1,33 @@
 // Live camera scan of the target: the detector runs on the video a few times per second and its
 // result (spot outlines, numbered arrows) is drawn over the live picture. When the same arrows stay
-// in place for about a second the result locks by itself; "Take now" takes it at once.
+// in place for about a second the result locks by itself; "Take now" takes it at once. When to lock
+// is decided by the steady reading of scan.js; this view runs the camera, the detector and the drawing.
 // Nothing is recorded or stored: frames are analysed in memory and dropped.
 import { h } from '../../core/dom.js';
 import { icons } from '../icons.js';
-import { detectArrows, consensus } from '../photoDetect.js';
-import { scoreFromPoint, spotCentres } from '../scoring.js';
-import { CLOSE_UP_MARGIN, spotsBox, isCloseUp, resultOffCrop, withArrows } from '../scanGeometry.js';
+import { detectArrows } from '../photoDetect.js';
+import { spotCentres } from '../scoring.js';
+import { resultOffCrop, arrowMarkLayout } from '../scanGeometry.js';
+import { createSteadyReading, nextLook } from '../scan.js';
 
-const FRAME_MAX = 560;
-const VIEW_MAX = 1280; // the overlay and the kept picture: the whole frame, up to this size // frames are scaled to this many pixels on their long side for detection
+const FRAME_MAX = 560; // frames are scaled to this many pixels on their long side for detection
+const VIEW_MAX = 1280; // the overlay and the kept picture: the whole frame, up to this size
 const TICK_MS = 120; // pause between analyses (each takes 0.2–0.6 s on a phone)
-const LOCK_MS = 1000; // the agreed reading must go back at least this long…
-const LOCK_FRAMES = 5; // …and this many of the recent frames must agree on it
-const WINDOW_FRAMES = 8; // how many recent readings are compared
-const WINDOW_MS = 5000; // readings older than this are dropped
+
+/** What the status line says for each kind of reading (see createSteadyReading). */
+const STATUS = {
+  lost: () => 'Fit the target in the frame.',
+  empty: () => 'Target found. Looking for arrows…',
+  partial: () => 'Show all the spots of the sheet (or Take now for this spot only).',
+  reading: () => 'Reading the arrows…',
+  holding: (r) => `${r.scores.join(' · ')}: hold steady…`,
+};
 
 /**
  * Mark the found arrows on a picture so the hit itself stays visible: nothing is drawn over the
  * point of impact; beside it (on a thin line that ends on the point, away from the shaft) is a label
  * with the score read there.
  */
-/** Where an arrow's score label sits on a picture of the given size: its centre and radius. */
-export function arrowMarkLayout(width, height, spots, a, { long = false } = {}) {
-  const o = (spots[a.spot ?? 0] || spots[0]).outer;
-  const spotR = (o.rx + o.ry) / 2;
-  const p = a.image;
-  const r = Math.max(width / 45, Math.min(width / 18, 0.17 * spotR)); // the label's radius
-  // On the far side of the point from the shaft (the shaft leans one way, the label goes the
-  // other), so it never lies on the arrow. With no shaft seen: outwards from the spot's middle,
-  // and for an arrow in the very middle up and to the right.
-  let dx = p.x - o.cx;
-  let dy = p.y - o.cy;
-  const dist = Math.hypot(dx, dy);
-  if (a.lean) {
-    dx = -a.lean.x;
-    dy = -a.lean.y;
-  } else if (dist < 0.12 * spotR) {
-    dx = 0.7;
-    dy = -0.7;
-  } else {
-    dx /= dist;
-    dy /= dist;
-  }
-  // `long`: where the labels are dragged by finger, the line is long enough that the finger on the
-  // label does not cover the point of impact
-  const reach = r + (long ? Math.max(0.75 * spotR, 3.4 * r) : Math.max(0.28 * spotR, 1.2 * r));
-  return {
-    r,
-    lx: Math.max(r + 2, Math.min(width - r - 2, p.x + dx * reach)),
-    ly: Math.max(r + 2, Math.min(height - r - 2, p.y + dy * reach)),
-  };
-}
-
 export function drawArrowMarks(g, spots, arrows, labels, { hollow = false, active = -1, long = false } = {}) {
   const { width, height } = g.canvas;
   g.save();
@@ -113,9 +88,7 @@ export function liveScan({ face, maxArrows, spotHint = 0 }) {
     let timer = 0;
     let busy = false;
     let seq = 0;
-    let last = null; // the latest result without an error
-    let recent = []; // the last readings: [{ t, arrows }]
-    let hold = null; // what most of them agree on: { arrows, count, since }, or null
+    const reading = createSteadyReading({ face, maxArrows });
 
     const video = h('video', { class: 'live-video', playsinline: true, muted: true, autoplay: true });
     video.muted = true;
@@ -216,9 +189,7 @@ export function liveScan({ face, maxArrows, spotHint = 0 }) {
       });
     };
 
-    const values = (arrows) => arrows.map((a) => scoreFromPoint(a.x, a.y, face));
-
-    function draw(res, hollow = false) {
+    function draw(res, scores = [], hollow = false) {
       octx.clearRect(0, 0, overlay.width, overlay.height);
       // the scan frame: what is outside it is dimmed (and not looked at)
       if (frame) {
@@ -240,74 +211,29 @@ export function liveScan({ face, maxArrows, spotHint = 0 }) {
         octx.ellipse(s.outer.cx, s.outer.cy, s.outer.rx, s.outer.ry, s.outer.angle, 0, Math.PI * 2);
         octx.stroke();
       }
-      drawArrowMarks(octx, res.spots, res.arrows, values(res.arrows), { hollow });
-    }
-
-    // The result to hand over: the agreed arrows (their average place on the face over the frames
-    // that agree), drawn on the latest frame's outline; or the latest reading when nothing agrees yet.
-    function steady() {
-      if (!last) return null;
-      if (!hold) return last.res;
-      return withArrows(last.res, hold.arrows);
+      drawArrowMarks(octx, res.spots, res.arrows, scores, { hollow });
     }
 
     function take() {
-      const res = steady();
+      const res = reading.take();
       if (!res) return;
       finish({ canvas: shot, res });
     }
 
     function onResult(res) {
       if (closed) return;
-      if (res.error) {
-        draw(res);
-        last = null;
-        hold = null;
-        recent = [];
-        takeBtn.disabled = true;
-        bar.style.width = '0%';
-        status.textContent = 'Fit the target in the frame.';
-        return;
+      if (!res.error) {
+        // keep the analysed moment (the whole frame) for the preview
+        shot.width = full.width;
+        shot.height = full.height;
+        shot.getContext('2d').drawImage(full, 0, 0);
       }
-      // keep the analysed moment (the whole frame) for the preview
-      shot.width = full.width;
-      shot.height = full.height;
-      shot.getContext('2d').drawImage(full, 0, 0);
-      last = { res };
-      takeBtn.disabled = false;
-      const now = performance.now();
-      if (!res.arrows.length) {
-        draw(res);
-        hold = null;
-        recent = [];
-        bar.style.width = '0%';
-        status.textContent = 'Target found. Looking for arrows…';
-        return;
-      }
-      // A gate: with several arrows to place on a sheet of several spots, all its spots must be in
-      // the picture. A view of one spot alone never locks by itself ("Take now" still takes it).
-      if (res.partial && maxArrows > 1) {
-        hold = null;
-        recent = [];
-        draw(res, true);
-        bar.style.width = '0%';
-        status.textContent = 'Show all the spots of the sheet (or Take now for this spot only).';
-        return;
-      }
-      // The last few readings, and what most of them agree on. A frame that reads something else
-      // now and then (blur, a reflection) changes nothing: the markers show the agreed arrows, and
-      // the result locks once enough of the recent frames agree for long enough.
-      recent.push({ t: now, arrows: res.arrows });
-      recent = recent.filter((f) => now - f.t < WINDOW_MS).slice(-WINDOW_FRAMES);
-      const agreed = consensus(recent.map((f) => f.arrows));
-      hold = agreed && agreed.count >= 2 ? { ...agreed, since: recent[agreed.oldest].t } : null;
-      const shown = steady();
-      // a reading nothing else agrees with yet is drawn hollow
-      draw(shown, !hold);
-      const held = hold ? Math.min((now - hold.since) / LOCK_MS, hold.count / LOCK_FRAMES) : 0;
-      bar.style.width = `${Math.round(Math.min(1, held) * 100)}%`;
-      status.textContent = hold ? `${values(shown.arrows).join(' · ')}: hold steady…` : 'Reading the arrows…';
-      if (hold && now - hold.since >= LOCK_MS && hold.count >= LOCK_FRAMES) {
+      const r = reading.read(res, performance.now());
+      draw(r.show, r.scores, r.hollow);
+      takeBtn.disabled = !r.canTake;
+      bar.style.width = `${Math.round(r.progress * 100)}%`;
+      status.textContent = STATUS[r.kind](r);
+      if (r.locked) {
         if (navigator.vibrate) navigator.vibrate(40);
         take();
       }
@@ -346,7 +272,7 @@ export function liveScan({ face, maxArrows, spotHint = 0 }) {
           guide = { x: Math.round((vw - gw) / 2), y: Math.round((vh - gw / shape) / 2), w: Math.round(gw), h: Math.round(gw / shape) };
           frame = { x: guide.x * ko, y: guide.y * ko, w: guide.w * ko, h: guide.h * ko };
           region = null;
-          if (!last) draw(null);
+          if (!reading.take()) draw(null); // no reading yet: just the scan frame
         }
         const r = region || guide;
         const k = Math.min(1, FRAME_MAX / Math.max(r.w, r.h));
@@ -368,13 +294,10 @@ export function liveScan({ face, maxArrows, spotHint = 0 }) {
             onResult(res);
           } else {
             // analysed-part pixels → whole-frame overlay pixels
-            const seen = resultOffCrop(res, r, k, ko);
-            // next time, analyse just the sheet: the box around the spots, with a margin
-            const box = spotsBox(seen.spots, { margin: CLOSE_UP_MARGIN, bounds: guide, scale: ko });
-            // …but only once every spot of the sheet is seen. While only some are (the camera came
-            // in on one spot first), keep looking at the whole frame, or the others are never found.
-            region = !res.partial && isCloseUp(box, guide) ? box : null;
-            onResult(seen);
+            const found = resultOffCrop(res, r, k, ko);
+            // next time, analyse just the sheet (once every spot of it is seen)
+            region = nextLook(found, guide, ko);
+            onResult(found);
           }
         } catch (err) {
           console.error(err);

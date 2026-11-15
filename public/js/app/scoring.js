@@ -95,18 +95,31 @@ export function isValidArrowValue(v) {
 }
 
 /**
+ * The scoring rings of a face, in its radius: the X ring's edge, and how many scoring rings of equal
+ * width (the 10 ring first) fill the radius. A 10–6 face has five (10 to 6), a full face ten.
+ */
+function ringRule(face) {
+  return isSpotFace(face) ? { x: 0.1, perRadius: 5 } : { x: 0.05, perRadius: 10 };
+}
+
+/**
+ * The edges of a face's scoring rings as fractions of its radius, the X ring first and the face's
+ * edge (1) last: ring k (k ≥ 1) scores 10 − (k − 1) inside its edge.
+ */
+export function ringEdges(face) {
+  const { x, perRadius } = ringRule(face);
+  return [x, ...Array.from({ length: perRadius }, (_, k) => (k + 1) / perRadius)];
+}
+
+/**
  * Score a tap given its position normalised to the face radius (x, y in [-1, 1], centre 0,0).
  * A tap exactly on a ring line scores the lower ring.
  */
 export function scoreFromPoint(x, y, face) {
+  const { x: xRing, perRadius } = ringRule(face);
   const d = Math.hypot(x, y);
-  if (isSpotFace(face)) {
-    if (d <= 0.1) return 'X';
-    if (d < 1) return 10 - Math.floor(round9(d * 5));
-    return 'M';
-  }
-  if (d <= 0.05) return 'X';
-  if (d < 1) return 10 - Math.floor(round9(d * 10));
+  if (d <= xRing) return 'X';
+  if (d < 1) return 10 - Math.floor(round9(d * perRadius));
   return 'M';
 }
 

@@ -62,12 +62,10 @@ export function guideSheet(onClose) {
 /** Dates that already have a session (marked with a dot in the date picker). */
 export const sessionDates = (ctx) => new Set(ctx.repo.list('sessions').map((s) => s.date));
 
-/** Date and start time of a saved session, editable in History (a cleared time is removed). */
+/** Date and start time of a finished session, editable in History (a cleared time is removed). */
 export function whenCard(ctx, ss) {
-  const change = (patch) => {
-    const cur = ctx.repo.get('sessions', ss.id);
-    if (cur && ctx.save('sessions', { ...cur, ...patch })) ctx.rerender();
-  };
+  const redraw = ({ status }) => status === 'saved' && ctx.rerender();
+  const change = (when) => redraw(ctx.finished.setWhen(ss.id, when));
   return card(
     { 'aria-labelledby': 'when-title' },
     h('h2', { class: 'card-title', id: 'when-title' }, 'When'),
@@ -108,10 +106,7 @@ export function whenCard(ctx, ss) {
               max: 1440,
               value: ss.minutes ?? '',
               dataset: { fk: 'edit-minutes' },
-              onChange: (e) => {
-                const n = parseInt(e.target.value, 10);
-                change({ minutes: Number.isFinite(n) && n >= 0 ? n : null });
-              },
+              onChange: (e) => redraw(ctx.finished.setMinutes(ss.id, e.target.value)),
             }),
             h('span', { class: 'muted small' }, 'min'),
           ),
@@ -135,17 +130,20 @@ export function gearPicker({ options, value, onChange }) {
 
 /**
  * The equipment a session used, changeable on the running session and later in History
- * (picking a saved setup copies its fields into the session).
+ * (picking a saved setup copies its fields into the session). `pick(choice)` stores the choice
+ * (History passes the finished session's); by default it is stored on the running session here.
  */
-export function gearCard(ctx, ss) {
+export function gearCard(ctx, ss, pick = null) {
   const settings = ctx.repo.getSettings();
   const snapshots = ctx.repo.list('gearSnapshots', { sort: (a, b) => b.createdAt.localeCompare(a.createdAt) });
   const choices = gearChoices({ settings, snapshots, session: ss });
-  const onChange = (v) => {
-    const cur = ctx.repo.get('sessions', ss.id);
-    const next = gearForChoice(v, { settings, snapshots });
-    if (cur && next && ctx.save('sessions', { ...cur, ...next })) ctx.rerender();
-  };
+  const onChange =
+    pick ||
+    ((v) => {
+      const cur = ctx.repo.get('sessions', ss.id);
+      const next = gearForChoice(v, { settings, snapshots });
+      if (cur && next && ctx.save('sessions', { ...cur, ...next })) ctx.rerender();
+    });
   return card(
     { 'aria-labelledby': 'gear-title' },
     h('h2', { class: 'card-title', id: 'gear-title' }, 'Equipment'),

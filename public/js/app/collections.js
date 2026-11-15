@@ -1,6 +1,6 @@
 // What the app stores (ARCHITECTURE §6.4). The repository validates before every save and on import.
 import { FACE_IDS, ARROWS_PER_END_MAX, isValidArrowsPerEnd, isValidArrowValue } from './scoring.js';
-import { SESSION_TYPES, DRILL_IDS, MENTAL_TECHNIQUES, EFFORT_MAX, FOCUS_MAX, isScored, countsArrows, isTime } from './sessionTypes.js';
+import { SESSION_TYPES, DRILL_IDS, MENTAL_TECHNIQUES, EFFORT_MAX, FOCUS_MAX, isScored, countsArrows, isTime, emptyReview, emptyCompetition } from './sessionTypes.js';
 
 const isStr = (v) => typeof v === 'string';
 const isGrade = (g) => g == null || (Number.isInteger(g) && g >= 1 && g <= 5);
@@ -66,9 +66,9 @@ export const collections = {
       if (r.time != null && !isTime(r.time)) errs.push('time must be HH:MM');
       if (!SESSION_TYPES.includes(r.type)) errs.push('invalid session type');
       if (!['active', 'finished'].includes(r.status)) errs.push('invalid status');
-      if (r.review != null && (typeof r.review !== 'object' || !isStr(r.review.good ?? '') || !isStr(r.review.workOn ?? '') || !isStr(r.review.how ?? ''))) errs.push('invalid review');
+      if (r.review != null && (typeof r.review !== 'object' || Object.keys(emptyReview()).some((k) => !isStr(r.review[k] ?? '')))) errs.push('invalid review');
       if (!isScored(r.type)) return [...errs, ...validateForm(r)];
-      if (r.competition != null && (typeof r.competition !== 'object' || ['event', 'round', 'conditions', 'placement'].some((k) => !isStr(r.competition[k] ?? '')))) {
+      if (r.competition != null && (typeof r.competition !== 'object' || Object.keys(emptyCompetition()).some((k) => !isStr(r.competition[k] ?? '')))) {
         errs.push('invalid competition details');
       }
       if (!(Number.isFinite(r.distance) && r.distance > 0)) errs.push('invalid distance');

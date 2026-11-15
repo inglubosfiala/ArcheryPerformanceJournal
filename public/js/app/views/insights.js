@@ -354,14 +354,7 @@ function sessionsView(ctx, sessions, f, setF) {
 
 function reviewsView(ctx, sessions, f, setF) {
   const rows = reviewRows(sessions, f.q);
-  const save = (id, key) => (e) => {
-    const cur = ctx.repo.get('sessions', id);
-    if (cur)
-      ctx.save('sessions', {
-        ...cur,
-        review: { good: '', workOn: '', how: '', ...cur.review, [key]: e.target.value },
-      });
-  };
+  const save = (id, key) => (e) => ctx.finished.setReview(id, key, e.target.value);
   const note = (s, key, label) =>
     h(
       'label',
