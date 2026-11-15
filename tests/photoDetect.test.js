@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { detectArrows, colourClass, expectedColour } from '../public/js/app/photoDetect.js';
+import { detectArrows, colourClass, expectedColour, matchArrows } from '../public/js/app/photoDetect.js';
 import { spotCentres, isSpotFace, scoreFromPoint } from '../public/js/app/scoring.js';
 
 const RGB = {
@@ -153,5 +153,19 @@ describe('photo arrow detection', () => {
     expect(res.arrows).toHaveLength(1);
     expect(res.arrows[0].spot).toBe(2);
     expect(Math.hypot(res.arrows[0].x - 0.2, res.arrows[0].y + 0.1)).toBeLessThan(0.06);
+  });
+
+  it('matches the arrows of two live frames only when they are the same arrows in place', () => {
+    const a = [
+      { x: 0.1, y: 0.1, spot: 0 },
+      { x: -0.3, y: 0.2, spot: 1 },
+    ];
+    // same arrows, slightly moved and listed in another order
+    expect(matchArrows(a, [{ x: -0.28, y: 0.22, spot: 1 }, { x: 0.12, y: 0.08, spot: 0 }])).toEqual([1, 0]);
+    // one moved too far, one on another spot, a different count, nothing at all
+    expect(matchArrows(a, [{ x: 0.4, y: 0.1, spot: 0 }, { x: -0.3, y: 0.2, spot: 1 }])).toBeNull();
+    expect(matchArrows(a, [{ x: 0.1, y: 0.1, spot: 2 }, { x: -0.3, y: 0.2, spot: 1 }])).toBeNull();
+    expect(matchArrows(a, [a[0]])).toBeNull();
+    expect(matchArrows([], [])).toBeNull();
   });
 });

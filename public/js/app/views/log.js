@@ -27,6 +27,7 @@ import { faceSheet, faceViewBox, VB } from './face.js';
 import { SESSION_TYPES, TYPE_LABELS, isScored, hourMinute, sessionType } from '../sessionTypes.js';
 import { emptyForm, formSections } from './sessionForms.js';
 import { detectArrows } from '../photoDetect.js';
+import { liveScan } from './liveScan.js';
 
 export function findActive(repo) {
   return repo.list('sessions', { filter: (x) => x.status === 'active' })[0] || null;
@@ -854,24 +855,11 @@ function renderActive(ctx, session) {
 const PHOTO_MAX = 640; // the photo is scaled down to this many pixels on its long side before detection
 
 /**
- * Camera button: take (or pick) a photo of the target; arrows found on it fill the empty slots of
- * the end after a preview. Best effort: wrong ones are dragged on the face afterwards. The photo is
- * only used in memory and is never stored.
+ * Camera button: scan the target with the live camera (or take / pick a photo from there); arrows
+ * found fill the empty slots of the end after a preview. Best effort: wrong ones are dragged on
+ * the face afterwards. Pictures are only used in memory and are never stored.
  */
 function photoButton(ctx, session) {
-  const input = h('input', {
-    type: 'file',
-    accept: 'image/*',
-    capture: 'environment',
-    class: 'sr-only',
-    tabindex: '-1',
-    'aria-hidden': 'true',
-    onChange: (e) => {
-      const file = e.target.files?.[0];
-      e.target.value = '';
-      if (file) scoreFromPhoto(ctx, file);
-    },
-  });
   return h(
     'span',
     { class: 'photo-btn-wrap' },
@@ -880,26 +868,56 @@ function photoButton(ctx, session) {
       {
         type: 'button',
         class: 'icon-btn',
-        'aria-label': 'Score arrows from a photo of the target',
+        'aria-label': 'Score arrows with the camera',
         dataset: { fk: 'photo' },
         disabled: L.viewIndex(session) !== session.ends.length,
-        onClick: () => input.click(),
+        onClick: () => scoreLive(ctx),
       },
       icons.camera(),
     ),
-    input,
   );
 }
 
-async function scoreFromPhoto(ctx, file) {
+/** What a scan needs from the running session, or null (with a message) when the end is full. */
+function scanContext(ctx) {
   const session = findActive(ctx.repo);
-  if (!session) return;
+  if (!session) return null;
   const face = session.face;
   const empty = L.shownEnd(session).arrows.filter((a) => a.v == null).length;
   if (!empty) {
     ctx.toast('This end is full. Clear an arrow or go to the next end first.');
-    return;
+    return null;
   }
+  // A picture of a three-spot sheet may show only one spot (a close-up): its arrows then go on the
+  // first spot of the sheet that has no arrow yet in this end.
+  const used = new Set(L.shownEnd(session).arrows.filter((a) => a.v != null && a.spot != null).map((a) => a.spot));
+  const spotHint = Math.max(0, spotCentres(face).findIndex((_, k) => !used.has(k)));
+  return { face, empty, spotHint };
+}
+
+/** Live camera: the result locks by itself (or Take now); Cancel in the preview goes back to the camera. */
+async function scoreLive(ctx) {
+  for (;;) {
+    const sc = scanContext(ctx);
+    if (!sc) return;
+    const got = await liveScan({ face: sc.face, maxArrows: sc.empty, spotHint: sc.spotHint });
+    if (!got) return;
+    if (got.file) {
+      await scoreFromPhoto(ctx, got.file);
+      return;
+    }
+    const preview = h('canvas', { class: 'photo-preview' });
+    preview.width = got.canvas.width;
+    preview.height = got.canvas.height;
+    preview.getContext('2d').drawImage(got.canvas, 0, 0);
+    if (await previewAndApply(ctx, preview, got.res, sc, { cancelLabel: 'Back to camera' })) return;
+  }
+}
+
+async function scoreFromPhoto(ctx, file) {
+  const sc = scanContext(ctx);
+  if (!sc) return;
+  const { face, empty, spotHint } = sc;
   let bitmap;
   try {
     bitmap = await createImageBitmap(file);
@@ -914,18 +932,21 @@ async function scoreFromPhoto(ctx, file) {
   const g = canvas.getContext('2d', { willReadFrequently: true });
   g.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
   bitmap.close();
-  // A photo of a three-spot sheet may show only one spot (a close-up): its arrows then go on the
-  // first spot of the sheet that has no arrow yet in this end.
-  const used = new Set(L.shownEnd(session).arrows.filter((a) => a.v != null && a.spot != null).map((a) => a.spot));
-  const freeSpot = spotCentres(face).findIndex((_, k) => !used.has(k));
-  const spotHint = Math.max(0, freeSpot);
   const res = detectArrows(g.getImageData(0, 0, canvas.width, canvas.height), face, empty, { spotHint });
   if (res.error) {
     ctx.toast(res.error);
     return;
   }
+  await previewAndApply(ctx, canvas, res, sc);
+}
 
-  // preview: the face edge found, and each arrow numbered with its score
+/**
+ * Show the picture with what was found (the face edge, each arrow numbered with its score) and, on
+ * Use, enter the arrows into the end. Returns true when the question is settled (used, or nothing
+ * to use), false when it was cancelled.
+ */
+async function previewAndApply(ctx, canvas, res, { face, spotHint }, { cancelLabel = 'Cancel' } = {}) {
+  const g = canvas.getContext('2d');
   const line = Math.max(2, canvas.width / 220);
   g.lineWidth = line;
   g.strokeStyle = '#00e5ff';
@@ -962,16 +983,19 @@ async function scoreFromPhoto(ctx, file) {
         }Drag any arrow on the target to correct it.`
       : 'Try a photo taken straight at the target, close enough that the face fills the picture.',
     confirmLabel: n ? 'Use' : 'OK',
+    cancelLabel,
     icon: 'camera',
     body: canvas,
   });
-  if (!ok || !n) return;
+  if (!ok) return false;
+  if (!n) return true;
   update(ctx, (cur) =>
     res.arrows.reduce((s, a, i) => {
       const onFace = Math.hypot(a.x, a.y) < 1.05;
       return L.enterScore(s, values[i], onFace ? round3(a.x) : null, onFace ? round3(a.y) : null, a.spot);
     }, { ...cur, pinned: false }),
   );
+  return true;
 }
 
 function findSightMark(repo, distance) {

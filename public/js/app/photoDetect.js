@@ -229,7 +229,7 @@ export function detectArrows(img, face, maxArrows, { debug = false, spotHint = 0
   //    transform (every dark pixel votes for the lines through it), so old holes (scattered dots)
   //    and the ring lines (curved) do not count. The arrow is at the end of the line inside a face.
   const rejects = debug ? [] : null;
-  const shafts = findShafts({ width, height, data, nearest, spotPx, face, odd, rejects });
+  const shafts = findShafts({ width, height, data, nearest, spotPx, face, odd, cls, rejects });
 
   // 2) Nocks / fletchings seen head-on: big compact blobs of colour that does not belong to the ring
   //    under it (only used for arrows the shafts did not account for).
@@ -326,9 +326,41 @@ function distToSegment(x, y, a, b) {
  * Arrow shafts as straight dark lines near the spots. Returns [{ a, b, length, tip, tipAt }]: the
  * dark run along the line (a–b) and its end inside a face (the arrow's entry point).
  */
-function findShafts({ width, height, data, nearest, spotPx, face, odd, rejects = null }) {
+function findShafts({ width, height, data, nearest, spotPx, face, odd, cls, rejects = null }) {
+  const bright = (i) => Math.max(data[i * 4], data[i * 4 + 1], data[i * 4 + 2]);
+  // How bright each ring colour is in this photo (the median of its pixels). A shaft over a ring is
+  // "dark" when it is clearly darker than that ring, even if it is brownish rather than black
+  // (carbon in the light, wood): otherwise the line would stop where the shaft enters the gold.
+  const hist = { gold: new Int32Array(256), red: new Int32Array(256), blue: new Int32Array(256), white: new Int32Array(256) };
+  for (let i = 0; i < width * height; i++) {
+    const hgram = hist[cls[i]];
+    if (hgram) hgram[bright(i)]++;
+  }
+  const refs = {};
+  for (const [zone, hgram] of Object.entries(hist)) {
+    const total = hgram.reduce((p, q) => p + q, 0);
+    let seen = 0;
+    for (let v = 0; v < 256 && total; v++) {
+      seen += hgram[v];
+      if (seen * 2 >= total) {
+        refs[zone] = v;
+        break;
+      }
+    }
+  }
+  const maxRef = Math.max(0, ...Object.values(refs));
+  const raw = new Uint8Array(width * height);
+  for (let i = 0; i < width * height; i++) {
+    const v = bright(i);
+    if (v <= 125) raw[i] = 1;
+    else if (v <= 0.78 * maxRef) {
+      const d = nearest(i % width, (i / width) | 0).d;
+      const zone = d < 1 ? expectedColour(d, face, 0.03) : null;
+      if (zone && refs[zone] && v <= 0.78 * refs[zone]) raw[i] = 1;
+    }
+  }
   // dark pixels on or around the faces (the sheet), but not on a full face's black rings
-  const isDarkPx = (i) => Math.max(data[i * 4], data[i * 4 + 1], data[i * 4 + 2]) <= 125;
+  const isDarkPx = (i) => raw[i] === 1;
   // A shaft is thin: a dark pixel only counts when the dark run through it is short across (in x
   // or in y). That drops big dark areas (a table or wall behind the sheet, shadows).
   const maxThick = Math.max(6, Math.round(0.16 * spotPx));
@@ -463,7 +495,9 @@ function findShafts({ width, height, data, nearest, spotPx, face, odd, rejects =
     const line = { a, b, length: run.u1 - run.u0, tip, tipAt, t };
     const same = found.findIndex((f) => {
       const da = Math.min(Math.abs(f.t - t), T - Math.abs(f.t - t));
-      return da <= 12 && (distToSegment(tip.x, tip.y, f.a, f.b) < 0.15 * spotPx || Math.hypot(f.tip.x - tip.x, f.tip.y - tip.y) < 0.3 * spotPx);
+      const near = Math.hypot(f.tip.x - tip.x, f.tip.y - tip.y);
+      // also a line of any direction ending at the same point: the shaft's shadow starts there too
+      return near < 0.15 * spotPx || (da <= 12 && (distToSegment(tip.x, tip.y, f.a, f.b) < 0.15 * spotPx || near < 0.3 * spotPx));
     });
     if (same >= 0) {
       if (tipAt.d < found[same].tipAt.d) found[same] = { ...line, length: Math.max(line.length, found[same].length) };
@@ -472,4 +506,31 @@ function findShafts({ width, height, data, nearest, spotPx, face, odd, rejects =
     found.push(line);
   }
   return found;
+}
+
+/**
+ * Live view: are the arrows of two frames the same arrows in (nearly) the same places?
+ * Returns, for each arrow of `prev`, the index of its match in `cur` (same spot, within `tol` face
+ * units), or null when the counts differ or an arrow has no match.
+ */
+export function matchArrows(prev, cur, tol = 0.1) {
+  if (!prev.length || prev.length !== cur.length) return null;
+  const used = new Set();
+  const map = [];
+  for (const a of prev) {
+    let best = -1;
+    let bestD = tol;
+    cur.forEach((b, j) => {
+      if (used.has(j) || (a.spot ?? null) !== (b.spot ?? null)) return;
+      const d = Math.hypot(a.x - b.x, a.y - b.y);
+      if (d <= bestD) {
+        bestD = d;
+        best = j;
+      }
+    });
+    if (best < 0) return null;
+    used.add(best);
+    map.push(best);
+  }
+  return map;
 }
