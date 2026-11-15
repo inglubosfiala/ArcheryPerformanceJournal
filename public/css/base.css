@@ -657,6 +657,9 @@ textarea {
 
 button.saved-end {
   width: 100%;
+  /* room inside the rounded row, so the end number clears the viewed row's accent bar */
+  padding-left: 14px;
+  padding-right: 12px;
   border: 0;
   background: transparent;
   text-align: left;
