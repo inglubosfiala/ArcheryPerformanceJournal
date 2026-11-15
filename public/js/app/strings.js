@@ -47,7 +47,6 @@ export const T = {
   arrowN: (n) => `Arrow ${n}`,
   arrowScored: (n, v) => `Arrow ${n}: ${v}`,
   placeArrow: (n) => `Place arrow ${n}`,
-  gradeMAndS: 'Grade M and S',
   nextArrow: 'Next arrow',
   saveEndNow: (n) => `Save end ${n} now`,
   scoreOnly: 'or enter the score only',

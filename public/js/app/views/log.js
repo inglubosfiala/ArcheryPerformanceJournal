@@ -127,10 +127,9 @@ function announceArrow(ctx) {
   if (a?.v != null) announce(T.arrowScored(s.cursor + 1, a.v));
 }
 
-// the bottom bar's primary button for each L.primaryAction: its label, and what it does
+// the bottom bar's primary button for each L.primaryAction ('grade' has none): its label, and what it does
 const PRIMARY = {
   place: { label: (pa) => T.placeArrow(pa.slot) },
-  grade: { label: () => T.gradeMAndS },
   next: { label: () => T.nextArrow, run: L.nextArrow },
   save: { label: (pa) => T.saveEnd(pa.end), run: L.nextEnd },
   back: { label: (pa) => T.backToEnd(pa.end), run: (c) => L.goToEnd(c, null) },
@@ -272,14 +271,19 @@ function renderActive(ctx, session) {
           gradePanel(session, { onGrade: (kind, g) => update(ctx, (c) => L.gradeArrow(c, kind, g)) }),
         );
 
-  // --- bottom bar, in thumb reach: Undo, Scan (the most used), and the primary action
+  // --- bottom bar, in thumb reach: Undo, the primary action, and Scan (the most used) at the end.
+  // While the selected arrow still needs its grades there is no primary button (the M / S rows are
+  // the next step); its place stays empty, so Scan does not move.
   const pa = L.primaryAction(session, { askGrades });
-  const primary = APL.Button({
-    children: PRIMARY[pa.action].label(pa),
-    disabled: !pa.enabled,
-    onClick: () => update(ctx, PRIMARY[pa.action].run),
-    fk: 'primary',
-  });
+  const primary =
+    pa.action === 'grade'
+      ? h('span', { class: 'score-actions-gap', 'aria-hidden': 'true' })
+      : APL.Button({
+          children: PRIMARY[pa.action].label(pa),
+          disabled: !pa.enabled,
+          onClick: () => update(ctx, PRIMARY[pa.action].run),
+          fk: 'primary',
+        });
   const undoBtn = h(
     'button',
     {
@@ -400,7 +404,7 @@ function renderActive(ctx, session) {
         gearCard(ctx, session),
         h('button', { type: 'button', class: 'btn btn-text danger apl-discard', onClick: discard }, T.discardSession),
       ),
-      APL.BottomBar({ children: h('div', { class: 'score-actions' }, undoBtn, photoButton(ctx, session), primary) }),
+      APL.BottomBar({ children: h('div', { class: 'score-actions' }, undoBtn, primary, photoButton(ctx, session)) }),
     ),
   };
 }
