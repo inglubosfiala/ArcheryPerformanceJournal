@@ -1787,10 +1787,23 @@ button.arrow-count:hover {
   font: var(--type-screen-title);
 }
 
-.score-sub {
-  margin: 0;
-  font: var(--type-caption);
+/* the session's total, just over the list of its ends (lines up with the ends' scores) */
+.ends-total {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--subtle);
+  font: var(--type-label);
+  letter-spacing: var(--type-label-tracking);
+  text-transform: uppercase;
   color: var(--muted);
+}
+
+.ends-total strong {
+  font: var(--type-value-lg);
+  letter-spacing: 0;
+  color: var(--ink);
 }
 
 /* slot strip: one card per arrow, the current one outlined in accent */

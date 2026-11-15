@@ -8,7 +8,6 @@ import {
   isMultiSpot,
   spotCentres,
   zoneOf,
-  faceLabel,
   suggestedSpot,
 } from '../scoring.js';
 import { sumArrows, computeStats, fmt } from '../stats.js';
@@ -141,8 +140,8 @@ function renderActive(ctx, session) {
     if (update(ctx, (cur) => L.enterScore(cur, v, x, y, spot))) announceArrow(ctx);
   };
 
-  const total =
-    session.ends.reduce((n, e) => n + sumArrows(e.arrows), 0) + (viewing ? 0 : sumArrows(current.arrows));
+  // the session's total: every end, the one being shot included (also while an earlier one is open)
+  const total = [...session.ends, session.current].reduce((n, e) => n + sumArrows(e.arrows), 0);
 
   // session timer: tap to pause / resume
   // sessions started before the timer existed show it stopped at 0:00; one tap starts it
@@ -163,7 +162,6 @@ function renderActive(ctx, session) {
         T.endN(endNo),
         viewing ? h('span', { class: 'end-of muted' }, T.endOf(totalEnds)) : null,
       ),
-      h('p', { class: 'score-sub' }, [`${T.total} ${total}`, `${session.distance} m`, faceLabel(session.face)].join(' · ')),
     ),
     timerBtn,
   );
@@ -252,11 +250,13 @@ function renderActive(ctx, session) {
           {
             type: 'button',
             class: 'score-clear',
+            // the button says just "Clear"; screen readers hear which arrow
+            'aria-label': T.clearArrow(cursor + 1),
             onClick: () => update(ctx, L.clearArrow),
             dataset: { fk: 'clear-arrow' },
           },
-          icons.erase(),
-          T.clearArrow(cursor + 1),
+          icons.clear(),
+          T.clear,
         )
       : null,
   );
@@ -399,6 +399,8 @@ function renderActive(ctx, session) {
         details,
         card(
           { class: 'card-list', 'aria-label': T.ends },
+          // the session's total, just over its ends
+          h('div', { class: 'ends-total' }, h('span', null, T.total), h('strong', null, String(total))),
           h('ol', { class: 'saved-ends', reversed: true }, rows.reverse()),
         ),
         gearCard(ctx, session),

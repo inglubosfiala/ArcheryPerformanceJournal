@@ -47,6 +47,7 @@ export const T = {
   arrowScored: (n, v) => `Arrow ${n}: ${v}`,
   prevEnd: 'Previous end',
   nextEnd: 'Next end',
+  clear: 'Clear',
   clearArrow: (n) => `Clear arrow ${n}`,
   prevShort: 'Previous',
   nextShort: 'Next',

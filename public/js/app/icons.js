@@ -46,6 +46,8 @@ export const icons = {
   clock: () => icon(18, c(12, 12, 9), p('M12 7v5l3 2')),
   close: () => icon(18, p('M6 6l12 12M18 6 6 18')),
   trash: () => icon(18, p('M3 6h18'), p('M8 6V4h8v2'), p('M19 6l-1 14H6L5 6')),
+  // Clear (an arrow): a bin with its lid and two ribs
+  clear: () => icon(18, p('M4 7h16'), p('M9.5 7V4.5h5V7'), p('M6.5 7l1 12.5h9l1-12.5'), p('M10.5 11v5M13.5 11v5')),
   log: () => icon(22, c(12, 12, 9), c(12, 12, 5), c(12, 12, 1)),
   dashboard: () => icon(22, s('rect', { x: 3, y: 3, width: 7, height: 9, rx: 1.5 }), s('rect', { x: 14, y: 3, width: 7, height: 5, rx: 1.5 }), s('rect', { x: 14, y: 12, width: 7, height: 9, rx: 1.5 }), s('rect', { x: 3, y: 16, width: 7, height: 5, rx: 1.5 })),
   history: () => icon(22, p('M4 19V5'), p('M4 19h16'), p('M8 15l4-5 3 3 5-6')),
