@@ -530,6 +530,8 @@ function findSightMark(repo, distance) {
 // ---------------------------------------------------------------- target face
 
 const LOUPE_SPAN = 24; // viewBox units shown in the magnifier (the face is 202 wide → ~3× zoom)
+// A finger aiming a new arrow aims this many screen pixels above itself, so it never hides the point.
+const AIM_OFFSET_PX = 64;
 // The spot an arrow was just placed on (multi-spot sheets): placing re-renders the page, and the new
 // target starts zoomed on this spot and animates out to the whole sheet (the reverse of the zoom in).
 let zoomOutFrom = null;
@@ -677,18 +679,75 @@ function targetInput(session, enter, slots, { clearable = false, clearLabel = 'C
     zoomOutBtn.hidden = i == null;
   }
 
-  const toFace = (ev) => {
-    const r = btn.getBoundingClientRect();
-    // screen → SVG units (the sheet may be letterboxed inside the square button)
-    const m = sheet.getScreenCTM()?.inverse();
-    const pt = m ? new DOMPoint(ev.clientX, ev.clientY).matrixTransform(m) : { x: 0, y: 0 };
+  // --- one gesture's geometry, read once when the pointer lands (no layout reads while it moves)
+  let geo = null; // { rect, inv, unitsPerPx }
+  const readGeometry = () => {
+    const rect = btn.getBoundingClientRect();
+    const vb = sheet.getAttribute('viewBox').split(' ').map(Number);
     return {
-      x: pt.x / 100,
-      y: pt.y / 100,
-      // finger position inside the stage, used to keep the loupe out from under the finger
-      px: ev.clientX - r.left,
-      py: ev.clientY - r.top,
+      rect,
+      // screen → SVG units (the sheet may be letterboxed inside the square button)
+      inv: sheet.getScreenCTM()?.inverse() ?? null,
+      // one screen pixel in SVG units (the sheet is letterboxed with "meet")
+      unitsPerPx: Math.max(vb[2] / rect.width, vb[3] / rect.height),
     };
+  };
+  const toSheet = (clientX, clientY) => {
+    const pt = geo.inv ? new DOMPoint(clientX, clientY).matrixTransform(geo.inv) : { x: 0, y: 0 };
+    return { x: pt.x / 100, y: pt.y / 100 };
+  };
+  const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
+  // A pointer position: `x`, `y` the aimed point on the sheet (one spot's radius = 1), `fx`, `fy`
+  // the finger on the sheet, `px`, `py` the finger inside the stage. With `offset` (a finger aiming
+  // a new arrow) the aimed point is AIM_OFFSET_PX above the finger, so the finger never hides it,
+  // and kept inside the stage; the finger itself may go below it. A mouse or pen aims where it points.
+  const toFace = (ev, { offset = false } = {}) => {
+    const { rect } = geo;
+    const finger = toSheet(ev.clientX, ev.clientY);
+    const aim = offset
+      ? toSheet(clamp(ev.clientX, rect.left, rect.right), clamp(ev.clientY - AIM_OFFSET_PX, rect.top, rect.bottom))
+      : finger;
+    return { x: aim.x, y: aim.y, fx: finger.x, fy: finger.y, px: ev.clientX - rect.left, py: ev.clientY - rect.top };
+  };
+
+  // on the sheet while a finger aims: a crosshair at the aimed point, a faint ring where the finger
+  // is, and a thin line between them (drawn in screen pixels, scaled to the sheet per gesture)
+  const crosshair = s(
+    'g',
+    null,
+    s('path', { d: 'M0 -17v11M0 6v11M-17 0h11M6 0h11', stroke: '#14181C', 'stroke-opacity': 0.6, 'stroke-width': 4, 'stroke-linecap': 'round' }),
+    s('path', { d: 'M0 -17v11M0 6v11M-17 0h11M6 0h11', stroke: '#FFFFFF', 'stroke-width': 2, 'stroke-linecap': 'round' }),
+    s('circle', { r: 3, fill: '#14181C', stroke: '#FFFFFF', 'stroke-width': 1.5 }),
+  );
+  const fingerRing = s('circle', {
+    r: 28,
+    fill: 'rgba(255, 255, 255, 0.1)',
+    stroke: 'rgba(255, 255, 255, 0.7)',
+    'stroke-width': 2,
+    'stroke-dasharray': '5 4',
+  });
+  const aimLine = s('line', { stroke: 'rgba(255, 255, 255, 0.7)', 'stroke-linecap': 'round' });
+  const aimGuide = s('g', { class: 'aim-guide', visibility: 'hidden' }, aimLine, fingerRing, crosshair);
+  sheet.append(aimGuide);
+  const drawAimGuide = (p) => {
+    const k = geo.unitsPerPx;
+    const [ax, ay, fx, fy] = [p.x * 100, p.y * 100, p.fx * 100, p.fy * 100];
+    crosshair.setAttribute('transform', `translate(${ax} ${ay}) scale(${k})`);
+    fingerRing.setAttribute('transform', `translate(${fx} ${fy}) scale(${k})`);
+    // the line runs from under the crosshair to the ring's edge, when there is room for it
+    const d = Math.hypot(fx - ax, fy - ay);
+    const from = 17 * k;
+    const to = d - 28 * k;
+    aimLine.setAttribute('visibility', to > from ? 'visible' : 'hidden');
+    if (to > from) {
+      const [ux, uy] = [(fx - ax) / d, (fy - ay) / d];
+      aimLine.setAttribute('x1', ax + ux * from);
+      aimLine.setAttribute('y1', ay + uy * from);
+      aimLine.setAttribute('x2', ax + ux * to);
+      aimLine.setAttribute('y2', ay + uy * to);
+      aimLine.setAttribute('stroke-width', 1.5 * k);
+    }
+    aimGuide.setAttribute('visibility', 'visible');
   };
 
   // The loupe's place is chosen once, when the finger lands, and kept until it lifts (it never jumps).
@@ -721,6 +780,7 @@ function targetInput(session, enter, slots, { clearable = false, clearLabel = 'C
     loupeScore.textContent = String(v);
     loupeScore.className = `score-chip loupe-score z-${zoneOf(v)}`;
     loupe.hidden = false;
+    if (active?.offset) drawAimGuide(p);
     if (active?.mode === 'move') {
       const from = active.origin;
       guideLine.setAttribute('x1', from.x * 100);
@@ -737,10 +797,7 @@ function targetInput(session, enter, slots, { clearable = false, clearLabel = 'C
   const aimFrom = (f, off) => ({ ...f, x: f.x + off.x, y: f.y + off.y });
   // the placed arrow of the shown end nearest the pointer, within `reachPx` on the screen
   const grabAt = (f, reachPx) => {
-    const vb = sheet.getAttribute('viewBox').split(' ').map(Number);
-    const r = btn.getBoundingClientRect();
-    const unitsPerPx = Math.max(vb[2] / r.width, vb[3] / r.height); // the sheet is letterboxed (meet)
-    const reach = (reachPx * unitsPerPx) / 100;
+    const reach = (reachPx * geo.unitsPerPx) / 100;
     let best = null;
     L.shownEnd(session).arrows.forEach((a, i) => {
       if (a.v == null || a.x == null) return;
@@ -752,14 +809,42 @@ function targetInput(session, enter, slots, { clearable = false, clearLabel = 'C
     return best;
   };
 
+  // pointer moves are applied once per frame: the latest position wins
+  let frame = 0;
+  let pending = null;
+  const applyMove = (pos) => {
+    if (active.mode === 'pick') {
+      active.p = toFace(pos);
+      return;
+    }
+    active.moved = Math.max(active.moved, Math.hypot(pos.clientX - active.from.x, pos.clientY - active.from.y));
+    active.p = aimFrom(toFace(pos, { offset: active.offset }), active.off);
+    show(active.p);
+  };
+  const flushMove = () => {
+    cancelAnimationFrame(frame);
+    frame = 0;
+    const pos = pending;
+    pending = null;
+    if (pos && active) applyMove(pos);
+  };
+
   const end = (ev, commit) => {
     if (!active || ev.pointerId !== active.id) return;
+    // the last move counts (it may still be waiting for its frame); a cancelled touch drops it
+    if (commit) flushMove();
+    else {
+      cancelAnimationFrame(frame);
+      frame = 0;
+      pending = null;
+    }
     const { p, mode, idx, tapPicks, moved } = active;
     active = null;
     loupe.hidden = true;
     loupe.classList.remove('is-moving');
     loupeTag.hidden = true;
     moveGuide.setAttribute('visibility', 'hidden');
+    aimGuide.setAttribute('visibility', 'hidden');
     btn.classList.remove('aiming', 'moving');
     sheet.querySelector('.is-grabbed')?.classList.remove('is-grabbed');
     if (!commit) return;
@@ -791,7 +876,8 @@ function targetInput(session, enter, slots, { clearable = false, clearLabel = 'C
     } catch {
       /* pointer already gone */
     }
-    const p = toFace(ev);
+    geo = readGeometry();
+    const p = toFace(ev); // the finger itself: picking a spot and grabbing an arrow work under it
     // Touching a placed arrow of this end grabs it: dragging moves it (the pointer keeps its distance
     // to the dot, so the dot does not jump under the finger). A finger covers the dot and lands
     // less exactly than a mouse, so it reaches further. On a sheet of several spots this works on
@@ -804,9 +890,11 @@ function targetInput(session, enter, slots, { clearable = false, clearLabel = 'C
       return;
     }
     const from = { x: ev.clientX, y: ev.clientY, moved: 0 };
+    // a finger aiming a new arrow aims above itself; a mouse or pen where it points
+    const offset = !grab && ev.pointerType === 'touch';
     active = grab
       ? { id: ev.pointerId, mode: 'move', idx: grab.i, off: grab.off, p: aimFrom(p, grab.off), origin: aimFrom(p, grab.off), from, moved: 0, tapPicks: whole }
-      : { id: ev.pointerId, mode: 'aim', off: { x: 0, y: 0 }, p, from, moved: 0 };
+      : { id: ev.pointerId, mode: 'aim', off: { x: 0, y: 0 }, offset, p: offset ? toFace(ev, { offset }) : p, from, moved: 0 };
     if (grab) {
       sheet.querySelector(`[data-arrow="${grab.i}"]`)?.classList.add('is-grabbed');
       guideNumber.textContent = String(grab.i + 1);
@@ -823,13 +911,8 @@ function targetInput(session, enter, slots, { clearable = false, clearLabel = 'C
   });
   btn.addEventListener('pointermove', (ev) => {
     if (!active || ev.pointerId !== active.id) return;
-    if (active.mode === 'pick') {
-      active.p = toFace(ev);
-      return;
-    }
-    active.moved = Math.max(active.moved, Math.hypot(ev.clientX - active.from.x, ev.clientY - active.from.y));
-    active.p = aimFrom(toFace(ev), active.off);
-    show(active.p);
+    pending = { clientX: ev.clientX, clientY: ev.clientY };
+    if (!frame) frame = requestAnimationFrame(flushMove);
   });
   btn.addEventListener('pointerup', (ev) => end(ev, true));
   btn.addEventListener('pointercancel', (ev) => end(ev, false));

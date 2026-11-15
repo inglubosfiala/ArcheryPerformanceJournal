@@ -48,6 +48,7 @@ const SHELL = [
   './js/app/gearFields.js',
   './js/app/icons.js',
   './js/app/scoring.js',
+  './js/app/loupePlacement.js',
   './js/app/photoDetect.js',
   './js/app/photoWorker.js',
   './js/app/scanGeometry.js',
