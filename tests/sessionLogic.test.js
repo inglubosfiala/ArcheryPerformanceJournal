@@ -101,6 +101,21 @@ describe('editing an existing arrow', () => {
   });
 });
 
+describe('moving a placed arrow', () => {
+  it('changes its score and position, keeps its grades and the other arrows', () => {
+    let s = L.enterScore(start(), 9, 0.3, 0.1);
+    s = L.gradeArrow(s, 'm', 2);
+    s = L.enterScore(s, 7, -0.6, 0.2);
+    s = L.moveArrow(s, 0, 10, 0.05, -0.02);
+    expect(s.current.arrows[0]).toMatchObject({ v: 10, x: 0.05, y: -0.02, m: 2 });
+    expect(s.current.arrows[1]).toMatchObject({ v: 7, x: -0.6, y: 0.2 });
+    expect(s.pinned).toBe(false);
+    // the next score still goes to the next empty slot
+    s = L.enterScore(s, 8);
+    expect(s.current.arrows.map((a) => a.v)).toEqual([10, 7, 8]);
+  });
+});
+
 describe('let-down steppers', () => {
   it('correct let-downs never exceed let-downs', () => {
     let s = L.bump(start(), 'cld', 1);

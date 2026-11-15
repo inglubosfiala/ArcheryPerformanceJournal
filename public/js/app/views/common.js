@@ -15,6 +15,10 @@ export const card = (props, ...children) => h('section', { ...props, class: ['ca
 
 export const sectionLabel = (text, id) => h('div', { class: 'section-label', id }, text);
 
+/** The back button, the same on every page: alone on its row, at the right (thumb side). */
+export const backBar = (href, label) =>
+  h('div', { class: 'back-bar' }, h('a', { class: 'icon-btn', href, 'aria-label': label, dataset: { fk: 'back' } }, icons.back()));
+
 export function chip({ label, sub, pressed, onClick, fk }) {
   return h(
     'button',

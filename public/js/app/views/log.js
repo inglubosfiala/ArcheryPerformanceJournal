@@ -20,7 +20,7 @@ import { sumArrows, computeStats, fmt } from '../stats.js';
 import * as L from '../sessionLogic.js';
 import { T } from '../strings.js';
 import { icons } from '../icons.js';
-import { card, chip, sectionLabel, gearPicker, gearCard, sessionDates } from './common.js';
+import { card, chip, sectionLabel, gearPicker, gearCard, sessionDates, backBar } from './common.js';
 import { datePicker, timePicker } from './pickers.js';
 import { gearChoices, gearForChoice } from '../gearFields.js';
 import { faceSheet, faceViewBox, VB } from './face.js';
@@ -53,7 +53,8 @@ export function logSubtitle(repo) {
 
 export function renderLog(ctx) {
   const active = findActive(ctx.repo);
-  return active ? renderActive(ctx, active) : renderSetup(ctx);
+  // no session running (e.g. it was just finished or discarded): choose a type for a new one
+  return active ? renderActive(ctx, active) : renderTypeChoice(ctx);
 }
 
 /** New-session setup, reachable from the bottom bar even while a session is in progress. */
@@ -80,12 +81,8 @@ function renderTypeChoice(ctx) {
     content: h(
       'div',
       { class: 'stack' },
-      h(
-        'div',
-        { class: 'row align-center' },
-        h('a', { class: 'icon-btn', href: '#/home', 'aria-label': 'Back to dashboard' }, icons.back()),
-        h('h1', { class: 'page-title sm grow' }, T.newSession),
-      ),
+      backBar('#/home', 'Back to dashboard'),
+      h('h1', { class: 'page-title sm' }, T.newSession),
       card(
         { class: 'setup-card', 'aria-label': 'Session type' },
         sectionLabel('Session type'),
@@ -470,12 +467,8 @@ function renderSetup(ctx, type, active = null) {
     content: h(
       'div',
       { class: 'stack' },
-      h(
-        'div',
-        { class: 'row align-center' },
-        h('a', { class: 'icon-btn', href: '#/new', 'aria-label': 'Back to session type' }, icons.back()),
-        h('h1', { class: 'page-title sm grow' }, `${TYPE_LABELS[type]} session`),
-      ),
+      backBar('#/new', 'Back to session type'),
+      h('h1', { class: 'page-title sm' }, `${TYPE_LABELS[type]} session`),
       active && isScored(type)
         ? h(
             'div',
@@ -604,19 +597,15 @@ function renderActive(ctx, session) {
     }),
   );
 
-  const undoBtn = h(
-    'button',
-    {
-      type: 'button',
-      class: 'icon-btn',
-      'aria-label': T.undo,
-      dataset: { fk: 'undo' },
-      onClick: () => update(ctx, L.undo),
-    },
-    icons.undo(),
-  );
-
-  const input = targetInput(session, enter, slots);
+  // Clear: shown when an arrow was tapped on the left and has a score or grades; empties that arrow
+  const picked = session.pinned ? L.shownEnd(session).arrows[session.cursor] : null;
+  const clearable = !!picked && (picked.v != null || picked.m != null || picked.s != null);
+  const input = targetInput(session, enter, slots, {
+    onMove: (i, v, x, y, spot) => update(ctx, (cur) => L.moveArrow(cur, i, v, x, y, spot)),
+    clearable,
+    clearLabel: `Clear arrow ${session.cursor + 1}`,
+    onClear: () => update(ctx, L.clearArrow),
+  });
 
   // session timer: tap to pause / resume
   // sessions started before the timer existed show it stopped at 0:00; one tap starts it
@@ -633,45 +622,52 @@ function renderActive(ctx, session) {
     h(
       'div',
       { class: 'end-head' },
-      // ‹ End N › — Next on the newest end saves it and starts a new one
+      // only the end's name up here; Previous / Next end are under the grades
       h(
         'div',
         { class: 'end-nav' },
-        h(
-          'button',
-          {
-            type: 'button',
-            class: 'icon-btn',
-            'aria-label': T.prevEnd,
-            disabled: !L.canPrevEnd(session),
-            dataset: { fk: 'end-prev' },
-            onClick: () => update(ctx, L.prevEnd),
-          },
-          icons.back(),
-        ),
         h(
           'h2',
           { class: 'end-title' },
           `${T.end} ${endNo}`,
           h('span', { class: 'end-of muted' }, totalEnds > 1 ? ` / ${totalEnds}` : ''),
         ),
-        h(
-          'button',
-          {
-            type: 'button',
-            class: 'icon-btn',
-            'aria-label': viewing ? T.nextEnd : T.saveAndNext,
-            disabled: !L.canNextEnd(session),
-            dataset: { fk: 'end-next' },
-            onClick: () => update(ctx, L.nextEnd),
-          },
-          icons.forward(),
-        ),
       ),
-      h('div', { class: 'end-totals' }, timerBtn, undoBtn),
+      h('div', { class: 'end-totals' }, timerBtn),
     ),
     input,
     grades,
+    // Previous end (disabled on the first end) and Next end: on the newest end Next saves it and
+    // starts a new one (it needs at least one arrow); on an earlier end it moves one end forward
+    h(
+      'div',
+      { class: 'end-step' },
+      h(
+        'button',
+        {
+          type: 'button',
+          class: 'btn btn-outline end-step-btn',
+          disabled: !L.canPrevEnd(session),
+          dataset: { fk: 'end-prev' },
+          onClick: () => update(ctx, L.prevEnd),
+        },
+        icons.back(),
+        T.prevEnd,
+      ),
+      h(
+        'button',
+        {
+          type: 'button',
+          class: 'btn btn-primary end-step-btn',
+          'aria-label': viewing ? T.nextEnd : `${T.nextEnd} (saves end ${endNo})`,
+          disabled: !L.canNextEnd(session),
+          dataset: { fk: 'end-next' },
+          onClick: () => update(ctx, L.nextEnd),
+        },
+        T.nextEnd,
+        icons.forward(),
+      ),
+    ),
   );
 
   // --- end details
@@ -707,7 +703,6 @@ function renderActive(ctx, session) {
       ),
     );
 
-  const canSave = L.canSaveEnd(session);
   const canFinish = L.canFinish(session);
   // Finish asks OK / Cancel first; the timer is paused meanwhile and runs on if it is cancelled
   const finish = async () => {
@@ -738,7 +733,7 @@ function renderActive(ctx, session) {
     const ok = await confirmDialog({ title: 'Discard session?', message: T.confirmDiscard, confirmLabel: 'Discard', danger: true });
     if (!ok) return;
     ctx.remove('sessions', session.id);
-    ctx.rerender();
+    ctx.navigate('home', { replace: true });
   };
 
   const details = card(
@@ -759,28 +754,19 @@ function renderActive(ctx, session) {
     h(
       'div',
       { class: 'row' },
+      // looking at an earlier end: jump straight back to the one being shot
       viewing
         ? h(
             'button',
             {
               type: 'button',
-              class: 'btn btn-primary grow-2',
+              class: 'btn btn-outline grow-2',
               dataset: { fk: 'back-current' },
               onClick: () => update(ctx, (c) => L.goToEnd(c, null)),
             },
             T.backToEnd(totalEnds),
           )
-        : h(
-            'button',
-            {
-              type: 'button',
-              class: 'btn btn-primary grow-2',
-              disabled: !canSave,
-              dataset: { fk: 'save-end' },
-              onClick: () => update(ctx, L.saveEnd),
-            },
-            T.saveEnd(endNo),
-          ),
+        : null,
       h(
         'button',
         { type: 'button', class: 'btn btn-outline grow-1', disabled: !canFinish, onClick: finish },
@@ -868,6 +854,9 @@ function findSightMark(repo, distance) {
 // ---------------------------------------------------------------- target face
 
 const LOUPE_SPAN = 24; // viewBox units shown in the magnifier (the face is 202 wide → ~3× zoom)
+// The spot an arrow was just placed on (multi-spot sheets): placing re-renders the page, and the new
+// target starts zoomed on this spot and animates out to the whole sheet (the reverse of the zoom in).
+let zoomOutFrom = null;
 
 function arrowDots(session) {
   const at = (a) => sheetPoint(a, session.face);
@@ -892,7 +881,7 @@ function arrowDots(session) {
     ...cur.map(({ a, i }) =>
       s(
         'g',
-        { transform: `translate(${at(a).x} ${at(a).y})`, opacity: i === movingIdx ? 0.55 : null },
+        { transform: `translate(${at(a).x} ${at(a).y})`, opacity: i === movingIdx ? 0.55 : null, 'data-arrow': i },
         // the arrow being moved gets a dashed ring so you can see which one will change
         i === movingIdx
           ? s('circle', {
@@ -921,7 +910,7 @@ function arrowDots(session) {
  * target area; the arrow is then placed on it the same way, and the view zooms back out.
  * The magnifier's place is chosen when the finger lands and stays there until it lifts.
  */
-function targetInput(session, enter, slots) {
+function targetInput(session, enter, slots, { clearable = false, clearLabel = 'Clear arrow', onClear, onMove } = {}) {
   const selectedValue = L.shownEnd(session).arrows[session.cursor]?.v ?? null;
   // magnifier: zoomed copy of the face centred on the finger, with a crosshair and the live score
   const marker = s(
@@ -995,6 +984,11 @@ function targetInput(session, enter, slots) {
     icons.back(),
     'All spots',
   );
+  if (multi && zoomOutFrom != null) {
+    sheet.setAttribute('viewBox', spotBox(zoomOutFrom).join(' '));
+    zoomOutFrom = null;
+    requestAnimationFrame(() => setBox(fullBox));
+  }
   function zoomTo(i) {
     zoomed = i;
     setBox(i == null ? fullBox : spotBox(i));
@@ -1052,26 +1046,50 @@ function targetInput(session, enter, slots) {
     loupe.hidden = false;
   };
 
+  // the aimed point: the finger's, shifted by the grab offset (finger px / py stay the finger's)
+  const aimFrom = (f, off) => ({ ...f, x: f.x + off.x, y: f.y + off.y });
+  // the placed arrow of the shown end nearest the finger, within about a fingertip (26 px)
+  const grabAt = (f) => {
+    const vb = sheet.getAttribute('viewBox').split(' ').map(Number);
+    const r = btn.getBoundingClientRect();
+    const unitsPerPx = Math.max(vb[2] / r.width, vb[3] / r.height); // the sheet is letterboxed (meet)
+    const reach = (26 * unitsPerPx) / 100;
+    let best = null;
+    L.shownEnd(session).arrows.forEach((a, i) => {
+      if (a.v == null || a.x == null) return;
+      const d = sheetPoint(a, session.face);
+      const dot = { x: d.x / 100, y: d.y / 100 };
+      const dist = Math.hypot(dot.x - f.x, dot.y - f.y);
+      if (dist <= reach && (!best || dist < best.dist)) best = { i, dist, off: { x: dot.x - f.x, y: dot.y - f.y } };
+    });
+    return best;
+  };
+
   const end = (ev, commit) => {
     if (!active || ev.pointerId !== active.id) return;
-    const { p, mode } = active;
+    const { p, mode, idx } = active;
     active = null;
     loupe.hidden = true;
     btn.classList.remove('aiming');
+    sheet.querySelector('.is-grabbed')?.classList.remove('is-grabbed');
     if (!commit) return;
     // a tap on the whole sheet zooms into the spot tapped
     if (mode === 'pick') {
       zoomTo(locateOnSheet(p.x, p.y, session.face).spot);
       return;
     }
+    if (multi) zoomOutFrom = zoomed;
     const hit = locateOnSheet(p.x, p.y, session.face);
     const keep = Math.hypot(hit.x, hit.y) < 1.05;
-    enter(
-      scoreFromPoint(hit.x, hit.y, session.face),
-      keep ? round3(hit.x) : null,
-      keep ? round3(hit.y) : null,
-      hit.spot,
-    );
+    const args = [scoreFromPoint(hit.x, hit.y, session.face), keep ? round3(hit.x) : null, keep ? round3(hit.y) : null, hit.spot];
+    // a placed arrow that was dragged moves; otherwise the touch enters a score
+    if (mode === 'move') onMove(idx, ...args);
+    else enter(...args);
+    // nothing was entered (the page did not re-render): zoom out here instead
+    if (multi && btn.isConnected) {
+      zoomOutFrom = null;
+      zoomTo(null);
+    }
   };
 
   btn.addEventListener('pointerdown', (ev) => {
@@ -1088,15 +1106,25 @@ function targetInput(session, enter, slots) {
       active = { id: ev.pointerId, p, mode: 'pick' };
       return;
     }
-    active = { id: ev.pointerId, p, mode: 'aim' };
+    // touching a placed arrow of this end grabs it: dragging moves it (the finger keeps its distance
+    // to the dot, so the dot does not jump under the finger)
+    const grab = onMove ? grabAt(p) : null;
+    active = grab
+      ? { id: ev.pointerId, mode: 'move', idx: grab.i, off: grab.off, p: aimFrom(p, grab.off) }
+      : { id: ev.pointerId, mode: 'aim', off: { x: 0, y: 0 }, p };
+    if (grab) sheet.querySelector(`[data-arrow="${grab.i}"]`)?.classList.add('is-grabbed');
     btn.classList.add('aiming');
-    show(p);
-    placeLoupe(p);
+    show(active.p);
+    placeLoupe(active.p);
   });
   btn.addEventListener('pointermove', (ev) => {
     if (!active || ev.pointerId !== active.id) return;
-    active.p = toFace(ev);
-    if (active.mode === 'aim') show(active.p);
+    if (active.mode === 'pick') {
+      active.p = toFace(ev);
+      return;
+    }
+    active.p = aimFrom(toFace(ev), active.off);
+    show(active.p);
   });
   btn.addEventListener('pointerup', (ev) => end(ev, true));
   btn.addEventListener('pointercancel', (ev) => end(ev, false));
@@ -1129,6 +1157,21 @@ function targetInput(session, enter, slots) {
           },
           String(k),
         ),
+      ),
+      // at the thumb's end of the row; its place is kept (invisible) when no arrow is picked
+      h(
+        'button',
+        {
+          type: 'button',
+          class: ['quick-key', 'clear-key', !clearable && 'is-off'],
+          'aria-label': clearLabel,
+          'aria-hidden': clearable ? null : 'true',
+          tabindex: clearable ? null : '-1',
+          disabled: !clearable,
+          dataset: { fk: 'clear-arrow' },
+          onClick: () => onClear?.(),
+        },
+        icons.erase(),
       ),
     ),
   );

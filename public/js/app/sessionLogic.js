@@ -222,6 +222,15 @@ export function clearArrow(session) {
   });
 }
 
+/**
+ * Move arrow `i` of the shown end to a new spot on the target (dragged there on the face): its score
+ * and position change, its grades stay. The arrow is selected afterwards, as after any score.
+ */
+export function moveArrow(session, i, v, x = null, y = null, spot = null) {
+  if (!shownEnd(session).arrows[i]) return session;
+  return enterScore({ ...clone(session), cursor: i, pinned: true }, v, x, y, spot);
+}
+
 /** Clear the last scored arrow in the shown end. */
 export function undo(session) {
   const arrows = shownEnd(session).arrows;

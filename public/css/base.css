@@ -1515,7 +1515,7 @@ textarea {
 /* ---------------------------------------------------------------- quick score strip under the target face */
 .quick-keys {
   display: grid;
-  grid-template-columns: repeat(7, minmax(0, 1fr));
+  grid-template-columns: repeat(8, minmax(0, 1fr));
   gap: 4px;
   width: 100%;
 }
@@ -3645,7 +3645,7 @@ button.arrow-count:hover {
 }
 
 /* History → a session: back button alone on the right, then the title card */
-.detail-top {
+.back-bar {
   display: flex;
   justify-content: flex-end;
 }
@@ -3691,4 +3691,51 @@ button.arrow-count:hover {
 .zoom-out-btn svg {
   width: 18px;
   height: 18px;
+}
+
+/* Previous end / Next end, right under the M / S grades */
+.end-step {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.btn.end-step-btn {
+  min-height: 52px;
+  gap: 4px;
+  font-size: 16px;
+}
+
+.btn.end-step-btn svg {
+  width: 20px;
+  height: 20px;
+}
+
+.btn.end-step-btn:disabled {
+  opacity: 0.4;
+}
+
+/* Clear (the picked arrow): last key of the quick row, red outline; invisible but keeps its place
+   when no arrow is picked, so the score keys never shift */
+.quick-key.clear-key {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  color: var(--danger);
+  border: 2px solid var(--danger);
+}
+
+.quick-key.clear-key svg {
+  width: 22px;
+  height: 22px;
+}
+
+.quick-key.clear-key.is-off {
+  visibility: hidden;
+}
+
+/* a placed arrow being dragged to a new place: its old dot fades while the loupe shows the new one */
+.target-btn [data-arrow].is-grabbed {
+  opacity: 0.25;
 }

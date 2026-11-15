@@ -5,7 +5,7 @@ import { faceLabel, sheetPoint, isMultiSpot, spotCentres } from '../scoring.js';
 import { computeStats, sumArrows, fmt } from '../stats.js';
 import { T } from '../strings.js';
 import { icons } from '../icons.js';
-import { card, gearCard, whenCard } from './common.js';
+import { card, gearCard, whenCard, backBar } from './common.js';
 import { VB, faceRings, faceSheet, faceViewBox } from './face.js';
 import { TYPE_LABELS, isScored, sessionType, formSummary, newestFirst } from '../sessionTypes.js';
 import { formSections } from './sessionForms.js';
@@ -114,7 +114,7 @@ function renderList(ctx) {
  */
 function detailHeader(ss, detail) {
   return [
-    h('div', { class: 'detail-top' }, h('a', { class: 'icon-btn', href: '#/history', 'aria-label': T.backToLog }, icons.back())),
+    backBar('#/history', T.backToLog),
     card(
       { class: 'detail-head', 'aria-labelledby': 'detail-title' },
       h('h1', { class: 'card-title detail-title', id: 'detail-title' }, `${TYPE_LABELS[sessionType(ss)]} session`),
@@ -413,12 +413,8 @@ function renderTrash(ctx) {
     content: h(
       'div',
       { class: 'stack' },
-      h(
-        'div',
-        { class: 'row align-center' },
-        h('a', { class: 'icon-btn', href: '#/history', 'aria-label': 'Back to history' }, icons.back()),
-        h('h1', { class: 'page-title sm grow' }, 'Recently deleted'),
-      ),
+      backBar('#/history', 'Back to history'),
+      h('h1', { class: 'page-title sm' }, 'Recently deleted'),
       h('p', { class: 'muted small' }, `Deleted sessions are kept here for ${TRASH_DAYS} days, then removed for good.`),
       items.length ? null : card(null, h('p', { class: 'muted' }, 'Nothing here.')),
       h(
