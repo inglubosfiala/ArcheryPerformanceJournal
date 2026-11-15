@@ -1078,3 +1078,26 @@ a.apl-sessionrow:hover {
 .apl-ink {
   color: var(--ink);
 }
+
+/* Insights (insights.js) */
+.insights-controls {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.insights-view {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.apl-table .sort-btn {
+  min-height: var(--tap-min);
+  font: inherit;
+  color: inherit;
+}
+
+.apl-table th[aria-sort] {
+  color: var(--accent-bright);
+}

@@ -108,6 +108,12 @@
   --on-grade-light: #ffffff;
   --on-grade-dark: #14181c;
   --mark: #e5007e;
+  --series-1: #3987e5;
+  --series-2: #d95926;
+  --series-3: #199e70;
+  --series-4: #c98500;
+  --series-5: #d55181;
+  --series-6: #008300;
   /* type */
   --font-sans: Inter, system-ui, -apple-system, "Segoe UI", sans-serif;
   --type-screen-title: 700 20px/26px var(--font-sans);

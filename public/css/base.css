@@ -157,31 +157,6 @@ p {
   padding: 0;
 }
 
-.title-row {
-  display: flex;
-  justify-content: space-between;
-  align-items: baseline;
-  gap: 8px;
-}
-
-/* ---------------------------------------------------------------- type */
-.page-title {
-  font-family: var(--font-display);
-  font-size: 26px;
-  font-weight: 700;
-  line-height: 1.15;
-}
-
-.page-title.sm {
-  font-size: 21px;
-}
-
-.card-title {
-  font-family: var(--font-display);
-  font-size: 16px;
-  font-weight: 700;
-}
-
 .field-label {
   font-size: 12px;
   font-weight: 600;
@@ -208,10 +183,6 @@ p {
   text-align: center;
 }
 
-.right {
-  text-align: right;
-}
-
 .block {
   display: block;
 }
@@ -220,16 +191,10 @@ p {
   margin-top: -4px;
 }
 
-.nowrap {
-  white-space: nowrap;
-}
-
-.num,
 .end-totals,
 .slot-grades,
 .saved-end,
-.big-score,
-.tile dd {
+.big-score {
   font-variant-numeric: tabular-nums;
 }
 
@@ -252,10 +217,6 @@ p {
   box-shadow: var(--shadow);
   color: inherit;
   text-decoration: none;
-}
-
-.card-flush {
-  padding: 14px 0 6px;
 }
 
 .card-list {
@@ -508,30 +469,6 @@ p {
   display: flex;
   gap: 8px;
   align-items: center;
-}
-
-.segmented {
-  flex: 1;
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  background: var(--subtle);
-  border-radius: 12px;
-  padding: 3px;
-  gap: 3px;
-}
-
-.segmented button {
-  min-height: 40px;
-  border: 0;
-  border-radius: 10px;
-  font-size: 14px;
-  font-weight: 600;
-  background: transparent;
-}
-
-.segmented button[aria-pressed='true'] {
-  background: var(--surface);
-  box-shadow: 0 1px 3px rgba(20, 24, 28, 0.18);
 }
 
 .keypad {
@@ -804,35 +741,6 @@ textarea {
   font-weight: 700;
 }
 
-.tiles {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 8px;
-  margin: 0;
-}
-
-.tile {
-  background: var(--surface);
-  border-radius: 14px;
-  padding: 10px 12px;
-  box-shadow: var(--shadow);
-}
-
-.tile dt {
-  font-size: 11px;
-  font-weight: 600;
-  color: var(--muted);
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-}
-
-.tile dd {
-  margin: 0;
-  font-family: var(--font-display);
-  font-size: 20px;
-  font-weight: 700;
-}
-
 .bars {
   display: flex;
   flex-direction: column;
@@ -857,10 +765,6 @@ textarea {
   height: 12px;
   background: var(--ink);
   border-radius: 6px;
-}
-
-.table-scroll {
-  overflow-x: auto;
 }
 
 .import-preview {
@@ -925,14 +829,9 @@ textarea {
 
 .main,
 .stack > *,
-.card,
-.table-scroll {
+.card {
   min-width: 0;
   max-width: 100%;
-}
-
-.page-title {
-  overflow-wrap: anywhere;
 }
 
 /* ---------------------------------------------------------------- target magnifier (loupe) */
@@ -967,11 +866,6 @@ textarea {
   background: #ffffff;
   pointer-events: none;
   z-index: 5;
-}
-
-.loupe.right {
-  left: auto;
-  right: -6px;
 }
 
 .loupe[hidden] {
@@ -1269,21 +1163,12 @@ button.saved-end {
   padding-right: 16px;
 }
 
-.main .card.card-flush {
-  padding-left: 0;
-  padding-right: 0;
-}
-
 @media (min-width: 600px) {
   .main .card {
     margin-left: -24px;
     margin-right: -24px;
     padding-left: 24px;
     padding-right: 24px;
-  }
-  .main .card.card-flush {
-    padding-left: 0;
-    padding-right: 0;
   }
 }
 
@@ -1402,12 +1287,6 @@ button.saved-end {
   border-top: 3px solid #b45309;
 }
 
-/* Performance review: tall enough for a few sentences, and grows with the text where supported */
-.review-text {
-  min-height: 9rem;
-  field-sizing: content;
-}
-
 /* more than 6 arrows per end: arrow list in two columns so the target keeps its size */
 .aim-row.aim-row-wide {
   grid-template-columns: 104px minmax(0, 1fr);
@@ -1451,33 +1330,6 @@ button.saved-end {
 
 .group-faces .group-face svg {
   max-height: 360px;
-}
-
-/* session stats tiles sit in an edge-to-edge band like the cards */
-.main .tiles {
-  margin-left: -16px;
-  margin-right: -16px;
-  padding: 14px 16px;
-  background: var(--surface);
-  box-shadow: var(--shadow);
-}
-
-.main .tile {
-  background: var(--ground);
-  box-shadow: none;
-}
-
-@media (min-width: 600px) {
-  .main .tiles {
-    margin-left: -24px;
-    margin-right: -24px;
-    padding-left: 24px;
-    padding-right: 24px;
-  }
-}
-
-.main .tiles {
-  max-width: none;
 }
 
 /* The app frame is pinned to the window, so the bottom tabs always sit on the bottom edge.
@@ -1524,98 +1376,19 @@ body {
 }
 
 /* ---------------------------------------------------------------- Insights */
-:root {
-  /* categorical series colours: data only, never UI state */
-  --series-1: #3987e5;
-  --series-2: #d95926;
-  --series-3: #199e70;
-  --series-4: #c98500;
-  --series-5: #d55181;
-  --series-6: #008300;
-}
-
 /* wide layout on a desktop browser */
 .app.app-wide {
   max-width: 1280px;
 }
 
-.segmented {
-  display: flex;
-  gap: 4px;
-  padding: 4px;
-  border-radius: 12px;
-  background: var(--surface);
-  overflow-x: auto;
-}
-
-.seg {
-  flex: 1 0 auto;
-  text-align: center;
-  padding: 8px 12px;
-  border-radius: 9px;
-  color: var(--muted);
-  font-weight: 600;
-  font-size: 14px;
-  text-decoration: none;
-  white-space: nowrap;
-}
-
-.seg[aria-current='page'] {
-  background: var(--ink);
-  color: var(--surface);
-}
-
+/* Insights: the range, type and distance filters, one section under the other */
 .filters {
   display: flex;
-  flex-wrap: wrap;
-  align-items: flex-end;
-  gap: 10px;
-}
-
-.range {
-  display: flex;
-  gap: 4px;
-  flex-wrap: wrap;
-}
-
-.range-btn {
-  height: 40px;
-  padding: 0 12px;
-  border-radius: 10px;
-  border: 1px solid var(--border);
-  background: var(--surface);
-  color: var(--ink);
-  font: inherit;
-  font-size: 14px;
-  font-weight: 600;
-}
-
-.range-btn[aria-pressed='true'] {
-  background: var(--ink);
-  color: var(--surface);
-  border-color: var(--ink);
-}
-
-.filter {
-  display: flex;
   flex-direction: column;
-  gap: 4px;
-  min-width: 140px;
-}
-
-.filter .input,
-.search {
-  height: 40px;
-}
-
-.tiles-6 {
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--space-4);
 }
 
 @media (min-width: 900px) {
-  .tiles-6 {
-    grid-template-columns: repeat(6, minmax(0, 1fr));
-  }
   .chart-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
@@ -1626,7 +1399,7 @@ body {
 
 .chart-grid {
   display: grid;
-  gap: 12px;
+  gap: var(--space-3);
 }
 
 /* charts run edge to edge like every card; on a desktop two sit side by side and together span the full width */
@@ -1661,7 +1434,7 @@ body {
 }
 
 .viz-axis {
-  font-size: 11px;
+  font-size: 12px;
   fill: var(--muted);
   font-variant-numeric: tabular-nums;
 }
@@ -1693,7 +1466,6 @@ body {
   font-size: 12px;
   line-height: 1.4;
   white-space: nowrap;
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.25);
 }
 
 .viz-tip-title {
@@ -1720,35 +1492,6 @@ body {
   height: 10px;
   border-radius: 3px;
   flex: none;
-}
-
-.data-table {
-  width: 100%;
-  border-collapse: collapse;
-  font-size: 14px;
-}
-
-.data-table th,
-.data-table td {
-  padding: 10px 12px;
-  text-align: left;
-  border-bottom: 1px solid var(--divider);
-  white-space: nowrap;
-}
-
-.data-table td.num,
-.data-table th.num {
-  text-align: right;
-  font-variant-numeric: tabular-nums;
-}
-
-.data-table thead th {
-  font-size: 12px;
-  color: var(--muted);
-  font-weight: 700;
-  position: sticky;
-  top: 0;
-  background: var(--surface);
 }
 
 .sort-btn {
@@ -1782,25 +1525,11 @@ body {
   text-decoration: none;
 }
 
-.journal-text {
-  min-height: 5rem;
-}
-
 @media (min-width: 900px) {
   .journal-row {
     grid-template-columns: 180px repeat(3, minmax(0, 1fr));
     align-items: start;
   }
-}
-
-/* Insights: the view switch sits on the band, so it uses the page ground colour */
-.insights-controls .segmented {
-  background: var(--ground);
-}
-
-.insights-controls .range-btn:not([aria-pressed='true']),
-.insights-controls .filter .input {
-  background: var(--surface);
 }
 
 /* session timer on the Log (tap to pause / resume) */
