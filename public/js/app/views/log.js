@@ -2,13 +2,8 @@
 import { h, s, todayIso } from '../../core/dom.js';
 import { confirmDialog } from './confirm.js';
 import {
-  DISTANCES,
   SETUP_FACES,
-  ARROWS_PER_END_MIN,
-  ARROWS_PER_END_MAX,
   DEFAULT_ARROWS_PER_END,
-  DISTANCE_DEFAULTS,
-  faceLabel,
   scoreFromPoint,
   locateOnSheet,
   sheetPoint,
@@ -20,12 +15,13 @@ import { sumArrows, computeStats, fmt } from '../stats.js';
 import * as L from '../sessionLogic.js';
 import { T } from '../strings.js';
 import { icons } from '../icons.js';
-import { card, chip, sectionLabel, gearPicker, gearCard, sessionDates, backBar } from './common.js';
+import { card, sectionLabel, gearPicker, gearCard, sessionDates, backBar } from './common.js';
 import { datePicker, timePicker } from './pickers.js';
 import { gearChoices, gearForChoice } from '../gearFields.js';
 import { faceSheet, faceViewBox, VB } from './face.js';
 import { SESSION_TYPES, TYPE_LABELS, isScored, hourMinute, sessionType, setupSummary, emptyCompetition } from '../sessionTypes.js';
 import { emptyForm, formSections } from './sessionForms.js';
+import { renderTypeChoice, renderScoredSetup } from './sessionSetup.js';
 import { detectArrows } from '../photoDetect.js';
 import { drawArrowMarks, liveScan } from './liveScan.js';
 import { PREVIEW_MARGIN, spotsBox, resultOnCrop } from '../scanGeometry.js';
@@ -100,55 +96,9 @@ export function renderLog(ctx) {
 /** New session: step 1 picks the type (#/new), step 2 asks that type's details (#/new/<type>). */
 export function renderNewSession(ctx, params = []) {
   const type = params[0];
-  if (SESSION_TYPES.includes(type)) return renderSetup(ctx, type, ctx.running.get());
-  return renderTypeChoice(ctx);
-}
-
-const TYPE_HINTS = {
-  training: 'Score arrow by arrow with M / S grades',
-  blank: 'Count arrows at the blank bale, no score',
-  competition: 'Scored like training, with event and placement',
-  strength: 'Holding and draw drills, effort',
-  mental: 'Visualisation, breathing, shot routine…',
-  manual: 'Type in the arrows or the duration afterwards',
-};
-
-function renderTypeChoice(ctx) {
-  // tapping a type opens it straight away; the last one picked is marked
-  const last = ctx.ui.get().newType;
-  return {
-    content: h(
-      'div',
-      { class: 'stack' },
-      backBar('#/home', 'Back to dashboard'),
-      card(
-        { class: 'setup-card', 'aria-label': 'Session type' },
-        sectionLabel('Session type'),
-        h(
-          'nav',
-          { class: 'type-list', 'aria-label': 'Session type' },
-          SESSION_TYPES.map((t) =>
-            h(
-              'a',
-              {
-                class: ['type-option', last === t && 'is-last'],
-                href: `#/new/${t}`,
-                dataset: { fk: `type-${t}` },
-                onClick: () => ctx.ui.quietSet({ newType: t }),
-              },
-              h(
-                'span',
-                { class: 'type-option-text' },
-                h('span', { class: 'type-option-title' }, TYPE_LABELS[t]),
-                h('span', { class: 'type-option-sub' }, TYPE_HINTS[t]),
-              ),
-              h('span', { class: 'type-option-go', 'aria-hidden': 'true' }, icons.forward()),
-            ),
-          ),
-        ),
-      ),
-    ),
-  };
+  if (!SESSION_TYPES.includes(type)) return renderTypeChoice(ctx);
+  if (isScored(type)) return renderScoredSetup(ctx, type, ctx.running.get());
+  return renderSetup(ctx, type);
 }
 
 /** Apply a session transition to the running session; the page is drawn again when it changed. */
@@ -156,9 +106,10 @@ function update(ctx, fn, { rerender = true } = {}) {
   if (ctx.running.apply(fn) && rerender) ctx.rerender();
 }
 
-// ---------------------------------------------------------------- new session
+// ---------------------------------------------------------------- new form session
 
-function renderSetup(ctx, type, active = null) {
+/** The setup of a form session (blank bale, SPT, mental, manual), saved straight to History. */
+function renderSetup(ctx, type) {
   const settings = ctx.repo.getSettings();
   // distance and face are remembered from the last session; arrows per end always start at the default
   const last = settings.lastSetup;
@@ -172,11 +123,6 @@ function renderSetup(ctx, type, active = null) {
   const set = (patch) => ctx.ui.set({ setup: { ...setup, ...patch } });
   // typing in a text field stores the draft without re-rendering, so the field keeps focus
   const quiet = (patch) => ctx.ui.quietSet({ setup: Object.assign(setup, patch) });
-  // a remembered distance that is not in the list (e.g. 90 m) steps from the nearest listed one
-  const distIndex = DISTANCES.reduce(
-    (best, d, i) => (Math.abs(d - setup.distance) < Math.abs(DISTANCES[best] - setup.distance) ? i : best),
-    0,
-  );
 
   // When: now by default; an earlier date / time logs the session afterwards (no running timer).
   // Fields left untouched follow the clock, so a draft kept open is not dated when it was opened.
@@ -216,31 +162,6 @@ function renderSetup(ctx, type, active = null) {
         onChange: (time) => time && setWhen({ time }),
       }),
     ),
-    // a scored session logged afterwards: its duration is typed in, the timer stays stopped
-    past && isScored(type)
-      ? h(
-          'label',
-          { class: 'field' },
-          h('span', { class: 'field-label' }, 'Duration'),
-          h(
-            'div',
-            { class: 'input-suffix' },
-            h('input', {
-              class: 'input',
-              type: 'number',
-              inputmode: 'numeric',
-              min: 0,
-              value: setup.pastMinutes ?? '',
-              dataset: { fk: 'past-minutes' },
-              onInput: (e) => {
-                const n = parseInt(e.target.value, 10);
-                quiet({ pastMinutes: Number.isFinite(n) && n >= 0 ? n : null });
-              },
-            }),
-            h('span', { class: 'muted small' }, 'min'),
-          ),
-        )
-      : null,
     past ? h('p', { class: 'muted small' }, 'Logged afterwards: no running timer.') : null,
   );
 
@@ -264,40 +185,6 @@ function renderSetup(ctx, type, active = null) {
             onChange: (v) => set({ gear: v }),
           }),
         );
-
-  const start = async () => {
-    // only one session runs at a time: the running-session module asks about the one in progress
-    const { distance, face, arrowsPerEnd } = setup;
-    const res = await ctx.running.start({
-      date: whenDate,
-      time: whenTime,
-      pastMinutes: past ? (setup.pastMinutes ?? 0) : null,
-      type,
-      distance,
-      face,
-      arrowsPerEnd,
-      competition: type === 'competition' ? { ...emptyCompetition(), ...setup.competition } : null,
-      ...chosenGear(),
-    });
-    if (res.status === 'cancelled') return;
-    ctx.ui.quietSet({ setup: null });
-    if (res.status === 'started') ctx.navigate('log', { replace: true });
-  };
-
-  const compField = (key, label, placeholder) =>
-    h(
-      'label',
-      { class: 'field' },
-      h('span', { class: 'field-label' }, label),
-      h('input', {
-        class: 'input',
-        value: setup.competition?.[key] || '',
-        placeholder,
-        autocomplete: 'off',
-        dataset: { fk: `comp-${key}` },
-        onInput: (e) => quiet({ competition: { ...setup.competition, [key]: e.target.value } }),
-      }),
-    );
 
   // Form sessions (blank bale / strength / mental / manual): a form saved straight to History.
   // The open form session (openFormSession.js) owns the timer, the kept draft, saving and
@@ -343,92 +230,7 @@ function renderSetup(ctx, type, active = null) {
     ctx.navigate(`history/${res.session.id}`, { replace: true });
   };
 
-  const body = isScored(type)
-    ? [
-        whenSection,
-        h(
-          'section',
-          { class: 'setup-section', 'aria-labelledby': 'lbl-dist' },
-          sectionLabel(T.distance, 'lbl-dist'),
-          stepper({
-            label: 'distance',
-            value: `${setup.distance} m`,
-            canDown: distIndex > 0,
-            canUp: distIndex < DISTANCES.length - 1,
-            fk: 'dist',
-            onStep: (dir) => {
-              const d = DISTANCES[distIndex + dir];
-              set({ distance: d, ...DISTANCE_DEFAULTS[d] });
-            },
-          }),
-        ),
-        h(
-          'section',
-          { class: 'setup-section', 'aria-labelledby': 'lbl-face' },
-          sectionLabel(T.targetFace, 'lbl-face'),
-          h(
-            'div',
-            { class: 'grid-3' },
-            SETUP_FACES.map((f) =>
-              chip({
-                label: faceLabel(f),
-                pressed: setup.face === f,
-                fk: `face-${f}`,
-                onClick: () => set({ face: f }),
-              }),
-            ),
-          ),
-        ),
-        h(
-          'section',
-          { class: 'setup-section', 'aria-labelledby': 'lbl-n' },
-          sectionLabel(T.arrowsPerEnd, 'lbl-n'),
-          stepper({
-            label: 'arrows',
-            value: `${setup.arrowsPerEnd} arrows`,
-            canDown: setup.arrowsPerEnd > ARROWS_PER_END_MIN,
-            canUp: setup.arrowsPerEnd < ARROWS_PER_END_MAX,
-            fk: 'n',
-            onStep: (dir) => set({ arrowsPerEnd: setup.arrowsPerEnd + dir }),
-          }),
-        ),
-        type === 'competition'
-          ? h(
-              'section',
-              { class: 'setup-section', 'aria-label': 'Competition' },
-              sectionLabel('Competition'),
-              compField('event', 'Event', 'e.g. Indoor Cup Bratislava'),
-              h(
-                'div',
-                { class: 'grid-2' },
-                compField('round', 'Round', 'e.g. WA 18 m'),
-                compField('conditions', 'Conditions', 'hall, wind, light'),
-              ),
-            )
-          : null,
-        gearSection,
-        // Cancel gives the setup up (what was picked is forgotten) and goes back to the session types.
-        // This page has no title and no back button at the top, to keep the room for the setup.
-        h(
-          'div',
-          { class: 'grid-2 setup-actions' },
-          h(
-            'button',
-            {
-              type: 'button',
-              class: 'btn btn-outline btn-xl',
-              dataset: { fk: 'setup-cancel' },
-              onClick: () => {
-                ctx.ui.quietSet({ setup: null });
-                ctx.navigate('new', { replace: true });
-              },
-            },
-            'Cancel',
-          ),
-          h('button', { type: 'button', class: 'btn btn-primary btn-xl', dataset: { fk: 'setup-start' }, onClick: start }, T.start),
-        ),
-      ]
-    : [
+  const body = [
         whenSection,
         // blank bale: the timer sits beside the arrow count (in the form), without a label
         // SPT: the same big timer as on the blank bale page (no label, no border), on the right
@@ -451,7 +253,7 @@ function renderSetup(ctx, type, active = null) {
         timed && !past
           ? h('button', { type: 'button', class: 'btn btn-text danger', dataset: { fk: 'discard-form' }, onClick: discardForm }, 'Discard session')
           : null,
-      ];
+  ];
 
   // a timed form whose start is not in the past: its timer runs, it is a running session
   const running = timed && !past;
@@ -459,58 +261,14 @@ function renderSetup(ctx, type, active = null) {
     content: h(
       'div',
       { class: 'stack' },
-      // no back button on the scored setups (they have Cancel) and on a running SPT or blank bale
-      // session (Save or Discard end it; the tab bar leaves it running)
-      isScored(type) || (running && (type === 'strength' || type === 'blank')) ? null : backBar('#/new', 'Back to session type'),
-      // no title on the scored setups, the SPT page and a running blank bale session: the room goes
-      // to the form
-      isScored(type) || type === 'strength' || (running && type === 'blank') ? null : h('h1', { class: 'page-title sm' }, `${TYPE_LABELS[type]} session`),
-      active && isScored(type)
-        ? h(
-            'div',
-            { class: 'banner', role: 'status' },
-            h(
-              'span',
-              null,
-              T.inProgress(setupSummary(active), active.ends.length),
-            ),
-            h('a', { class: 'btn btn-primary btn-sm', href: '#/log' }, T.continueSession),
-          )
-        : null,
+      // no back button on a running SPT or blank bale session (Save or Discard end it; the tab bar
+      // leaves it running)
+      running && (type === 'strength' || type === 'blank') ? null : backBar('#/new', 'Back to session type'),
+      // no title on the SPT page and a running blank bale session: the room goes to the form
+      type === 'strength' || (running && type === 'blank') ? null : h('h1', { class: 'page-title sm' }, `${TYPE_LABELS[type]} session`),
       card({ class: 'setup-card', 'aria-label': `${TYPE_LABELS[type]} session` }, body),
     ),
   };
-}
-
-/** − value + control for the setup card. */
-function stepper({ label, value, canDown, canUp, fk, onStep }) {
-  return h(
-    'div',
-    { class: 'stepper', role: 'group' },
-    h(
-      'button',
-      {
-        type: 'button',
-        'aria-label': `Less ${label}`,
-        disabled: !canDown,
-        dataset: { fk: `${fk}-minus` },
-        onClick: () => onStep(-1),
-      },
-      '−',
-    ),
-    h('output', { 'aria-live': 'polite' }, value),
-    h(
-      'button',
-      {
-        type: 'button',
-        'aria-label': `More ${label}`,
-        disabled: !canUp,
-        dataset: { fk: `${fk}-plus` },
-        onClick: () => onStep(1),
-      },
-      '+',
-    ),
-  );
 }
 
 /** Timer button (tap to pause / resume). The shown time is refreshed every second by the ticker. */

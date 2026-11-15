@@ -4,6 +4,7 @@
 import { h, formatDate, todayIso } from '../../core/dom.js';
 import { addDays, addMonths, monthGrid, monthStart, inRange, clampIso, weekdayMon } from '../../core/calendar.js';
 import { icons } from '../icons.js';
+import { Icon } from '../../ui/apl/index.js';
 
 const WEEKDAYS = ['Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa', 'Su'];
 const WEEKDAYS_FULL = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
@@ -15,15 +16,28 @@ let uid = 0;
 /**
  * Field + popup panel shared by the pickers: opens on tap, closes on Escape, an outside tap or focus
  * leaving it. `render(focus)` fills the panel each time it opens.
+ * `apl` ({ icon, value, hint }): the field is drawn as an APL FieldButton (value over hint, with an
+ * accent-bright icon) instead of an input.
  */
-function popupField({ fieldClass, icon, text, ariaLabel, dialogLabel, fk, render }) {
+function popupField({ fieldClass, icon, text, ariaLabel, dialogLabel, fk, render, apl = null }) {
   const id = `pk-${++uid}`;
   let open = false;
+  const content = apl
+    ? [
+        Icon({ name: apl.icon }),
+        h(
+          'span',
+          { class: 'apl-stack' },
+          h('span', { class: 'apl-t' }, apl.value),
+          apl.hint ? h('span', { class: 'apl-cap' }, apl.hint) : null,
+        ),
+      ]
+    : [h('span', { class: 'picker-field-icon' }, icon), h('span', { class: 'picker-field-text' }, text)];
   const trigger = h(
     'button',
     {
       type: 'button',
-      class: ['input', 'picker-field', fieldClass],
+      class: apl ? ['apl', 'apl-field', 'picker-apl', fieldClass] : ['input', 'picker-field', fieldClass],
       'aria-haspopup': 'dialog',
       'aria-expanded': 'false',
       'aria-controls': id,
@@ -31,8 +45,7 @@ function popupField({ fieldClass, icon, text, ariaLabel, dialogLabel, fk, render
       dataset: fk ? { fk } : undefined,
       onClick: () => (open ? close() : show()),
     },
-    h('span', { class: 'picker-field-icon' }, icon),
-    h('span', { class: 'picker-field-text' }, text),
+    content,
   );
   const panel = h('div', { class: 'picker-panel', id, role: 'dialog', 'aria-label': dialogLabel, hidden: true });
   const wrap = h('div', { class: 'picker' }, trigger, panel);
@@ -77,6 +90,13 @@ function popupField({ fieldClass, icon, text, ariaLabel, dialogLabel, fk, render
   return { wrap, panel, close };
 }
 
+/** The APL field of a date: "Today" / "Yesterday" over the day, or the day over its year. */
+function aplDate(value, today) {
+  const day = formatDate(value, { weekday: 'short', day: 'numeric', month: 'short' });
+  const named = value === today ? 'Today' : value === addDays(today, -1) ? 'Yesterday' : null;
+  return { icon: 'calendar', value: named || day, hint: named ? day : value.slice(0, 4) };
+}
+
 /** Arrow keys move focus between the buttons of a grid with `cols` columns. */
 function gridKeys(container, cols) {
   container.addEventListener('keydown', (e) => {
@@ -100,8 +120,9 @@ function gridKeys(container, cols) {
  * @param {Set<string>} [o.marks] dates shown with a dot (days that already have a session)
  * @param {string} [o.label]    accessible name of the field
  * @param {string} [o.fk]       focus key, so focus returns to the field after the re-render
+ * @param {boolean} [o.apl]     draw the field as an APL FieldButton ("Today" over "Sun, 15 Nov")
  */
-export function datePicker({ value, onChange, min = null, max = null, marks = new Set(), label = 'Date', fk }) {
+export function datePicker({ value, onChange, min = null, max = null, marks = new Set(), label = 'Date', fk, apl = false }) {
   const today = todayIso();
   let view = monthStart(value || today); // first day of the month shown
   let focused = value || today; // the day with the roving tab stop
@@ -113,6 +134,7 @@ export function datePicker({ value, onChange, min = null, max = null, marks = ne
     ariaLabel: `${label}: ${formatDate(value, LONG_DATE)}`,
     dialogLabel: `Choose ${label.toLowerCase()}`,
     fk,
+    apl: apl ? aplDate(value, today) : null,
     render: ({ focus }) => {
       view = monthStart(value || today);
       focused = clampIso(value || today, min, max);
@@ -226,8 +248,9 @@ export function datePicker({ value, onChange, min = null, max = null, marks = ne
  * @param {boolean} [o.clearable] offer Clear (the time is optional)
  * @param {string} [o.label]
  * @param {string} [o.fk]
+ * @param {string} [o.hint]     with it, the field is drawn as an APL FieldButton (the time over the hint)
  */
-export function timePicker({ value, onChange, clearable = false, label = 'Start time', fk }) {
+export function timePicker({ value, onChange, clearable = false, label = 'Start time', fk, hint = null }) {
   const now = () => {
     const d = new Date();
     return { hh: d.getHours(), mm: d.getMinutes() };
@@ -247,6 +270,7 @@ export function timePicker({ value, onChange, clearable = false, label = 'Start 
     ariaLabel: `${label}: ${value || 'not set'}`,
     dialogLabel: `Choose ${label.toLowerCase()}`,
     fk,
+    apl: hint == null ? null : { icon: 'clock', value: value || 'No time', hint },
     render: ({ focus }) => {
       draft = parse(value) || now();
       part = 'hh';
