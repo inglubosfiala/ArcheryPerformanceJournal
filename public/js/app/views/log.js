@@ -238,19 +238,28 @@ function renderActive(ctx, session) {
           'div',
           { class: 'score-under' },
           gradePanel(session, { onGrade: (kind, g) => update(ctx, (c) => L.gradeArrow(c, kind, g)) }),
-          // empties the selected arrow (score, position and grades); its slot is filled next
-          h(
-            'button',
-            {
-              type: 'button',
-              class: 'score-clear',
-              onClick: () => update(ctx, L.clearArrow),
-              dataset: { fk: 'clear-arrow' },
-            },
-            icons.erase(),
-            T.clearArrow(cursor + 1),
-          ),
         );
+
+  // --- under the slot strip, at the right: Clear for a scored selected arrow (empties its score,
+  // position and grades; its slot is filled next). The row keeps its height without the button, so
+  // the face does not move when it appears.
+  const stripTools = h(
+    'div',
+    { class: 'strip-tools' },
+    picked.v != null
+      ? h(
+          'button',
+          {
+            type: 'button',
+            class: 'score-clear',
+            onClick: () => update(ctx, L.clearArrow),
+            dataset: { fk: 'clear-arrow' },
+          },
+          icons.erase(),
+          T.clearArrow(cursor + 1),
+        )
+      : null,
+  );
 
   // --- bottom bar, in thumb reach: Undo, Previous / Next end, and Scan (the most used) at the end.
   // There is no Save end step (every change is saved as it is made): Next opens the next end, and
@@ -385,7 +394,7 @@ function renderActive(ctx, session) {
       h(
         'div',
         { class: 'apl-screen-body log-body' },
-        h('section', { class: 'score-screen', 'aria-label': T.endN(endNo) }, header, strip, input, under),
+        h('section', { class: 'score-screen', 'aria-label': T.endN(endNo) }, header, strip, stripTools, input, under),
         pills,
         details,
         card(

@@ -1955,14 +1955,32 @@ button.arrow-count:hover {
   gap: var(--space-2);
 }
 
+/* let-down counters fill their column: − at the left edge, the count centred, + at the right edge */
+.end-details .apl-stepper {
+  display: flex;
+  width: 100%;
+  justify-content: space-between;
+}
+
+.end-details .apl-stepper output {
+  flex: 1;
+}
+
 /* the chosen grade: a 3px ring (the others dim) */
 .score-under .grade-panel .apl-key[aria-pressed='true'] {
   box-shadow: 0 0 0 3px var(--ink);
 }
 
-/* Clear arrow n: under the grades, at the right; a destructive control, so danger outline and text */
+/* the row under the slot strip: Clear arrow n under the rightmost card. It keeps its height when
+   empty, so the face stays put. */
+.strip-tools {
+  display: flex;
+  justify-content: flex-end;
+  min-height: var(--tap-min);
+}
+
+/* Clear arrow n: a destructive control, so danger outline and text */
 .score-clear {
-  align-self: flex-end;
   display: inline-flex;
   align-items: center;
   gap: 6px;
