@@ -6,6 +6,7 @@ import { h } from '../../core/dom.js';
 import { icons } from '../icons.js';
 import { detectArrows, consensus } from '../photoDetect.js';
 import { scoreFromPoint, spotCentres } from '../scoring.js';
+import { CLOSE_UP_MARGIN, spotsBox, isCloseUp, resultOffCrop, withArrows } from '../scanGeometry.js';
 
 const FRAME_MAX = 560;
 const VIEW_MAX = 1280; // the overlay and the kept picture: the whole frame, up to this size // frames are scaled to this many pixels on their long side for detection
@@ -217,16 +218,6 @@ export function liveScan({ face, maxArrows, spotHint = 0 }) {
 
     const values = (arrows) => arrows.map((a) => scoreFromPoint(a.x, a.y, face));
 
-    // where a point of the face (relative to its spot's centre, spot radius 1) is in the picture
-    function onPicture(spots, a) {
-      const o = (spots[a.spot ?? 0] || spots[0]).outer;
-      const cos = Math.cos(o.angle);
-      const sin = Math.sin(o.angle);
-      const u1 = (cos * a.x + sin * a.y) * o.rx;
-      const u2 = (-sin * a.x + cos * a.y) * o.ry;
-      return { x: o.cx + cos * u1 - sin * u2, y: o.cy + sin * u1 + cos * u2 };
-    }
-
     function draw(res, hollow = false) {
       octx.clearRect(0, 0, overlay.width, overlay.height);
       // the scan frame: what is outside it is dimmed (and not looked at)
@@ -257,7 +248,7 @@ export function liveScan({ face, maxArrows, spotHint = 0 }) {
     function steady() {
       if (!last) return null;
       if (!hold) return last.res;
-      return { ...last.res, arrows: hold.arrows.map((a) => ({ ...a, image: onPicture(last.res.spots, a) })) };
+      return withArrows(last.res, hold.arrows);
     }
 
     function take() {
@@ -377,34 +368,13 @@ export function liveScan({ face, maxArrows, spotHint = 0 }) {
             onResult(res);
           } else {
             // analysed-part pixels → whole-frame overlay pixels
-            const sx = (px) => (r.x + px / k) * ko;
-            const sy = (py) => (r.y + py / k) * ko;
-            const sc = ko / k;
-            const spots = res.spots.map((s) => ({
-              outer: { cx: sx(s.outer.cx), cy: sy(s.outer.cy), rx: s.outer.rx * sc, ry: s.outer.ry * sc, angle: s.outer.angle },
-            }));
-            const arrows = res.arrows.map((a) => ({ ...a, image: { x: sx(a.image.x), y: sy(a.image.y) } }));
+            const seen = resultOffCrop(res, r, k, ko);
             // next time, analyse just the sheet: the box around the spots, with a margin
-            let x0 = Infinity;
-            let y0 = Infinity;
-            let x1 = -Infinity;
-            let y1 = -Infinity;
-            for (const s of spots) {
-              const rad = (Math.max(s.outer.rx, s.outer.ry) * 1.3) / ko;
-              x0 = Math.min(x0, s.outer.cx / ko - rad);
-              y0 = Math.min(y0, s.outer.cy / ko - rad);
-              x1 = Math.max(x1, s.outer.cx / ko + rad);
-              y1 = Math.max(y1, s.outer.cy / ko + rad);
-            }
-            x0 = Math.max(guide.x, Math.floor(x0));
-            y0 = Math.max(guide.y, Math.floor(y0));
-            x1 = Math.min(guide.x + guide.w, Math.ceil(x1));
-            y1 = Math.min(guide.y + guide.h, Math.ceil(y1));
-            const box = { x: x0, y: y0, w: x1 - x0, h: y1 - y0 };
+            const box = spotsBox(seen.spots, { margin: CLOSE_UP_MARGIN, bounds: guide, scale: ko });
             // …but only once every spot of the sheet is seen. While only some are (the camera came
             // in on one spot first), keep looking at the whole frame, or the others are never found.
-            region = !res.partial && box.w > 16 && box.h > 16 && box.w * box.h < 0.8 * guide.w * guide.h ? box : null;
-            onResult({ ...res, spots, arrows });
+            region = !res.partial && isCloseUp(box, guide) ? box : null;
+            onResult(seen);
           }
         } catch (err) {
           console.error(err);

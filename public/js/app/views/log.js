@@ -29,6 +29,7 @@ import { SESSION_TYPES, TYPE_LABELS, isScored, hourMinute, sessionType } from '.
 import { emptyForm, formSections } from './sessionForms.js';
 import { detectArrows } from '../photoDetect.js';
 import { arrowMarkLayout, drawArrowMarks, liveScan } from './liveScan.js';
+import { PREVIEW_MARGIN, CLOSE_UP_MARGIN, spotsBox, isCloseUp, keepCloseUp, resultOnCrop, moveArrow } from '../scanGeometry.js';
 
 /**
  * The running session's questions to the archer, as dialogs (the `confirm` adapter of
@@ -886,36 +887,15 @@ async function scoreLive(ctx) {
  * (the camera frame is mostly background), with the result's picture coordinates moved to match.
  */
 function cropToSpots(source, res) {
-  let x0 = Infinity;
-  let y0 = Infinity;
-  let x1 = -Infinity;
-  let y1 = -Infinity;
-  for (const s of res.spots) {
-    const rad = Math.max(s.outer.rx, s.outer.ry) * 1.25;
-    x0 = Math.min(x0, s.outer.cx - rad);
-    y0 = Math.min(y0, s.outer.cy - rad);
-    x1 = Math.max(x1, s.outer.cx + rad);
-    y1 = Math.max(y1, s.outer.cy + rad);
-  }
-  x0 = Math.max(0, Math.floor(x0));
-  y0 = Math.max(0, Math.floor(y0));
-  x1 = Math.min(source.width, Math.ceil(x1));
-  y1 = Math.min(source.height, Math.ceil(y1));
-  const w = Math.max(1, x1 - x0);
-  const hgt = Math.max(1, y1 - y0);
+  const box = spotsBox(res.spots, { margin: PREVIEW_MARGIN, bounds: { x: 0, y: 0, w: source.width, h: source.height } });
+  const w = Math.max(1, box.w);
+  const hgt = Math.max(1, box.h);
   const k = Math.min(3, PHOTO_MAX / Math.max(w, hgt));
   const canvas = h('canvas', { class: 'photo-preview' });
   canvas.width = Math.round(w * k);
   canvas.height = Math.round(hgt * k);
-  canvas.getContext('2d').drawImage(source, x0, y0, w, hgt, 0, 0, canvas.width, canvas.height);
-  return {
-    canvas,
-    res: {
-      ...res,
-      spots: res.spots.map((s) => ({ outer: { ...s.outer, cx: (s.outer.cx - x0) * k, cy: (s.outer.cy - y0) * k, rx: s.outer.rx * k, ry: s.outer.ry * k } })),
-      arrows: res.arrows.map((a) => ({ ...a, image: { x: (a.image.x - x0) * k, y: (a.image.y - y0) * k } })),
-    },
-  };
+  canvas.getContext('2d').drawImage(source, box.x, box.y, w, hgt, 0, 0, canvas.width, canvas.height);
+  return { canvas, res: resultOnCrop(res, box, k) };
 }
 
 async function scoreFromPhoto(ctx, file) {
@@ -944,32 +924,17 @@ async function scoreFromPhoto(ctx, file) {
   // Second look, at just the sheet: the box around the spots is taken from the full-size photo, so
   // the same number of analysed pixels shows the target in much more detail. Kept when it finds
   // the face again.
-  let x0 = Infinity;
-  let y0 = Infinity;
-  let x1 = -Infinity;
-  let y1 = -Infinity;
-  for (const s of res.spots) {
-    const rad = (Math.max(s.outer.rx, s.outer.ry) * 1.3) / k;
-    x0 = Math.min(x0, s.outer.cx / k - rad);
-    y0 = Math.min(y0, s.outer.cy / k - rad);
-    x1 = Math.max(x1, s.outer.cx / k + rad);
-    y1 = Math.max(y1, s.outer.cy / k + rad);
-  }
-  x0 = Math.max(0, Math.floor(x0));
-  y0 = Math.max(0, Math.floor(y0));
-  x1 = Math.min(bitmap.width, Math.ceil(x1));
-  y1 = Math.min(bitmap.height, Math.ceil(y1));
-  const bw = x1 - x0;
-  const bh = y1 - y0;
-  if (bw > 16 && bh > 16 && bw * bh < 0.8 * bitmap.width * bitmap.height) {
-    const k2 = Math.min(1, PHOTO_MAX / Math.max(bw, bh));
+  const whole = { x: 0, y: 0, w: bitmap.width, h: bitmap.height };
+  const box = spotsBox(res.spots, { margin: CLOSE_UP_MARGIN, bounds: whole, scale: k });
+  if (isCloseUp(box, whole)) {
+    const k2 = Math.min(1, PHOTO_MAX / Math.max(box.w, box.h));
     const close = document.createElement('canvas');
-    close.width = Math.round(bw * k2);
-    close.height = Math.round(bh * k2);
+    close.width = Math.round(box.w * k2);
+    close.height = Math.round(box.h * k2);
     const g2 = close.getContext('2d', { willReadFrequently: true });
-    g2.drawImage(bitmap, x0, y0, bw, bh, 0, 0, close.width, close.height);
+    g2.drawImage(bitmap, box.x, box.y, box.w, box.h, 0, 0, close.width, close.height);
     const res2 = detectArrows(g2.getImageData(0, 0, close.width, close.height), face, empty, { spotHint });
-    if (!res2.error && res2.spots.length >= res.spots.length) {
+    if (keepCloseUp(res, res2)) {
       canvas.width = close.width;
       canvas.height = close.height;
       canvas.getContext('2d').drawImage(close, 0, 0);
@@ -1035,33 +1000,6 @@ async function previewAndApply(ctx, canvas, res, { face }, { cancelLabel = 'Canc
 
   // --- dragging a score label moves its arrow: the line's end is the point of impact, the label
   // keeps its distance to it, and the score in the label follows the rings under the point
-  // a point of the picture → the face (relative to a spot's centre, spot radius 1)
-  const onFace = (o, p) => {
-    const cos = Math.cos(o.angle);
-    const sin = Math.sin(o.angle);
-    const vx = p.x - o.cx;
-    const vy = p.y - o.cy;
-    const u1 = (cos * vx + sin * vy) / o.rx;
-    const u2 = (-sin * vx + cos * vy) / o.ry;
-    return { x: cos * u1 - sin * u2, y: sin * u1 + cos * u2 };
-  };
-  const place = (a, p) => {
-    a.image = { x: Math.max(0, Math.min(canvas.width, p.x)), y: Math.max(0, Math.min(canvas.height, p.y)) };
-    // on a sheet of several spots (all in the picture) the arrow belongs to the spot it is nearest to
-    const single = res.partial || !isMultiSpot(face);
-    let at = single ? onFace(res.spots[0].outer, a.image) : null;
-    if (!single) {
-      res.spots.forEach((s, j) => {
-        const f = onFace(s.outer, a.image);
-        if (!at || Math.hypot(f.x, f.y) < Math.hypot(at.x, at.y)) {
-          at = f;
-          a.spot = j;
-        }
-      });
-    }
-    a.x = at.x;
-    a.y = at.y;
-  };
   const pictureXY = (ev) => {
     const r = canvas.getBoundingClientRect();
     // the canvas is shown with object-fit: contain, so it may be letterboxed inside its box
@@ -1099,7 +1037,7 @@ async function previewAndApply(ctx, canvas, res, { face }, { cancelLabel = 'Canc
   canvas.addEventListener('pointermove', (ev) => {
     if (!grab || ev.pointerId !== grab.id) return;
     const p = pictureXY(ev);
-    place(arrows[grab.i], { x: p.x + grab.off.x, y: p.y + grab.off.y });
+    arrows[grab.i] = moveArrow(arrows[grab.i], { x: p.x + grab.off.x, y: p.y + grab.off.y }, res, face, canvas);
     values = arrows.map((a) => scoreFromPoint(a.x, a.y, face));
     redraw();
   });
