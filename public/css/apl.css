@@ -1073,3 +1073,8 @@ a.apl-sessionrow:hover {
   font-weight: 600;
   color: var(--muted);
 }
+
+/* a value inside a caption line, in ink ("Last backup: 15 Nov 2026") */
+.apl-ink {
+  color: var(--ink);
+}

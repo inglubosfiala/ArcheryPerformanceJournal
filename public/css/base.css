@@ -141,19 +141,6 @@ p {
   align-items: baseline;
 }
 
-.grow {
-  flex: 1;
-  min-width: 0;
-}
-
-.grow-1 {
-  flex: 1;
-}
-
-.grow-2 {
-  flex: 2;
-}
-
 .self-end {
   align-self: flex-end;
 }
@@ -301,15 +288,6 @@ p {
   border: 2px solid var(--ink);
 }
 
-.btn-outline-thin {
-  min-height: 44px;
-  border: 1px solid var(--border);
-  font-weight: 600;
-  font-size: 14px;
-  padding: 0 14px;
-  border-radius: 12px;
-}
-
 .btn-pill {
   min-height: 44px;
   border-radius: 22px;
@@ -329,12 +307,6 @@ p {
 
 .btn-text.danger {
   color: var(--danger);
-}
-
-.btn-xl {
-  min-height: 58px;
-  border-radius: 16px;
-  font-size: 17px;
 }
 
 .btn-sm {
@@ -891,55 +863,13 @@ textarea {
   overflow-x: auto;
 }
 
-/* ---------------------------------------------------------------- settings */
-.switch-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  min-height: 48px;
-}
-
-.switch {
-  appearance: none;
-  width: 52px;
-  height: 32px;
-  border-radius: 16px;
-  background: var(--border);
-  position: relative;
-  flex: none;
-  cursor: pointer;
-  margin: 0;
-  transition: background 120ms;
-}
-
-.switch::after {
-  content: '';
-  position: absolute;
-  top: 3px;
-  left: 3px;
-  width: 26px;
-  height: 26px;
-  border-radius: 50%;
-  background: #ffffff;
-  transition: transform 120ms;
-}
-
-.switch:checked {
-  background: var(--accent);
-}
-
-.switch:checked::after {
-  transform: translateX(20px);
-}
-
 .import-preview {
   border: 1px solid var(--border);
-  border-radius: 12px;
-  padding: 12px;
+  border-radius: var(--radius-lg);
+  padding: var(--space-4);
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: var(--space-3);
 }
 
 /* ---------------------------------------------------------------- banners & toast */
