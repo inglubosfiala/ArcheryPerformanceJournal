@@ -1846,6 +1846,8 @@ button.arrow-count:hover {
 }
 
 .slot-card-grades {
+  display: flex;
+  gap: 6px;
   font-size: 13px;
   font-weight: 600;
   color: var(--ink-soft);

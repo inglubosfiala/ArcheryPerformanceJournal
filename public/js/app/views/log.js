@@ -189,7 +189,8 @@ function renderActive(ctx, session) {
     },
     current.arrows.map((a, i) => {
       const active = i === cursor;
-      const grades = `M${a.m ?? '–'} · S${a.s ?? '–'}`;
+      // only the grades already given ("M1", "M1 S2"); nothing while neither is set
+      const grades = [a.m != null && `M${a.m}`, a.s != null && `S${a.s}`].filter(Boolean);
       return h(
         'button',
         {
@@ -205,7 +206,9 @@ function renderActive(ctx, session) {
           'span',
           { class: 'slot-card-text', 'aria-hidden': 'true' },
           compact ? null : h('span', { class: 'slot-card-name' }, T.arrowN(i + 1)),
-          h('span', { class: 'slot-card-grades' }, grades),
+          grades.length
+            ? h('span', { class: 'slot-card-grades' }, grades.map((g) => h('span', null, g)))
+            : null,
         ),
       );
     }),
