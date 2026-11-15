@@ -127,19 +127,11 @@ function announceArrow(ctx) {
   if (a?.v != null) announce(T.arrowScored(s.cursor + 1, a.v));
 }
 
-// the bottom bar's primary button for each L.primaryAction ('place', 'grade' and 'done' have none): its label,
-// and what it does
-const PRIMARY = {
-  next: { label: () => T.nextArrow, run: L.nextArrow },
-  back: { label: (pa) => T.backToEnd(pa.end), run: (c) => L.goToEnd(c, null) },
-};
-
 function renderActive(ctx, session) {
   const { cursor } = session;
   const current = L.shownEnd(session); // the end on screen (the current one or a saved one)
   const viewing = session.view != null;
   const editing = L.isEditing(session);
-  const askGrades = ctx.repo.getSettings().askGrades !== false;
   const endNo = L.viewIndex(session) + 1;
   const totalEnds = session.ends.length + 1;
   const sight = findSightMark(ctx.repo, session.distance);
@@ -201,39 +193,16 @@ function renderActive(ctx, session) {
           dataset: { fk: `slot-${i}` },
           onClick: () => update(ctx, (cur) => L.selectArrow(cur, i)),
         },
-        h('span', { class: `score-chip z-${zoneOf(a.v)}`, 'aria-hidden': 'true' }, a.v == null ? (compact ? String(i + 1) : '') : String(a.v)),
+        h('span', { class: `score-chip z-${zoneOf(a.v)}`, 'aria-hidden': 'true' }, a.v == null ? String(i + 1) : String(a.v)),
         h(
           'span',
           { class: 'slot-card-text', 'aria-hidden': 'true' },
-          compact ? null : h('span', { class: 'slot-card-name' }, T.arrowN(i + 1)),
           grades.length
             ? h('span', { class: 'slot-card-grades' }, grades.map((g) => h('span', null, g)))
             : null,
         ),
       );
     }),
-  );
-
-  // --- Previous / Next end: used less, so small text links under the strip
-  const endLink = (label, { icon, trailing, onClick, fk }) =>
-    h(
-      'button',
-      { type: 'button', class: 'end-link', onClick, dataset: { fk } },
-      icon ? icon() : null,
-      label,
-      trailing ? trailing() : null,
-    );
-  const endLinks = h(
-    'nav',
-    { class: 'end-links', 'aria-label': 'Ends' },
-    L.canPrevEnd(session)
-      ? endLink(T.endN(endNo - 1), { icon: icons.back, onClick: () => update(ctx, L.prevEnd), fk: 'end-prev' })
-      : h('span'),
-    // the next end opens only from here (there is no Save end step: every change is saved as it is
-    // made); from the end being shot it needs at least one arrow, so empty ends do not pile up
-    L.canNextEnd(session)
-      ? endLink(T.endN(endNo + 1), { trailing: icons.forward, onClick: () => update(ctx, L.nextEnd), fk: 'end-next' })
-      : h('span'),
   );
 
   // --- the face (multi-spot sheets: the spot suggested for an empty selected arrow is outlined)
@@ -269,21 +238,43 @@ function renderActive(ctx, session) {
           'div',
           { class: 'score-under' },
           gradePanel(session, { onGrade: (kind, g) => update(ctx, (c) => L.gradeArrow(c, kind, g)) }),
+          // empties the selected arrow (score, position and grades); its slot is filled next
+          h(
+            'button',
+            {
+              type: 'button',
+              class: 'score-clear',
+              onClick: () => update(ctx, L.clearArrow),
+              dataset: { fk: 'clear-arrow' },
+            },
+            icons.erase(),
+            T.clearArrow(cursor + 1),
+          ),
         );
 
-  // --- bottom bar, in thumb reach: Undo, the primary action, and Scan (the most used) at the end.
-  // While the selected arrow still needs a score or its grades there is no primary button (the face,
-  // keypad or M / S rows are the next step); its place stays empty, so Scan does not move.
-  const pa = L.primaryAction(session, { askGrades });
-  const primary =
-    !PRIMARY[pa.action]
-      ? h('span', { class: 'score-actions-gap', 'aria-hidden': 'true' })
-      : APL.Button({
-          children: PRIMARY[pa.action].label(pa),
-          disabled: !pa.enabled,
-          onClick: () => update(ctx, PRIMARY[pa.action].run),
-          fk: 'primary',
-        });
+  // --- bottom bar, in thumb reach: Undo, Previous / Next end, and Scan (the most used) at the end.
+  // There is no Save end step (every change is saved as it is made): Next opens the next end, and
+  // from the end being shot it needs at least one arrow, so empty ends do not pile up.
+  const endBtn = (label, ariaLabel, { icon, trailing, enabled, onClick, fk }) =>
+    h(
+      'button',
+      { type: 'button', class: 'score-end-btn', 'aria-label': ariaLabel, disabled: !enabled, onClick, dataset: { fk } },
+      icon ? icon() : null,
+      label,
+      trailing ? trailing() : null,
+    );
+  const prevBtn = endBtn(T.prevShort, T.prevEnd, {
+    icon: icons.back,
+    enabled: L.canPrevEnd(session),
+    onClick: () => update(ctx, L.prevEnd),
+    fk: 'end-prev',
+  });
+  const nextBtn = endBtn(T.nextShort, T.nextEnd, {
+    trailing: icons.forward,
+    enabled: L.canNextEnd(session),
+    onClick: () => update(ctx, L.nextEnd),
+    fk: 'end-next',
+  });
   const undoBtn = h(
     'button',
     {
@@ -394,7 +385,7 @@ function renderActive(ctx, session) {
       h(
         'div',
         { class: 'apl-screen-body log-body' },
-        h('section', { class: 'score-screen', 'aria-label': T.endN(endNo) }, header, strip, endLinks, input, under),
+        h('section', { class: 'score-screen', 'aria-label': T.endN(endNo) }, header, strip, input, under),
         pills,
         details,
         card(
@@ -404,7 +395,7 @@ function renderActive(ctx, session) {
         gearCard(ctx, session),
         h('button', { type: 'button', class: 'btn btn-text danger apl-discard', onClick: discard }, T.discardSession),
       ),
-      APL.BottomBar({ children: h('div', { class: 'score-actions' }, undoBtn, primary, photoButton(ctx, session)) }),
+      APL.BottomBar({ children: h('div', { class: 'score-actions' }, undoBtn, prevBtn, nextBtn, photoButton(ctx, session)) }),
     ),
   };
 }

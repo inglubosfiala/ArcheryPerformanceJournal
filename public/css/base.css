@@ -1840,11 +1840,6 @@ button.arrow-count:hover {
   line-height: 1.25;
 }
 
-.slot-card-name {
-  font: var(--type-caption);
-  color: var(--muted);
-}
-
 .slot-card-grades {
   display: flex;
   gap: 6px;
@@ -1869,33 +1864,6 @@ button.arrow-count:hover {
 
 .slot-strip.is-compact .slot-card-grades {
   font-size: 11px;
-}
-
-/* Previous / Next end: small text links (used less than the bottom bar). The row keeps its height
-   when it has no link, so the face does not jump when "Save end now" appears after the first arrow. */
-.end-links {
-  display: flex;
-  justify-content: space-between;
-  min-height: var(--tap-min);
-}
-
-.end-link {
-  display: inline-flex;
-  align-items: center;
-  gap: 2px;
-  min-height: var(--tap-min);
-  padding: 0 6px;
-  border: 0;
-  background: transparent;
-  color: var(--accent-bright);
-  font: inherit;
-  font-size: 14px;
-  font-weight: 600;
-}
-
-.end-link svg {
-  width: 18px;
-  height: 18px;
 }
 
 /* the face: a row over a multi-spot sheet, then the stage (the loupe docks inside it) */
@@ -1992,16 +1960,48 @@ button.arrow-count:hover {
   box-shadow: 0 0 0 3px var(--ink);
 }
 
-/* bottom bar: Undo, Scan (the most used: accent outline), and the primary action */
-.score-actions {
-  display: flex;
-  gap: 10px;
+/* Clear arrow n: under the grades, at the right; a destructive control, so danger outline and text */
+.score-clear {
+  align-self: flex-end;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: var(--tap-min);
+  padding: 0 14px;
+  border: 1px solid var(--danger);
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: var(--danger);
+  font: var(--type-body-strong);
 }
 
-.score-actions .apl-btn,
-.score-actions-gap {
+/* bottom bar: Undo, Previous / Next end, and Scan (the most used: accent outline) */
+.score-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.score-end-btn {
   flex: 1;
   min-width: 0;
+  height: var(--tap-primary);
+  padding: 0 4px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-xl);
+  background: var(--surface);
+  color: var(--ink);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  font: var(--type-body-strong);
+  white-space: nowrap;
+}
+
+.score-end-btn svg {
+  flex: none;
+  width: 18px;
+  height: 18px;
 }
 
 .score-undo,
@@ -2023,8 +2023,8 @@ button.arrow-count:hover {
 }
 
 .score-scan {
-  gap: 8px;
-  padding: 0 16px;
+  gap: 6px;
+  padding: 0 12px;
   border: 2px solid var(--accent-bright);
   background: var(--accent-tint);
 }
@@ -2034,6 +2034,7 @@ button.arrow-count:hover {
 }
 
 .score-undo:disabled,
+.score-end-btn:disabled,
 .score-scan:disabled {
   opacity: 0.45;
 }
