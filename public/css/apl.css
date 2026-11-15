@@ -735,3 +735,142 @@
     animation: none;
   }
 }
+
+/* ScoreKeypad + GradeKeys: data colours (target-*, score-miss, grade-*) on the keys, never UI state */
+.apl-keypad {
+  display: grid;
+  width: 100%;
+  grid-template-columns: repeat(var(--apl-cols, 8), minmax(0, 1fr));
+  gap: var(--space-1);
+}
+
+.apl-grades {
+  display: grid;
+  grid-template-columns: 28px repeat(var(--apl-cols, 5), minmax(0, 1fr));
+  gap: var(--space-1);
+  align-items: center;
+}
+
+.apl-grades-label {
+  font: var(--type-count);
+  color: var(--muted);
+  text-align: center;
+}
+
+.apl-key {
+  min-height: var(--tap-min);
+  min-width: 0;
+  padding: 0;
+  border-radius: var(--radius-md);
+  border: 2px solid var(--key-bd, var(--border));
+  background: var(--key-bg, var(--surface));
+  color: var(--key-fg, var(--ink));
+  font: var(--type-count);
+}
+
+.apl-key[data-zone='gold'] {
+  --key-bg: var(--target-gold);
+  --key-bd: var(--target-gold);
+  --key-fg: var(--target-black);
+}
+
+.apl-key[data-zone='red'] {
+  --key-bg: var(--target-red);
+  --key-bd: var(--target-red);
+  --key-fg: var(--target-black);
+}
+
+.apl-key[data-zone='blue'] {
+  --key-bg: var(--target-blue);
+  --key-bd: var(--target-blue);
+  --key-fg: var(--target-black);
+}
+
+.apl-key[data-zone='black'] {
+  --key-bg: var(--target-black);
+  --key-bd: var(--border);
+  --key-fg: var(--target-white);
+}
+
+.apl-key[data-zone='white'] {
+  --key-bg: var(--target-white);
+  --key-bd: var(--target-white);
+  --key-fg: var(--target-black);
+}
+
+.apl-key[data-zone='miss'] {
+  --key-bg: var(--score-miss);
+  --key-bd: var(--score-miss);
+  --key-fg: var(--target-black);
+}
+
+.apl-key[data-grade='1'] {
+  --key-bg: var(--grade-1);
+  --key-bd: var(--grade-1);
+  --key-fg: var(--on-grade-light);
+}
+
+.apl-key[data-grade='2'] {
+  --key-bg: var(--grade-2);
+  --key-bd: var(--grade-2);
+  --key-fg: var(--on-grade-dark);
+}
+
+.apl-key[data-grade='3'] {
+  --key-bg: var(--grade-3);
+  --key-bd: var(--grade-3);
+  --key-fg: var(--on-grade-dark);
+}
+
+.apl-key[data-grade='4'] {
+  --key-bg: var(--grade-4);
+  --key-bd: var(--grade-4);
+  --key-fg: var(--on-grade-dark);
+}
+
+.apl-key[data-grade='5'] {
+  --key-bg: var(--grade-5);
+  --key-bd: var(--grade-5);
+  --key-fg: var(--on-grade-light);
+}
+
+/* the chosen key is ringed in ink; the others in its row dim */
+.apl-key[aria-pressed='true'] {
+  border-color: var(--ink);
+  box-shadow: inset 0 0 0 2px var(--surface);
+}
+
+.apl-keypad:has(.apl-key[aria-pressed='true']) .apl-key[aria-pressed='false'],
+.apl-grades:has(.apl-key[aria-pressed='true']) .apl-key[aria-pressed='false'] {
+  opacity: 0.35;
+}
+
+/* erase: a destructive control, so danger on its icon and outline */
+.apl-key--clear {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  --key-bg: transparent;
+  --key-bd: var(--danger);
+  --key-fg: var(--danger);
+}
+
+.apl-key--clear.is-off {
+  visibility: hidden;
+}
+
+/* running session (log.js): the end, its details and the saved ends stay close together so the
+   end fits one phone screen; Next end is in the bottom bar */
+.log-body {
+  gap: var(--space-3);
+}
+
+.end-sight {
+  display: flex;
+}
+
+.end-details {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}

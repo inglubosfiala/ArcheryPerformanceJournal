@@ -6,12 +6,15 @@
 // to give focus back to the same control after it redraws the page (main.js, renderNow).
 import { h, s } from '../../core/dom.js';
 
-/** @typedef {'back'|'repeat'|'calendar'|'clock'|'plus'|'arrowRight'|'target'|'bow'|'play'|'pause'|'close'|'chevron'} IconName */
+/** @typedef {'back'|'repeat'|'calendar'|'clock'|'plus'|'arrowRight'|'target'|'bow'|'play'|'pause'|'close'|'chevron'|'erase'} IconName */
 /** @typedef {'full'|'six'|'triple'|'vegas'} FaceKind */
 /** @typedef {{value: string|number, label: string}} Option */
 /** @typedef {Node|string|number|null|undefined|false} Child */
 
 const fkData = (fk) => (fk ? { fk } : undefined);
+
+/** An icon given by name (APL Icon) or as a ready node (the app's own icons). */
+const iconNode = (icon, size) => (typeof icon === 'string' ? Icon({ name: icon, size }) : icon);
 
 const PATHS = {
   back: [['path', { d: 'M15 18l-6-6 6-6' }]],
@@ -44,6 +47,10 @@ const PATHS = {
   pause: [['path', { d: 'M9 5v14M15 5v14' }]],
   close: [['path', { d: 'M6 6l12 12M18 6L6 18' }]],
   chevron: [['path', { d: 'M9 18l6-6-6-6' }]],
+  erase: [
+    ['path', { d: 'M21 5H9l-6 7 6 7h12a1 1 0 0 0 1-1V6a1 1 0 0 0-1-1z' }],
+    ['path', { d: 'M17 9l-5 6M12 9l5 6' }],
+  ],
 };
 
 /** Inline 24-unit stroke icon, `currentColor`, hidden from assistive technology. */
@@ -69,21 +76,26 @@ export function Icon({ name, size = 20, strokeWidth = 2 }) {
 export function Button({
   children,
   variant = 'primary',
+  leadingIcon,
   trailingIcon,
+  label,
   disabled = false,
   type = 'button',
   onClick,
   fk,
 }) {
+  // app additions: `leadingIcon` (an IconName or a node) before the text, `label` as the aria-label
   return h(
     'button',
     {
       type,
       class: ['apl', 'apl-btn', variant === 'secondary' && 'apl-btn--secondary'],
+      'aria-label': label,
       disabled,
       onClick,
       dataset: fkData(fk),
     },
+    leadingIcon ? iconNode(leadingIcon, 20) : null,
     children,
     trailingIcon ? Icon({ name: trailingIcon, strokeWidth: 2.2 }) : null,
   );
@@ -487,9 +499,6 @@ export function TimerButton({ running, text, elapsedMs = 0, startedAt = null, on
   );
 }
 
-/** An icon given by name (APL Icon) or as a ready node (the app's own icons). */
-const iconNode = (icon, size) => (typeof icon === 'string' ? Icon({ name: icon, size }) : icon);
-
 /**
  * Bottom tab bar: one link per section, the current one marked with aria-current and accent-bright.
  * `items`: { id, label, icon, href, current }. Each tab carries data-tab=id, so the app can move the
@@ -585,5 +594,78 @@ export function Banner({
     ),
     trailing,
     cue,
+  );
+}
+
+/**
+ * Score keys under the target face: one key per value in its ring colour (`zone`: gold, red, blue,
+ * black, white, miss), the selected arrow's value pressed and the others dimmed. `clear` adds an
+ * erase key at the end of the row, kept in place (invisible) while it does not apply.
+ */
+export function ScoreKeypad({ label, keys, value, onKey, clear = null, fk = 'key' }) {
+  return h(
+    'div',
+    {
+      class: 'apl apl-keypad',
+      role: 'group',
+      'aria-label': label,
+      style: { '--apl-cols': String(keys.length + (clear ? 1 : 0)) },
+    },
+    keys.map((k) =>
+      h(
+        'button',
+        {
+          type: 'button',
+          class: 'apl-key',
+          'aria-label': k.ariaLabel,
+          'aria-pressed': String(value === k.value),
+          dataset: { zone: k.zone, fk: `${fk}-${k.value}` },
+          onClick: () => onKey?.(k.value),
+        },
+        k.label ?? String(k.value),
+      ),
+    ),
+    clear
+      ? h(
+          'button',
+          {
+            type: 'button',
+            class: ['apl-key', 'apl-key--clear', !clear.enabled && 'is-off'],
+            'aria-label': clear.label,
+            'aria-hidden': clear.enabled ? undefined : 'true',
+            tabindex: clear.enabled ? undefined : '-1',
+            disabled: !clear.enabled,
+            dataset: { fk: `${fk}-clear` },
+            onClick: () => clear.onClick?.(),
+          },
+          Icon({ name: 'erase', size: 22 }),
+        )
+      : null,
+  );
+}
+
+/**
+ * One row of grade keys 1…max in the grade colours, after a short row label (M, S). The chosen
+ * grade is ringed and the others dim. `keyLabel(g)` names each key for screen readers.
+ */
+export function GradeKeys({ label, rowLabel, value, onChange, max = 5, keyLabel = (g) => String(g), fk }) {
+  return h(
+    'div',
+    { class: 'apl apl-grades', role: 'group', 'aria-label': label, style: { '--apl-cols': String(max) } },
+    h('span', { class: 'apl-grades-label', 'aria-hidden': 'true' }, rowLabel),
+    Array.from({ length: max }, (_, i) => i + 1).map((g) =>
+      h(
+        'button',
+        {
+          type: 'button',
+          class: 'apl-key',
+          'aria-label': keyLabel(g),
+          'aria-pressed': String(value === g),
+          dataset: { grade: String(g), fk: fk && `${fk}-${g}` },
+          onClick: () => onChange?.(g),
+        },
+        String(g),
+      ),
+    ),
   );
 }

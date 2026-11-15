@@ -99,6 +99,15 @@
   /* app additions (design/apl/tokens.app.json) */
   --danger: #ff8a80;
   --on-danger: #0b0e10;
+  --score-miss: #d7d9db;
+  --grade-1: #0b6e4f;
+  --grade-2: #7cc29a;
+  --grade-3: #f2d65c;
+  --grade-4: #f2994a;
+  --grade-5: #b3261e;
+  --on-grade-light: #ffffff;
+  --on-grade-dark: #14181c;
+  --mark: #e5007e;
   /* type */
   --font-sans: Inter, system-ui, -apple-system, "Segoe UI", sans-serif;
   --type-screen-title: 700 20px/26px var(--font-sans);

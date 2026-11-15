@@ -1,5 +1,6 @@
 // Small shared view pieces.
-import { h, todayIso } from '../../core/dom.js';
+import { h, todayIso, formatDate } from '../../core/dom.js';
+import * as APL from '../../ui/apl/index.js';
 import { zoneOf } from '../scoring.js';
 import { RUBRIC, T } from '../strings.js';
 import { icons } from '../icons.js';
@@ -105,16 +106,30 @@ export function whenCard(ctx, ss) {
   );
 }
 
-/** Equipment select for a session (gearChoices output): saved setups by name. */
-export function gearPicker({ options, value, onChange }) {
+/** The line under a saved equipment choice (gearChoices option ids). */
+export function gearDetail(id, snapshots) {
+  if (id === 'none') return 'Log without a bow setup';
+  if (id === 'current') return 'From the Gear tab';
+  if (id === 'recorded') return 'As saved with the session';
+  const sn = snapshots.find((x) => x.id === id);
+  return sn ? `Saved ${formatDate(sn.createdAt.slice(0, 10))}` : null;
+}
+
+/** Equipment choices (gearChoices output) as APL radio cards, ending with Add equipment. */
+export function gearCards(ctx, { options, value, onChange, snapshots }) {
   return h(
     'div',
-    { class: 'field' },
-    h(
-      'select',
-      { class: 'input', 'aria-label': 'Equipment', dataset: { fk: 'gear' }, onChange: (e) => onChange(e.target.value) },
-      options.map(([v, l]) => h('option', { value: v, selected: v === value }, l)),
+    { class: 'apl-list', role: 'group', 'aria-label': 'Equipment' },
+    options.map(([id, name]) =>
+      APL.SelectCard({
+        title: name,
+        detail: gearDetail(id, snapshots),
+        selected: id === value,
+        onClick: () => id !== value && onChange(id),
+        fk: `gear-${id}`,
+      }),
     ),
+    APL.AddButton({ children: 'Add equipment', onClick: () => ctx.navigate('gear'), fk: 'gear-add' }),
   );
 }
 
@@ -135,8 +150,7 @@ export function gearCard(ctx, ss, pick = null) {
       if (cur && next && ctx.save('sessions', { ...cur, ...next })) ctx.rerender();
     });
   return card(
-    { 'aria-labelledby': 'gear-title' },
-    h('h2', { class: 'card-title', id: 'gear-title' }, 'Equipment'),
-    gearPicker({ ...choices, onChange }),
+    { class: 'gear-card' },
+    APL.Section({ label: 'Equipment', id: 'gear', children: gearCards(ctx, { ...choices, onChange, snapshots }) }),
   );
 }

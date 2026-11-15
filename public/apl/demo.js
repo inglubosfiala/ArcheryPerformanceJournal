@@ -10,6 +10,8 @@ const state = {
   bow: 'recurve',
   count: 30,
   timerOn: true,
+  score: 9,
+  gradeM: 2,
   techniques: ['Breathing'],
 };
 const KINDS = {
@@ -198,6 +200,36 @@ function render() {
         title: 'SPT running',
         action: { label: 'Continue' },
       }),
+    ),
+    story(
+      'ScoreKeypad',
+      APL.ScoreKeypad({
+        label: 'Quick score',
+        keys: [
+          ['X', 'gold'],
+          [10, 'gold'],
+          [9, 'gold'],
+          [8, 'red'],
+          [7, 'red'],
+          [6, 'blue'],
+          ['M', 'miss'],
+        ].map(([value, zone]) => ({ value, zone, ariaLabel: `Score ${value}` })),
+        value: state.score,
+        onKey: (score) => set({ score }),
+        clear: { enabled: state.score != null, label: 'Clear', onClick: () => set({ score: null }) },
+        fk: 'score',
+      }),
+    ),
+    story(
+      'GradeKeys',
+      APL.GradeKeys({
+        label: 'Mental program',
+        rowLabel: 'M',
+        value: state.gradeM,
+        onChange: (gradeM) => set({ gradeM }),
+        fk: 'grade-m',
+      }),
+      APL.GradeKeys({ label: 'Shooting cycle', rowLabel: 'S', value: null, fk: 'grade-s' }),
     ),
     story(
       'TabBar',

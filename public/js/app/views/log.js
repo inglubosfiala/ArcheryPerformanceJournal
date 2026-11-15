@@ -17,7 +17,8 @@ import { card, gearCard } from './common.js';
 import { faceSheet, faceViewBox, VB } from './face.js';
 import { SESSION_TYPES, TYPE_LABELS, isScored, sessionType } from '../sessionTypes.js';
 import { renderTypeChoice, renderScoredSetup, renderFormSetup } from './sessionSetup.js';
-import { startTimerTicker } from './timer.js';
+import { sessionTimer } from './timer.js';
+import * as APL from '../../ui/apl/index.js';
 import { detectArrows } from '../photoDetect.js';
 import { drawArrowMarks, liveScan } from './liveScan.js';
 import { PREVIEW_MARGIN, spotsBox, resultOnCrop } from '../scanGeometry.js';
@@ -96,28 +97,6 @@ function update(ctx, fn, { rerender = true } = {}) {
   if (ctx.running.apply(fn) && rerender) ctx.rerender();
 }
 
-/** Timer button (tap to pause / resume). The shown time is refreshed every second by the ticker. */
-function timerButton(timer = null, onToggle, { large = false } = {}) {
-  const tm = timer || { running: false, startedAt: null, elapsedMs: 0 };
-  startTimerTicker();
-  return h(
-    'button',
-    {
-      type: 'button',
-      class: ['timer-btn', large && 'timer-btn-lg', !tm.running && 'is-paused'],
-      'aria-label': tm.running ? 'Pause the session timer' : 'Resume the session timer',
-      dataset: { fk: 'timer' },
-      onClick: onToggle,
-    },
-    tm.running ? icons.pause() : icons.play(),
-    h(
-      'span',
-      { class: 'timer-value', dataset: { elapsed: String(tm.elapsedMs || 0), started: tm.running ? tm.startedAt : '' } },
-      L.formatClock(L.timerElapsed(tm)),
-    ),
-  );
-}
-
 // ---------------------------------------------------------------- active session
 
 function renderActive(ctx, session) {
@@ -175,7 +154,7 @@ function renderActive(ctx, session) {
 
   // session timer: tap to pause / resume
   // sessions started before the timer existed show it stopped at 0:00; one tap starts it
-  const timerBtn = timerButton(session.timer, () =>
+  const timerBtn = sessionTimer(session.timer, () =>
     update(ctx, (c) => (c.timer?.running ? L.pauseTimer(c) : L.resumeTimer(c))),
   );
 
@@ -203,74 +182,49 @@ function renderActive(ctx, session) {
     ),
     input,
     grades,
-    // Previous end (disabled on the first end) and Next end: on the newest end Next saves it and
-    // starts a new one (it needs at least one arrow); on an earlier end it moves one end forward.
-    // The camera (score the end from the target) is the third button of the row, at the thumb.
+    // Previous end (disabled on the first end) and the camera (score the end from the target, at the
+    // thumb). Next end is the screen's primary action, in the bottom bar.
     h(
       'div',
-      { class: 'end-step' },
-      h(
-        'button',
-        {
-          type: 'button',
-          class: 'btn btn-outline end-step-btn',
-          disabled: !L.canPrevEnd(session),
-          'aria-label': T.prevEnd, // the button itself says just "Previous", so it fits on one line
-          dataset: { fk: 'end-prev' },
-          onClick: () => update(ctx, L.prevEnd),
-        },
-        icons.back(),
-        T.prevShort,
-      ),
-      h(
-        'button',
-        {
-          type: 'button',
-          class: 'btn btn-primary end-step-btn',
-          'aria-label': viewing ? T.nextEnd : `${T.nextEnd} (saves end ${endNo})`,
-          disabled: !L.canNextEnd(session),
-          dataset: { fk: 'end-next' },
-          onClick: () => update(ctx, L.nextEnd),
-        },
-        T.nextEnd,
-        icons.forward(),
-      ),
+      { class: 'apl-grid-2' },
+      APL.Button({
+        children: T.prevShort,
+        variant: 'secondary',
+        leadingIcon: 'back',
+        // the button itself says just "Previous", so it fits
+        label: T.prevEnd,
+        disabled: !L.canPrevEnd(session),
+        onClick: () => update(ctx, L.prevEnd),
+        fk: 'end-prev',
+      }),
       photoButton(ctx, session),
     ),
   );
 
+  // Next end: on the newest end it saves it and starts a new one (it needs at least one arrow); on
+  // an earlier end it moves one end forward.
+  const nextBtn = APL.Button({
+    children: T.nextEnd,
+    trailingIcon: 'arrowRight',
+    label: viewing ? T.nextEnd : `${T.nextEnd} (saves end ${endNo})`,
+    disabled: !L.canNextEnd(session),
+    onClick: () => update(ctx, L.nextEnd),
+    fk: 'end-next',
+  });
+
   // --- end details
   const stepper = (key, label) =>
-    h(
-      'div',
-      { class: 'field' },
-      h('div', { class: 'field-label', id: `lbl-${key}` }, label),
-      h(
-        'div',
-        { class: 'stepper', role: 'group', 'aria-labelledby': `lbl-${key}` },
-        h(
-          'button',
-          {
-            type: 'button',
-            'aria-label': `Fewer ${label.toLowerCase()}`,
-            dataset: { fk: `${key}-minus` },
-            onClick: () => update(ctx, (c) => L.bump(c, key, -1)),
-          },
-          '−',
-        ),
-        h('output', { 'aria-live': 'polite' }, String(current[key])),
-        h(
-          'button',
-          {
-            type: 'button',
-            'aria-label': `More ${label.toLowerCase()}`,
-            dataset: { fk: `${key}-plus` },
-            onClick: () => update(ctx, (c) => L.bump(c, key, 1)),
-          },
-          '+',
-        ),
-      ),
-    );
+    APL.Section({
+      label,
+      id: `end-${key}`,
+      children: APL.Stepper({
+        label: label.toLowerCase(),
+        value: current[key],
+        min: 0,
+        onChange: (v) => update(ctx, (c) => L.bump(c, key, v - current[key])),
+        fk: key,
+      }),
+    });
 
   const canFinish = L.canFinish(session);
   // Finish asks OK / Cancel first; the timer is paused meanwhile and runs on if it is cancelled
@@ -284,42 +238,26 @@ function renderActive(ctx, session) {
   };
 
   const details = card(
-    null,
-    h('div', { class: 'grid-2' }, stepper('ld', T.letDowns), stepper('cld', T.correctLetDowns)),
-    h(
-      'label',
-      { class: 'field' },
-      h('span', { class: 'field-label' }, T.noteForEnd),
-      h('textarea', {
-        rows: 2,
-        placeholder: T.notePh,
-        value: current.note,
-        dataset: { fk: 'note' },
-        onInput: (e) => update(ctx, (c) => L.setNote(c, e.target.value), { rerender: false }),
-      }),
-    ),
-    h(
-      'div',
-      { class: 'row' },
-      // looking at an earlier end: jump straight back to the one being shot
-      viewing
-        ? h(
-            'button',
-            {
-              type: 'button',
-              class: 'btn btn-outline grow-2',
-              dataset: { fk: 'back-current' },
-              onClick: () => update(ctx, (c) => L.goToEnd(c, null)),
-            },
-            T.backToEnd(totalEnds),
-          )
-        : null,
-      h(
-        'button',
-        { type: 'button', class: 'btn btn-outline grow-1', disabled: !canFinish, onClick: finish },
-        T.finish,
-      ),
-    ),
+    { class: 'end-details' },
+    h('div', { class: 'apl-grid-2' }, stepper('ld', T.letDowns), stepper('cld', T.correctLetDowns)),
+    APL.TextArea({
+      label: T.noteForEnd,
+      rows: 2,
+      placeholder: T.notePh,
+      value: current.note,
+      fk: 'note',
+      onInput: (e) => update(ctx, (c) => L.setNote(c, e.target.value), { rerender: false }),
+    }),
+    // looking at an earlier end: jump straight back to the one being shot
+    viewing
+      ? APL.Button({
+          children: T.backToEnd(totalEnds),
+          variant: 'secondary',
+          onClick: () => update(ctx, (c) => L.goToEnd(c, null)),
+          fk: 'back-current',
+        })
+      : null,
+    APL.Button({ children: T.finish, variant: 'secondary', disabled: !canFinish, onClick: finish, fk: 'finish' }),
   );
 
   // --- saved ends (newest first)
@@ -366,30 +304,36 @@ function renderActive(ctx, session) {
     sight && (sight.elevation || sight.windage)
       ? h(
           'div',
-          { class: 'pills' },
-          h(
-            'span',
-            { class: 'pill pill-accent' },
-            `Sight ${[sight.elevation, sight.windage].filter(Boolean).join(' / ')}`,
-          ),
+          { class: 'end-sight' },
+          APL.Badge({ children: `Sight ${[sight.elevation, sight.windage].filter(Boolean).join(' / ')}`, tone: 'neutral' }),
         )
       : null;
 
+  const total =
+    session.ends.reduce((n, e) => n + sumArrows(e.arrows), 0) + (viewing ? 0 : sumArrows(current.arrows));
   return {
     content: h(
       'div',
-      { class: 'stack' },
-      pills,
-      endCard,
-      details,
-      rows.length
-        ? card(
-            { class: 'card-list', 'aria-label': 'Saved ends' },
-            h('ol', { class: 'saved-ends', reversed: true }, rows.reverse()),
-          )
-        : null,
-      gearCard(ctx, session),
-      h('button', { type: 'button', class: 'btn btn-text danger', onClick: discard }, T.discardSession),
+      { class: 'apl-screen' },
+      h(
+        'div',
+        { class: 'apl-screen-body log-body' },
+        pills,
+        endCard,
+        details,
+        rows.length
+          ? card(
+              { class: 'card-list', 'aria-label': 'Saved ends' },
+              h('ol', { class: 'saved-ends', reversed: true }, rows.reverse()),
+            )
+          : null,
+        gearCard(ctx, session),
+        h('button', { type: 'button', class: 'btn btn-text danger apl-discard', onClick: discard }, T.discardSession),
+      ),
+      APL.BottomBar({
+        summary: `${T.end} ${endNo} · Total ${total}`,
+        children: nextBtn,
+      }),
     ),
   };
 }
@@ -402,19 +346,15 @@ function renderActive(ctx, session) {
  * afterwards. Pictures are only used in memory and are never stored.
  */
 function photoButton(ctx, session) {
-  return h(
-    'button',
-    {
-      type: 'button',
-      class: 'btn btn-outline end-step-btn',
-      'aria-label': 'Score arrows with the camera',
-      dataset: { fk: 'photo' },
-      disabled: !canScan(session),
-      onClick: () => scanTarget(ctx),
-    },
-    icons.camera(),
-    'Scan',
-  );
+  return APL.Button({
+    children: 'Scan',
+    variant: 'secondary',
+    leadingIcon: icons.camera(),
+    label: 'Score arrows with the camera',
+    disabled: !canScan(session),
+    onClick: () => scanTarget(ctx),
+    fk: 'photo',
+  });
 }
 
 /**
@@ -905,40 +845,20 @@ function targetInput(session, enter, slots, { clearable = false, clearLabel = 'C
       slots,
       h('div', { class: 'target-stage' }, btn, multi ? zoomOutBtn : null, loupe),
     ),
-    h(
-      'div',
-      { class: 'quick-keys', role: 'group', 'aria-label': 'Quick score without position' },
-      ['X', 10, 9, 8, 7, 6, 'M'].map((k) =>
-        h(
-          'button',
-          {
-            type: 'button',
-            class: `quick-key z-${zoneOf(k)}`,
-            'aria-label': `Score ${k === 'M' ? 'miss' : k}`,
-            // the selected arrow's score is shown pressed; the other keys dim (like the grade rows)
-            'aria-pressed': String(selectedValue === k),
-            dataset: { fk: `quick-${k}` },
-            onClick: () => enter(k, null, null),
-          },
-          String(k),
-        ),
-      ),
+    APL.ScoreKeypad({
+      label: 'Quick score without position',
+      keys: ['X', 10, 9, 8, 7, 6, 'M'].map((k) => ({
+        value: k,
+        zone: zoneOf(k),
+        ariaLabel: `Score ${k === 'M' ? 'miss' : k}`,
+      })),
+      // the selected arrow's score is shown pressed; the other keys dim (like the grade rows)
+      value: selectedValue,
+      onKey: (k) => enter(k, null, null),
       // at the thumb's end of the row; its place is kept (invisible) when no arrow is picked
-      h(
-        'button',
-        {
-          type: 'button',
-          class: ['quick-key', 'clear-key', !clearable && 'is-off'],
-          'aria-label': clearLabel,
-          'aria-hidden': clearable ? null : 'true',
-          tabindex: clearable ? null : '-1',
-          disabled: !clearable,
-          dataset: { fk: 'clear-arrow' },
-          onClick: () => onClear?.(),
-        },
-        icons.erase(),
-      ),
-    ),
+      clear: { enabled: clearable, label: clearLabel, onClick: () => onClear?.() },
+      fk: 'quick',
+    }),
   );
 }
 
@@ -949,24 +869,13 @@ function targetInput(session, enter, slots, { clearable = false, clearLabel = 'C
 function gradePanel(session, { onGrade }) {
   const a = L.shownEnd(session).arrows[session.cursor];
   const row = (kind, label, full) =>
-    h(
-      'div',
-      { class: 'grade-line', role: 'group', 'aria-label': `${full} for arrow ${session.cursor + 1}` },
-      h('span', { class: 'grade-line-label', 'aria-hidden': 'true' }, label),
-      [1, 2, 3, 4, 5].map((g) =>
-        h(
-          'button',
-          {
-            type: 'button',
-            class: `grade-key g${g}`,
-            'aria-pressed': String(a[kind] === g),
-            'aria-label': `${full} ${g}`,
-            dataset: { fk: `grade-${kind}-${g}` },
-            onClick: () => onGrade(kind, g),
-          },
-          String(g),
-        ),
-      ),
-    );
+    APL.GradeKeys({
+      label: `${full} for arrow ${session.cursor + 1}`,
+      rowLabel: label,
+      value: a[kind],
+      keyLabel: (g) => `${full} ${g}`,
+      onChange: (g) => onGrade(kind, g),
+      fk: `grade-${kind}`,
+    });
   return h('div', { class: 'grade-panel' }, row('m', 'M', T.mentalProgram), row('s', 'S', T.shootingCycle));
 }

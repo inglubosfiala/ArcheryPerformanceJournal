@@ -2,6 +2,15 @@
   "about": "Tokens this app adds to APL (approved 2026-11-15). Not part of the APL design system: errors and destructive text, and data colours that are drawn but never mark UI state.",
   "color": [
     { "name": "danger", "value": "#ff8a80", "usage": "Error text and destructive text buttons only (7.6:1 on surface). Never a fill behind text, never next to a target face as a score colour." },
-    { "name": "on-danger", "value": "#0b0e10", "usage": "Text on a danger fill (the confirm button of a destructive dialog)." }
+    { "name": "on-danger", "value": "#0b0e10", "usage": "Text on a danger fill (the confirm button of a destructive dialog)." },
+    { "name": "score-miss", "value": "#d7d9db", "usage": "Data: a miss (M) on score keys and chips, beside the target-* ring colours." },
+    { "name": "grade-1", "value": "#0b6e4f", "usage": "Data: grade 1 (best) on M / S keys and badges." },
+    { "name": "grade-2", "value": "#7cc29a", "usage": "Data: grade 2." },
+    { "name": "grade-3", "value": "#f2d65c", "usage": "Data: grade 3." },
+    { "name": "grade-4", "value": "#f2994a", "usage": "Data: grade 4." },
+    { "name": "grade-5", "value": "#b3261e", "usage": "Data: grade 5 (worst). Not an error colour." },
+    { "name": "on-grade-light", "value": "#ffffff", "usage": "Text on grade-1 and grade-5." },
+    { "name": "on-grade-dark", "value": "#14181c", "usage": "Text on grade-2, grade-3 and grade-4." },
+    { "name": "mark", "value": "#e5007e", "usage": "Data: an arrow's place on the face, and the arrow being moved or picked on the running session." }
   ]
 }

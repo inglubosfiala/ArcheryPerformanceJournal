@@ -2,7 +2,7 @@
 // form of the other types (blank bale, SPT, mental, manual), drawn with the APL components after the
 // design system's SessionSetup screen. The running-session and open-form-session modules own
 // starting, saving and discarding; these pages hold what is being picked (ui state `setup`).
-import { h, formatDate, todayIso } from '../../core/dom.js';
+import { h, todayIso } from '../../core/dom.js';
 import * as APL from '../../ui/apl/index.js';
 import * as L from '../sessionLogic.js';
 import { T } from '../strings.js';
@@ -16,7 +16,7 @@ import {
 } from '../scoring.js';
 import { SESSION_TYPES, TYPE_LABELS, hourMinute, setupSummary, emptyCompetition } from '../sessionTypes.js';
 import { gearChoices, gearForChoice } from '../gearFields.js';
-import { sessionDates } from './common.js';
+import { sessionDates, gearCards } from './common.js';
 import { datePicker, timePicker } from './pickers.js';
 import { emptyForm, formSections } from './sessionForms.js';
 import { sessionTimer } from './timer.js';
@@ -175,29 +175,15 @@ function equipmentSection(ctx, { settings, setup, set }) {
   });
   const gearOpts = gearChoices({ settings, snapshots });
   const gearChoice = gearOpts.options.some((o) => o[0] === setup.gear) ? setup.gear : gearOpts.value;
-  const detail = (id) => {
-    if (id === 'none') return 'Log without a bow setup';
-    if (id === 'current') return 'From the Gear tab';
-    const sn = snapshots.find((x) => x.id === id);
-    return sn ? `Saved ${formatDate(sn.createdAt.slice(0, 10))}` : null;
-  };
   const section = APL.Section({
     label: 'Equipment',
     id: 'setup-gear',
-    children: h(
-      'div',
-      { class: 'apl-list', role: 'group', 'aria-labelledby': 'setup-gear-label' },
-      gearOpts.options.map(([id, name]) =>
-        APL.SelectCard({
-          title: name,
-          detail: detail(id),
-          selected: id === gearChoice,
-          onClick: () => set({ gear: id }),
-          fk: `gear-${id}`,
-        }),
-      ),
-      APL.AddButton({ children: 'Add equipment', onClick: () => ctx.navigate('gear'), fk: 'gear-add' }),
-    ),
+    children: gearCards(ctx, {
+      ...gearOpts,
+      value: gearChoice,
+      onChange: (id) => set({ gear: id }),
+      snapshots,
+    }),
   });
   return {
     section,
