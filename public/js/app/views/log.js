@@ -15,7 +15,7 @@ import { T } from '../strings.js';
 import { icons } from '../icons.js';
 import { card, gearCard } from './common.js';
 import { faceSheet, faceViewBox, VB } from './face.js';
-import { SESSION_TYPES, TYPE_LABELS, isScored, sessionType, setupSummary } from '../sessionTypes.js';
+import { SESSION_TYPES, TYPE_LABELS, isScored, sessionType } from '../sessionTypes.js';
 import { renderTypeChoice, renderScoredSetup, renderFormSetup } from './sessionSetup.js';
 import { startTimerTicker } from './timer.js';
 import { detectArrows } from '../photoDetect.js';
@@ -74,12 +74,6 @@ export function askAboutOpenFormSession(q) {
     confirmLabel: 'Discard',
     danger: true,
   });
-}
-
-export function logSubtitle(a) {
-  return a
-    ? `${a.type === 'competition' ? 'Competition · ' : ''}${setupSummary(a, `${a.arrowsPerEnd} arrows/end`)}`
-    : T.sub.logIdle;
 }
 
 export function renderLog(ctx) {
@@ -760,11 +754,7 @@ function targetInput(session, enter, slots, { clearable = false, clearLabel = 'C
   // The loupe's place is chosen once, when the finger lands, and kept until it lifts (it never jumps).
   // Above the target face when there is room; otherwise over the face, centred, on the half away
   // from the finger (finger on the top half: loupe at the bottom, and the other way round).
-  const visibleTop = () => {
-    const header = document.querySelector('.app-header');
-    if (header && !header.hidden) return header.getBoundingClientRect().bottom;
-    return document.querySelector('.main')?.getBoundingClientRect().top ?? 0;
-  };
+  const visibleTop = () => document.querySelector('.main')?.getBoundingClientRect().top ?? 0;
   const placeLoupe = (p) => {
     const size = loupe.offsetWidth || 132;
     const gap = 10;

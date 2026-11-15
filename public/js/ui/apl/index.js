@@ -6,7 +6,7 @@
 // to give focus back to the same control after it redraws the page (main.js, renderNow).
 import { h, s } from '../../core/dom.js';
 
-/** @typedef {'back'|'repeat'|'calendar'|'clock'|'plus'|'arrowRight'|'target'|'bow'|'play'|'pause'|'close'} IconName */
+/** @typedef {'back'|'repeat'|'calendar'|'clock'|'plus'|'arrowRight'|'target'|'bow'|'play'|'pause'|'close'|'chevron'} IconName */
 /** @typedef {'full'|'six'|'triple'|'vegas'} FaceKind */
 /** @typedef {{value: string|number, label: string}} Option */
 /** @typedef {Node|string|number|null|undefined|false} Child */
@@ -43,6 +43,7 @@ const PATHS = {
   play: [['path', { d: 'M7 5l12 7-12 7z' }]],
   pause: [['path', { d: 'M9 5v14M15 5v14' }]],
   close: [['path', { d: 'M6 6l12 12M18 6L6 18' }]],
+  chevron: [['path', { d: 'M9 18l6-6-6-6' }]],
 };
 
 /** Inline 24-unit stroke icon, `currentColor`, hidden from assistive technology. */
@@ -483,5 +484,106 @@ export function TimerButton({ running, text, elapsedMs = 0, startedAt = null, on
       text,
     ),
     running ? null : h('span', { class: 'apl-timer-state' }, 'Paused'),
+  );
+}
+
+/** An icon given by name (APL Icon) or as a ready node (the app's own icons). */
+const iconNode = (icon, size) => (typeof icon === 'string' ? Icon({ name: icon, size }) : icon);
+
+/**
+ * Bottom tab bar: one link per section, the current one marked with aria-current and accent-bright.
+ * `items`: { id, label, icon, href, current }. Each tab carries data-tab=id, so the app can move the
+ * mark without drawing the bar again.
+ */
+export function TabBar({ label, items }) {
+  return h(
+    'nav',
+    { class: 'apl apl-tabbar', 'aria-label': label, style: { '--apl-cols': String(items.length) } },
+    items.map((it) =>
+      h(
+        'a',
+        {
+          class: 'apl-tab',
+          href: it.href,
+          'aria-current': it.current ? 'page' : undefined,
+          dataset: { tab: it.id },
+        },
+        iconNode(it.icon, 22),
+        h('span', null, it.label),
+      ),
+    ),
+  );
+}
+
+/**
+ * 60px row that opens a page (`href`) or does something (`onClick`): an icon well, a title and a
+ * detail line, an optional badge and a chevron. For navigation lists, where SelectCard would wrongly
+ * suggest a choice.
+ */
+export function NavRow({ title, detail, icon, href, onClick, badge = null, fk }) {
+  return h(
+    href ? 'a' : 'button',
+    { class: 'apl apl-navrow', href, type: href ? undefined : 'button', onClick, dataset: fkData(fk) },
+    icon ? h('span', { class: 'apl-navrow-well' }, iconNode(icon)) : null,
+    h(
+      'span',
+      { class: 'apl-stack' },
+      h('span', { class: 'apl-t' }, title),
+      detail ? h('span', { class: 'apl-cap' }, detail) : null,
+    ),
+    badge,
+    h('span', { class: 'apl-navrow-go', 'aria-hidden': 'true' }, Icon({ name: 'chevron' })),
+  );
+}
+
+/**
+ * A status strip: a title and detail, then an action. With `href` the whole strip is the link and the
+ * action label is its visible cue. `tone: 'accent'` marks something live (a running session), with a
+ * dot that pulses (`indicator: 'live'`) or stands still (`'paused'`). `trailing` goes before the action
+ * (a running time).
+ */
+export function Banner({
+  title,
+  detail,
+  tone = 'neutral',
+  indicator = null,
+  href,
+  action = null,
+  trailing = null,
+  fk,
+}) {
+  const cue = action
+    ? href || action.href
+      ? h(
+          href ? 'span' : 'a',
+          { class: 'apl-banner-action', href: href ? undefined : action.href },
+          action.label,
+          Icon({ name: 'chevron', size: 18 }),
+        )
+      : h(
+          'button',
+          { type: 'button', class: 'apl-banner-action', onClick: action.onClick, dataset: fkData(action.fk) },
+          action.label,
+        )
+    : null;
+  return h(
+    href ? 'a' : 'div',
+    {
+      class: ['apl', 'apl-banner', tone === 'accent' && 'apl-banner--accent'],
+      href,
+      role: href ? undefined : 'status',
+      dataset: fkData(fk),
+    },
+    indicator
+      ? h('span', { class: ['apl-banner-dot', indicator === 'paused' && 'is-paused'], 'aria-hidden': 'true' })
+      : null,
+    h(
+      'span',
+      { class: 'apl-stack' },
+      h('span', { class: 'apl-t' }, title),
+      detail ? h('span', { class: 'apl-cap' }, detail) : null,
+    ),
+    trailing,
+    cue,
   );
 }

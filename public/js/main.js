@@ -28,7 +28,8 @@ import { icons } from './app/icons.js';
 import * as L from './app/sessionLogic.js';
 import { TYPE_LABELS, sessionType } from './app/sessionTypes.js';
 import { guideSheet } from './app/views/common.js';
-import { renderLog, renderNewSession, logSubtitle, askAboutRunningSession, askAboutOpenFormSession } from './app/views/log.js';
+import { renderLog, renderNewSession, askAboutRunningSession, askAboutOpenFormSession } from './app/views/log.js';
+import * as APL from './ui/apl/index.js';
 import { startTimerTicker } from './app/views/timer.js';
 import { createRunningSession } from './app/runningSession.js';
 import { createOpenFormSessions } from './app/openFormSession.js';
@@ -98,33 +99,22 @@ let overlayClose = null;
 let lastOverlayKey = null;
 
 function buildShell() {
-  const sub = h('div', { class: 'header-sub' });
   const main = h('main', { id: 'main', class: 'main', tabindex: '-1' });
   const banner = h('div', { class: 'banners' });
-  const tabButtons = {};
-  const nav = h(
-    'nav',
-    { class: 'tabbar', 'aria-label': 'Sections' },
-    TABS.map(([name, label, icon]) => {
-      tabButtons[name] = h('a', { href: `#/${name}`, class: 'tab' }, icon(), h('span', null, label));
-      return tabButtons[name];
-    }),
-  );
-  const header = h(
-    'header',
-    { class: 'app-header' },
-    // Grades and Settings are tiles on the Dashboard, the only page that shows this bar
-    h('div', { class: 'brand' }, icons.logo(), h('div', null, h('div', { class: 'brand-title' }, T.appTitle), sub)),
-  );
+  const nav = APL.TabBar({
+    label: 'Sections',
+    items: TABS.map(([name, label, icon]) => ({ id: name, label, icon: icon(), href: `#/${name}` })),
+  });
+  const tabButtons = Object.fromEntries([...nav.querySelectorAll('[data-tab]')].map((el) => [el.dataset.tab, el]));
   const overlay = h('div', { class: 'overlay-root' });
   const toast = h('div', { class: 'toast-root', role: 'status', 'aria-live': 'polite' });
   // the test build (main-test, /test/) is marked on every screen so it is never mistaken for the real journal
   const envBadge = APP_ENV === 'test' ? h('div', { class: 'env-badge', 'aria-label': 'Test environment' }, 'TEST') : null;
   // sessions still running, shown on every page above the bottom bar (see renderRunning)
-  const running = h('div', { class: 'running-bars' });
-  const app = h('div', { class: ['app', APP_ENV === 'test' && 'env-test'] }, envBadge, header, banner, main, running, nav, overlay, toast);
+  const running = h('div', { class: 'running-bars apl apl-bar' });
+  const app = h('div', { class: ['app', APP_ENV === 'test' && 'env-test'] }, envBadge, banner, main, running, nav, overlay, toast);
   document.getElementById('app').replaceChildren(app);
-  return { app, header, sub, main, banner, running, nav, tabButtons, overlay, toast };
+  return { app, main, banner, running, nav, tabButtons, overlay, toast };
 }
 
 function renderNow({ scrollTop = false } = {}) {
@@ -138,11 +128,7 @@ function renderNow({ scrollTop = false } = {}) {
     result = { content: h('div', { class: 'card' }, h('p', { class: 'error' }, `Something went wrong: ${e.message}`)) };
   }
 
-  // header + tabs
-  const subs = { home: T.sub.home, insights: T.sub.insights, log: logSubtitle(ctx.running.get()), new: T.sub.new, history: T.sub.history, gear: T.sub.gear, sights: T.sub.sights, settings: T.sub.settings };
-  shell.sub.textContent = subs[route.name] || '';
-  // The top bar (title, Grades, Settings) is shown only on the Dashboard tab, to save space elsewhere.
-  shell.header.hidden = route.name !== 'home';
+  // tabs
   // Insights uses the full width of a desktop browser
   shell.app.classList.toggle('app-wide', route.name === 'insights');
   for (const [name, el] of Object.entries(shell.tabButtons)) {
@@ -173,7 +159,6 @@ function renderOverlay(overlay) {
   lastOverlayKey = overlay ? overlay.key : null;
   overlayClose = overlay ? overlay.onClose : null;
   for (const el of [shell.main, shell.nav, shell.banner, shell.running]) el.inert = !!overlay;
-  shell.header.inert = !!overlay;
   if (!overlay) {
     shell.overlay.replaceChildren();
     shell.overlay.className = 'overlay-root';
@@ -184,7 +169,7 @@ function renderOverlay(overlay) {
     }
     return;
   }
-  shell.overlay.className = `overlay-root open${overlay.below === 'header' ? ' below-header' : ''}`;
+  shell.overlay.className = 'overlay-root open';
   const backdrop = h('div', { class: 'backdrop', onClick: () => overlayClose?.() });
   shell.overlay.replaceChildren(backdrop, overlay.node);
   const first = overlay.node.querySelector('[data-autofocus]') || overlay.node.querySelector('button');
@@ -199,18 +184,20 @@ function renderRunning() {
   const items = [];
   const bar = ({ href, title, detail, timer, fk }) => {
     const tm = timer || { running: false, startedAt: null, elapsedMs: 0 };
-    return h(
-      'a',
-      { class: ['running-bar', !tm.running && 'is-paused'], href, dataset: { fk } },
-      h('span', { class: 'running-dot', 'aria-hidden': 'true' }),
-      h('span', { class: 'running-text' }, h('span', { class: 'running-title' }, title), detail ? h('span', { class: 'running-detail' }, detail) : null),
-      h(
+    return APL.Banner({
+      href,
+      title,
+      detail,
+      tone: 'accent',
+      indicator: tm.running ? 'live' : 'paused',
+      trailing: h(
         'span',
-        { class: 'timer-value running-time', dataset: { elapsed: String(tm.elapsedMs || 0), started: tm.running ? tm.startedAt : '' } },
+        { class: 'timer-value', dataset: { elapsed: String(tm.elapsedMs || 0), started: tm.running ? tm.startedAt : '' } },
         L.formatClock(L.timerElapsed(tm)),
       ),
-      h('span', { class: 'running-go' }, 'Continue', icons.forward()),
-    );
+      action: { label: T.continueSession },
+      fk,
+    });
   };
   const active = ctx.running.get();
   if (active && route.name !== 'log') {
@@ -240,9 +227,7 @@ function renderRunning() {
   if (items.length) startTimerTicker();
   // on the Dashboard, New session sits here too, under the running sessions
   if (route.name === 'home') {
-    items.push(
-      h('div', { class: 'dock-new' }, h('a', { class: 'btn btn-primary btn-xl', href: '#/new', dataset: { fk: 'new-session' } }, icons.plus(), T.newSession)),
-    );
+    items.push(APL.Button({ children: T.newSession, onClick: () => router.navigate('new'), fk: 'new-session' }));
   }
   shell.running.replaceChildren(...items);
 }
@@ -251,14 +236,7 @@ function renderBanners() {
   const st = ui.get();
   const items = [];
   if (st.update) {
-    items.push(
-      h(
-        'div',
-        { class: 'banner', role: 'status' },
-        h('span', null, T.newVersion),
-        h('button', { type: 'button', class: 'btn btn-primary btn-sm', onClick: () => st.update() }, T.reload),
-      ),
-    );
+    items.push(APL.Banner({ title: T.newVersion, action: { label: T.reload, onClick: () => st.update(), fk: 'reload' } }));
   }
   shell.banner.replaceChildren(...items);
 }

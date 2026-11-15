@@ -440,6 +440,11 @@
 .apl-screen > .apl-header {
   padding-left: 4px;
 }
+
+/* no back button: the title lines up with the content (16px) */
+.apl-screen > .apl-header > h1:first-child {
+  padding-left: 12px;
+}
 .apl-screen-body {
   flex: 1;
   display: flex;
@@ -582,4 +587,151 @@
 
 .apl-discard {
   align-self: center;
+}
+
+/* TabBar */
+.apl-tabbar {
+  display: grid;
+  grid-template-columns: repeat(var(--apl-cols, 5), minmax(0, 1fr));
+  flex: none;
+  height: calc(var(--tabbar-h) + env(safe-area-inset-bottom));
+  padding-bottom: env(safe-area-inset-bottom);
+  background: var(--surface-bar);
+  border-top: 1px solid var(--border-soft);
+}
+
+.apl-tab {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  min-height: var(--tap-min);
+  min-width: 0;
+  color: var(--muted);
+  font: var(--type-caption);
+  text-decoration: none;
+}
+
+.apl-tab > span {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.apl-tab[aria-current='page'] {
+  color: var(--accent-bright);
+}
+
+/* NavRow */
+.apl-navrow {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 60px;
+  width: 100%;
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--ink);
+  font: inherit;
+  text-align: left;
+  text-decoration: none;
+}
+
+.apl-navrow:hover {
+  border-color: var(--accent);
+}
+
+.apl-navrow .apl-stack {
+  flex: 1;
+}
+
+.apl-navrow-well {
+  width: 40px;
+  height: 40px;
+  border-radius: var(--radius-md);
+  background: var(--surface-sunken);
+  color: var(--accent-bright);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.apl-navrow-go {
+  display: inline-flex;
+  color: var(--muted);
+  flex-shrink: 0;
+}
+
+/* Banner */
+.apl-banner {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: var(--tap-primary);
+  padding: var(--space-2) var(--space-2) var(--space-2) var(--space-4);
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--ink);
+  text-decoration: none;
+}
+
+.apl-banner--accent {
+  background: var(--accent-tint);
+  border-color: var(--accent-tint-border);
+}
+
+.apl-banner .apl-stack {
+  flex: 1;
+}
+
+.apl-banner .timer-value {
+  font: var(--type-body-strong);
+  font-variant-numeric: tabular-nums;
+}
+
+.apl-banner-action {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  min-height: var(--tap-min);
+  padding: 0 var(--space-2);
+  border: 0;
+  background: transparent;
+  color: var(--accent-bright);
+  font-size: 14px;
+  font-weight: 600;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.apl-banner-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 5px;
+  background: var(--accent-bright);
+  flex-shrink: 0;
+  animation: apl-pulse 1.6s ease-in-out infinite;
+}
+
+.apl-banner-dot.is-paused {
+  background: var(--radio-off);
+  animation: none;
+}
+
+@keyframes apl-pulse {
+  50% {
+    opacity: 0.35;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .apl-banner-dot {
+    animation: none;
+  }
 }

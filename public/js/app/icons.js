@@ -53,14 +53,4 @@ export const icons = {
   gear: () =>
     icon(22, p('M4 6h10M18 6h2M4 12h4M12 12h8M4 18h12'), c(16, 6, 2), c(10, 12, 2), c(18, 18, 2)),
   sights: () => icon(22, c(12, 12, 7), p('M12 2v5M12 17v5M2 12h5M17 12h5')),
-  logo: () =>
-    s(
-      'svg',
-      { width: 28, height: 28, viewBox: '-100 -100 200 200', 'aria-hidden': 'true', focusable: 'false' },
-      s('circle', { r: 96, fill: '#FFFFFF' }),
-      s('circle', { r: 76, fill: '#1A1A1A' }),
-      s('circle', { r: 58, fill: '#00A2E8' }),
-      s('circle', { r: 40, fill: '#D22B2B' }),
-      s('circle', { r: 20, fill: '#FFE11A' }),
-    ),
 };

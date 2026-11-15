@@ -6,7 +6,6 @@
   --subtle: var(--surface-sunken);
   --focus: var(--accent-bright);
   --shadow: none;
-  --header-h: 60px;
   --tabbar-h: 66px;
   --font-display: var(--font-sans);
   --font-body: var(--font-sans);
@@ -86,68 +85,12 @@ p {
   position: relative;
 }
 
-.app-header {
-  height: var(--header-h);
-  flex: none;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-  padding: 0 12px 0 16px;
-  background: #14181c;
-  color: #ffffff;
-}
-
-.brand {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  min-width: 0;
-}
-
 .brand-title {
   font-family: var(--font-display);
   font-weight: 700;
   font-size: 17px;
   letter-spacing: 0.2px;
   white-space: nowrap;
-}
-
-.header-sub {
-  font-size: 12px;
-  color: #c9cdc6;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  max-width: 52vw;
-}
-
-.header-actions {
-  display: flex;
-  gap: 6px;
-  flex: none;
-}
-
-.header-btn {
-  height: 44px;
-  min-width: 44px;
-  padding: 0 12px;
-  border-radius: 22px;
-  border: 1px solid #4a5057;
-  background: transparent;
-  color: #ffffff;
-  font-size: 13px;
-  font-weight: 600;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-  text-decoration: none;
-}
-
-.header-btn.icon-only {
-  padding: 0;
-  width: 44px;
 }
 
 .main {
@@ -157,32 +100,6 @@ p {
   overflow-x: hidden;
   padding: 12px 16px 24px;
   outline: none;
-}
-
-.tabbar {
-  height: calc(var(--tabbar-h) + env(safe-area-inset-bottom));
-  padding-bottom: env(safe-area-inset-bottom);
-  flex: none;
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  background: var(--surface);
-  border-top: 1px solid var(--divider);
-}
-
-.tab {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 3px;
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--muted);
-  text-decoration: none;
-}
-
-.tab[aria-current='page'] {
-  color: var(--accent);
 }
 
 /* ---------------------------------------------------------------- layout helpers */
@@ -852,10 +769,6 @@ textarea {
   margin: 0 auto;
 }
 
-.overlay-root.below-header {
-  top: var(--header-h);
-}
-
 .backdrop {
   position: absolute;
   inset: 0;
@@ -1189,7 +1102,6 @@ textarea {
   transform: translateX(20px);
 }
 
-
 .import-preview {
   border: 1px solid var(--border);
   border-radius: 12px;
@@ -1205,31 +1117,10 @@ textarea {
 }
 
 .banners {
-  padding: 8px 16px 0;
+  padding: var(--space-2) var(--space-5) 0;
   display: flex;
   flex-direction: column;
-  gap: 6px;
-}
-
-.banner {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 8px 8px 8px 12px;
-  border-radius: 12px;
-  background: var(--surface);
-  border: 1px solid var(--border);
-  font-size: 13px;
-}
-
-.banner > span {
-  flex: 1;
-}
-
-.banner-warn {
-  border-color: #c9a800;
-  background: #fff8cc;
-  color: #14181c;
+  gap: var(--space-2);
 }
 
 .toast-root {
@@ -1264,9 +1155,6 @@ textarea {
   .main {
     padding: 16px 24px 32px;
   }
-  .header-sub {
-    max-width: none;
-  }
 }
 
 /* ---------------------------------------------------------------- overflow guards (no page-level sideways scroll) */
@@ -1284,18 +1172,6 @@ textarea {
 
 .page-title {
   overflow-wrap: anywhere;
-}
-
-/* light banner keeps dark text and controls in both themes */
-.banner-warn .btn,
-.banner-warn .icon-btn {
-  background: #ffffff;
-  color: #14181c;
-  border-color: #a9aeb3;
-}
-
-.brand > svg {
-  flex: none;
 }
 
 /* ---------------------------------------------------------------- target magnifier (loupe) */
@@ -1566,18 +1442,6 @@ textarea {
   width: min(100%, 340px, max(230px, calc(100dvh - 460px)));
 }
 
-/* ---------------------------------------------------------------- five-tab bottom bar */
-.tabbar {
-  grid-template-columns: repeat(6, minmax(0, 1fr));
-}
-
-.tab {
-  font-size: 11px;
-  min-width: 0;
-}
-
-
-
 /* ---------------------------------------------------------------- end navigation */
 .end-nav {
   display: flex;
@@ -1771,11 +1635,6 @@ button.saved-end {
   align-self: start;
 }
 
-/* top bar only on the Dashboard tab */
-.app-header[hidden] {
-  display: none;
-}
-
 .end-setup {
   font-size: 12px;
   font-weight: 600;
@@ -1881,7 +1740,8 @@ button.saved-end {
   pointer-events: none;
 }
 
-.env-test .tabbar {
+/* the test build: an orange line over the tab bar too */
+.env-test .apl-tabbar {
   border-top: 3px solid #b45309;
 }
 
@@ -1894,17 +1754,6 @@ button.saved-end {
 /* New-session setup: one compact card that fits a phone screen */
 .setup-card {
   gap: 14px;
-}
-
-/* banners inside a page run edge to edge like the cards */
-.main .banner {
-  margin-left: -16px;
-  margin-right: -16px;
-  border-radius: 0;
-  border-left: 0;
-  border-right: 0;
-  padding-left: 16px;
-  padding-right: 16px;
 }
 
 /* more than 6 arrows per end: arrow list in two columns so the target keeps its size */
@@ -1967,8 +1816,7 @@ button.saved-end {
 }
 
 @media (min-width: 600px) {
-  .main .tiles,
-  .main .banner {
+  .main .tiles {
     margin-left: -24px;
     margin-right: -24px;
     padding-left: 24px;
@@ -1978,84 +1826,6 @@ button.saved-end {
 
 .main .tiles {
   max-width: none;
-}
-
-.main .banner {
-  max-width: none;
-}
-
-/* ---------------------------------------------------------------- dashboard (gate to the features) */
-.hub-actions {
-  gap: 12px;
-}
-
-.hub-active {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-
-.hub-grid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 10px;
-}
-
-.hub-tile {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 6px;
-  min-height: 104px;
-  padding: 14px;
-  border-radius: 14px;
-  border: 0;
-  background: var(--surface);
-  box-shadow: var(--shadow);
-  color: var(--ink);
-  text-align: left;
-  font: inherit;
-  text-decoration: none;
-  cursor: pointer;
-}
-
-.hub-tile svg {
-  width: 26px;
-  height: 26px;
-  color: var(--accent);
-}
-
-.hub-tile-title {
-  font-size: 16px;
-  font-weight: 700;
-}
-
-.hub-tile-sub {
-  font-size: 12px;
-  line-height: 1.3;
-}
-
-.hub-tile:active {
-  transform: scale(0.98);
-}
-
-.hub-last {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  color: inherit;
-  text-decoration: none;
-}
-
-.hub-workon p {
-  margin: 4px 0 0;
-  white-space: pre-wrap;
-}
-
-/* an odd last tile (Settings) spans the row */
-.hub-grid > :last-child:nth-child(odd) {
-  grid-column: span 2;
-  min-height: 0;
 }
 
 /* The app frame is pinned to the window, so the bottom tabs always sit on the bottom edge.
@@ -2070,42 +1840,6 @@ body {
   position: fixed;
   inset: 0;
   height: auto;
-}
-
-/* ---------------------------------------------------------------- session types */
-/* step 1 of New session: one row per type */
-.type-list {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-2);
-}
-
-/* a session type: a 60px card like an APL SelectCard, leading to its setup */
-.type-option {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  min-height: 60px;
-  padding: 0 var(--space-4);
-  border-radius: var(--radius-lg);
-  border: 1px solid var(--border);
-  background: var(--surface);
-  color: var(--ink);
-  text-decoration: none;
-}
-
-.type-option-text {
-  flex: 1;
-}
-
-.type-option-go {
-  display: inline-flex;
-  color: var(--muted);
-  flex: none;
-}
-
-.type-option:hover {
-  border-color: var(--accent);
 }
 
 .type-badge {
@@ -2192,17 +1926,9 @@ body {
   --series-6: #008300;
 }
 
-
 /* wide layout on a desktop browser */
 .app.app-wide {
   max-width: 1280px;
-}
-
-.tab span {
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  max-width: 100%;
 }
 
 .segmented {
@@ -2611,7 +2337,6 @@ body {
   }
 }
 
-
 /* ---------------------------------------------------------------- date and time pickers */
 .picker {
   position: relative;
@@ -3013,7 +2738,6 @@ body {
   transform-origin: top right;
 }
 
-
 /* ---------------------------------------------------------------- confirmation dialog */
 .btn-danger {
   background: var(--danger);
@@ -3167,103 +2891,14 @@ body {
 }
 
 /* ---------------------------------------------------------------- running sessions (above the bottom bar) */
+/* running sessions (and, on the Dashboard, New session) in an APL bottom bar above the tab bar */
 .running-bars {
   flex: none;
-  display: flex;
-  flex-direction: column;
+  padding-bottom: 12px;
 }
 
 .running-bars:empty {
   display: none;
-}
-
-.running-bar {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  min-height: 52px;
-  padding: 8px 16px;
-  background: var(--accent);
-  color: var(--on-accent);
-  text-decoration: none;
-  border-top: 1px solid color-mix(in srgb, var(--on-accent) 18%, transparent);
-  animation: running-in 200ms ease-out;
-}
-
-@keyframes running-in {
-  from {
-    transform: translateY(8px);
-    opacity: 0;
-  }
-}
-
-.running-dot {
-  width: 10px;
-  height: 10px;
-  flex: none;
-  border-radius: 50%;
-  background: currentColor;
-  animation: running-pulse 1.4s ease-in-out infinite;
-}
-
-.running-bar.is-paused .running-dot {
-  animation: none;
-  opacity: 0.5;
-}
-
-@keyframes running-pulse {
-  50% {
-    opacity: 0.25;
-    transform: scale(0.75);
-  }
-}
-
-.running-text {
-  flex: 1;
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-  line-height: 1.2;
-}
-
-.running-title {
-  font-weight: 700;
-  font-size: 15px;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.running-detail {
-  font-size: 12px;
-  opacity: 0.8;
-}
-
-.running-time {
-  font-family: var(--font-display);
-  font-size: 20px;
-  font-weight: 800;
-  font-variant-numeric: tabular-nums;
-}
-
-.running-go {
-  display: inline-flex;
-  align-items: center;
-  gap: 2px;
-  font-size: 14px;
-  font-weight: 700;
-}
-
-.running-go svg {
-  width: 18px;
-  height: 18px;
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .running-bar,
-  .running-dot {
-    animation: none;
-  }
 }
 
 /* the count is a button (tap to type the number) */
@@ -3286,31 +2921,6 @@ button.arrow-count:hover {
   font-size: 40px;
   font-weight: 800;
   text-align: center;
-}
-
-
-/* Dashboard: New session docked above the tab bar */
-.dock-new {
-  padding: 10px 16px;
-  background: var(--surface);
-  border-top: 1px solid var(--divider);
-}
-
-.dock-new .btn {
-  width: 100%;
-}
-
-/* Dashboard tiles sit straight on the page (no card behind them), like every other card */
-.card.hub-card {
-  background: transparent;
-  box-shadow: none;
-  padding: 0;
-}
-
-/* the header is a panel like the tab bar */
-.app-header {
-  background: var(--surface);
-  border-bottom: 1px solid var(--divider);
 }
 
 /* History → Recently deleted */

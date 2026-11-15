@@ -166,6 +166,53 @@ function render() {
     ),
     h('h2', { class: 'apl-label' }, 'App additions'),
     story(
+      'NavRow',
+      h(
+        'div',
+        { class: 'apl-list' },
+        APL.NavRow({ href: '#', icon: 'target', title: 'History', detail: '12 sessions' }),
+        APL.NavRow({
+          href: '#',
+          title: 'Training',
+          detail: 'Score arrow by arrow with M / S grades',
+          badge: APL.Badge({ children: 'Last used', tone: 'neutral' }),
+        }),
+      ),
+    ),
+    story(
+      'Banner',
+      APL.Banner({ title: 'New version available', action: { label: 'Reload', onClick: () => {} } }),
+      APL.Banner({
+        href: '#',
+        tone: 'accent',
+        indicator: 'live',
+        title: 'Blank bale running',
+        detail: '42 arrows',
+        trailing: h('span', { class: 'timer-value' }, '24:10'),
+        action: { label: 'Continue' },
+      }),
+      APL.Banner({
+        href: '#',
+        tone: 'accent',
+        indicator: 'paused',
+        title: 'SPT running',
+        action: { label: 'Continue' },
+      }),
+    ),
+    story(
+      'TabBar',
+      APL.TabBar({
+        label: 'Sections',
+        items: ['Dashboard', 'History', 'Insights', 'Gear', 'Sights'].map((label, i) => ({
+          id: label,
+          label,
+          icon: ['target', 'calendar', 'arrowRight', 'bow', 'clock'][i],
+          href: '#',
+          current: i === 0,
+        })),
+      }),
+    ),
+    story(
       'TextField',
       APL.TextField({ label: 'Event', placeholder: 'e.g. Indoor Cup Bratislava', fk: 'tf-event' }),
       h(

@@ -6,7 +6,6 @@ import { h, formatDate, todayIso } from '../../core/dom.js';
 import * as APL from '../../ui/apl/index.js';
 import * as L from '../sessionLogic.js';
 import { T } from '../strings.js';
-import { icons } from '../icons.js';
 import {
   DISTANCES,
   DISTANCE_DEFAULTS,
@@ -55,25 +54,16 @@ export function renderTypeChoice(ctx) {
           id: 'new-type',
           children: h(
             'nav',
-            { class: 'type-list', 'aria-labelledby': 'new-type-label' },
+            { class: 'apl-list', 'aria-labelledby': 'new-type-label' },
             SESSION_TYPES.map((t) =>
-              h(
-                'a',
-                {
-                  class: 'type-option',
-                  href: `#/new/${t}`,
-                  dataset: { fk: `type-${t}` },
-                  onClick: () => ctx.ui.quietSet({ newType: t }),
-                },
-                h(
-                  'span',
-                  { class: 'apl-stack type-option-text' },
-                  h('span', { class: 'apl-t' }, TYPE_LABELS[t]),
-                  h('span', { class: 'apl-cap' }, TYPE_HINTS[t]),
-                ),
-                last === t ? APL.Badge({ children: 'Last used', tone: 'neutral' }) : null,
-                h('span', { class: 'type-option-go', 'aria-hidden': 'true' }, icons.forward()),
-              ),
+              APL.NavRow({
+                href: `#/new/${t}`,
+                title: TYPE_LABELS[t],
+                detail: TYPE_HINTS[t],
+                badge: last === t ? APL.Badge({ children: 'Last used', tone: 'neutral' }) : null,
+                onClick: () => ctx.ui.quietSet({ newType: t }),
+                fk: `type-${t}`,
+              }),
             ),
           ),
         }),
@@ -268,12 +258,10 @@ export function renderScoredSetup(ctx, type, active = null) {
     'div',
     { class: 'apl-screen-body' },
     active
-      ? h(
-          'div',
-          { class: 'banner', role: 'status' },
-          h('span', null, T.inProgress(setupSummary(active), active.ends.length)),
-          h('a', { class: 'btn btn-primary btn-sm', href: '#/log' }, T.continueSession),
-        )
+      ? APL.Banner({
+          title: T.inProgress(setupSummary(active), active.ends.length),
+          action: { label: T.continueSession, href: '#/log' },
+        })
       : null,
     APL.RepeatCard({
       title: 'Same as last session',
