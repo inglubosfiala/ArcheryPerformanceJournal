@@ -3,7 +3,6 @@ import { h, todayIso, formatDate } from '../../core/dom.js';
 import * as APL from '../../ui/apl/index.js';
 import { zoneOf } from '../scoring.js';
 import { RUBRIC, T } from '../strings.js';
-import { icons } from '../icons.js';
 import { gearChoices, gearForChoice } from '../gearFields.js';
 import { isScored } from '../sessionTypes.js';
 import { datePicker, timePicker } from './pickers.js';
@@ -18,31 +17,38 @@ export const card = (props, ...children) => h('section', { ...props, class: ['ca
 export function guideSheet(onClose) {
   return {
     onClose,
-    node: h(
-      'div',
-      { class: 'sheet', role: 'dialog', 'aria-modal': 'true', 'aria-labelledby': 'guide-title' },
-      h(
-        'div',
-        { class: 'sheet-head' },
-        h('h2', { class: 'sheet-title', id: 'guide-title' }, T.gradingGuide),
+    node: APL.Dialog({
+      sheet: true,
+      title: T.gradingGuide,
+      idPrefix: 'guide',
+      onClose,
+      closeLabel: 'Close grading guide',
+      children: [
+        h('p', { class: 'apl-cap13' }, T.guideIntro),
         h(
-          'button',
-          { type: 'button', class: 'icon-btn round', 'aria-label': 'Close grading guide', onClick: onClose, dataset: { autofocus: '' } },
-          icons.close(),
+          'table',
+          { class: 'guide-table' },
+          h(
+            'thead',
+            null,
+            h(
+              'tr',
+              null,
+              h('th', { scope: 'col' }, h('span', { class: 'sr-only' }, 'Grade')),
+              h('th', { scope: 'col' }, T.mentalProgram),
+              h('th', { scope: 'col' }, T.shootingCycle),
+            ),
+          ),
+          h(
+            'tbody',
+            null,
+            [1, 2, 3, 4, 5].map((g) =>
+              h('tr', null, h('th', { scope: 'row' }, gradeBadge(g)), h('td', null, RUBRIC.m[g - 1]), h('td', null, RUBRIC.s[g - 1])),
+            ),
+          ),
         ),
-      ),
-      h('p', { class: 'muted small' }, T.guideIntro),
-      h(
-        'table',
-        { class: 'guide-table' },
-        h('thead', null, h('tr', null, h('th', { scope: 'col' }, h('span', { class: 'sr-only' }, 'Grade')), h('th', { scope: 'col' }, T.mentalProgram), h('th', { scope: 'col' }, T.shootingCycle))),
-        h(
-          'tbody',
-          null,
-          [1, 2, 3, 4, 5].map((g) => h('tr', null, h('th', { scope: 'row' }, gradeBadge(g)), h('td', null, RUBRIC.m[g - 1]), h('td', null, RUBRIC.s[g - 1]))),
-        ),
-      ),
-    ),
+      ],
+    }),
   };
 }
 
@@ -68,7 +74,6 @@ export function whenCard(ctx, ss) {
             max: todayIso(),
             marks: sessionDates(ctx),
             fk: 'edit-date',
-            apl: true,
             onChange: (date) => change({ date }),
           }),
           timePicker({

@@ -244,7 +244,7 @@ function renderBanners() {
 let toastTimer;
 function toast(message) {
   clearTimeout(toastTimer);
-  shell.toast.replaceChildren(h('div', { class: 'toast' }, message));
+  shell.toast.replaceChildren(APL.Toast({ message }));
   toastTimer = setTimeout(() => shell.toast.replaceChildren(), 4000);
 }
 

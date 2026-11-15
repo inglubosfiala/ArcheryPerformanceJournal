@@ -3,7 +3,7 @@
 // on the last three seconds of a phase, so it can be followed without looking, and keeps the screen
 // awake while it is open. Nothing is stored: closing it just returns to the session form.
 import { h } from '../../core/dom.js';
-import { icons } from '../icons.js';
+import * as APL from '../../ui/apl/index.js';
 import { tabataPlan, tabataAt, tabataStartOf, tabataClock } from '../tabata.js';
 
 const PHASE_NAMES = { prepare: 'Get ready', work: 'Hold', rest: 'Rest', setRest: 'Rest between sets' };
@@ -61,19 +61,26 @@ export function tabataTimer({ title, work, rest, reps, sets }) {
     const counts = h('p', { class: 'tabata-counts' });
     const total = h('p', { class: 'tabata-total' });
     const bar = h('div', { class: 'tabata-bar-fill' });
-    const pauseBtn = h('button', { type: 'button', class: 'btn btn-primary tabata-main', dataset: { fk: 'tabata-pause' }, onClick: () => toggle() });
-    const skipBtn = h(
-      'button',
-      { type: 'button', class: 'btn btn-outline', dataset: { fk: 'tabata-skip' }, onClick: () => jump(1) },
-      'Skip',
-      icons.forward(),
-    );
-    const backBtn = h(
-      'button',
-      { type: 'button', class: 'btn btn-outline', dataset: { fk: 'tabata-back' }, onClick: () => jump(-1) },
-      icons.back(),
-      'Back',
-    );
+    const pauseBtn = APL.Button({
+      children: 'Pause',
+      variant: 'secondary',
+      onClick: () => toggle(),
+      fk: 'tabata-pause',
+    });
+    const skipBtn = APL.Button({
+      children: 'Skip',
+      variant: 'secondary',
+      trailingIcon: 'chevron',
+      onClick: () => jump(1),
+      fk: 'tabata-skip',
+    });
+    const backBtn = APL.Button({
+      children: 'Back',
+      variant: 'secondary',
+      leadingIcon: 'back',
+      onClick: () => jump(-1),
+      fk: 'tabata-back',
+    });
     const dialog = h(
       'dialog',
       { class: 'tabata', 'aria-label': `${title}: interval timer` },
@@ -81,7 +88,12 @@ export function tabataTimer({ title, work, rest, reps, sets }) {
         'div',
         { class: 'tabata-top' },
         h('span', { class: 'tabata-title' }, title),
-        h('button', { type: 'button', class: 'icon-btn', 'aria-label': 'Close the timer', dataset: { fk: 'tabata-close' }, onClick: () => finish(false) }, icons.close()),
+        APL.IconButton({
+          icon: 'close',
+          label: 'Close the timer',
+          onClick: () => finish(false),
+          fk: 'tabata-close',
+        }),
       ),
       h('div', { class: 'tabata-face' }, phaseName, clock, counts),
       h('div', { class: 'tabata-bar', 'aria-hidden': 'true' }, bar),
@@ -90,7 +102,10 @@ export function tabataTimer({ title, work, rest, reps, sets }) {
     );
 
     function setPauseLabel(done) {
-      pauseBtn.replaceChildren(done ? 'Done' : running ? icons.pause() : icons.play(), done ? '' : running ? 'Pause' : 'Resume');
+      pauseBtn.replaceChildren(
+        done ? '' : APL.Icon({ name: running ? 'pause' : 'play' }),
+        done ? 'Done' : running ? 'Pause' : 'Resume',
+      );
     }
 
     function render() {
@@ -121,7 +136,10 @@ export function tabataTimer({ title, work, rest, reps, sets }) {
         const p = at.phase;
         dialog.dataset.phase = p.kind;
         phaseName.textContent = PHASE_NAMES[p.kind];
-        counts.textContent = plan.sets > 1 ? `Hold ${p.rep} of ${plan.reps} · set ${p.set} of ${plan.sets}` : `Hold ${p.rep} of ${plan.reps}`;
+        counts.textContent =
+          plan.sets > 1
+            ? `Hold ${p.rep} of ${plan.reps} · set ${p.set} of ${plan.sets}`
+            : `Hold ${p.rep} of ${plan.reps}`;
         skipBtn.disabled = false;
         setPauseLabel(false);
         if (!first) {

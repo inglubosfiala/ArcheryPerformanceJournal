@@ -84,12 +84,18 @@ export function Button({
   onClick,
   fk,
 }) {
-  // app additions: `leadingIcon` (an IconName or a node) before the text, `label` as the aria-label
+  // app additions: `leadingIcon` (an IconName or a node) before the text, `label` as the aria-label,
+  // `variant: 'danger'` for the confirm button of a destructive Dialog
   return h(
     'button',
     {
       type,
-      class: ['apl', 'apl-btn', variant === 'secondary' && 'apl-btn--secondary'],
+      class: [
+        'apl',
+        'apl-btn',
+        variant === 'secondary' && 'apl-btn--secondary',
+        variant === 'danger' && 'apl-btn--danger',
+      ],
       'aria-label': label,
       disabled,
       onClick,
@@ -779,4 +785,84 @@ export function SessionRow({
     foot ? h('span', { class: 'apl-cap' }, foot) : null,
     actions ? h('span', { class: 'apl-sessionrow-actions' }, actions) : null,
   );
+}
+
+/**
+ * A dialog's content and frame (the caller opens and closes it).
+ * Centred (`<dialog>`, for showModal): an icon well, the title, the message, optional `body` (fields,
+ * a picture) and the `actions` (Cancel, then the confirm Button) side by side. `tone: 'danger'` tints
+ * the well. `bare`: only the body and the actions on screen; the title still names the dialog.
+ * `sheet: true`: a bottom sheet (`div role=dialog`, for the app's overlay layer) with the title, a
+ * close IconButton (`onClose`, `closeLabel`) and `children`.
+ */
+export function Dialog({
+  title,
+  message = '',
+  icon = null,
+  tone = 'neutral',
+  body = null,
+  actions = [],
+  bare = false,
+  sheet = false,
+  onClose,
+  closeLabel = 'Close',
+  idPrefix = 'dialog',
+  children = [],
+}) {
+  const titleId = `${idPrefix}-title`;
+  const msgId = `${idPrefix}-msg`;
+  if (sheet) {
+    return h(
+      'div',
+      {
+        class: 'apl apl-dialog apl-dialog--sheet',
+        role: 'dialog',
+        'aria-modal': 'true',
+        'aria-labelledby': titleId,
+      },
+      h(
+        'div',
+        { class: 'apl-dialog-sheethead' },
+        h('h2', { class: 'apl-dialog-title', id: titleId }, title),
+        h(
+          'button',
+          {
+            type: 'button',
+            class: 'apl-iconbtn',
+            'aria-label': closeLabel,
+            onClick: onClose,
+            dataset: { autofocus: '' },
+          },
+          Icon({ name: 'close', size: 22 }),
+        ),
+      ),
+      children,
+    );
+  }
+  return h(
+    'dialog',
+    bare
+      ? { class: 'apl apl-dialog apl-dialog--bare', 'aria-label': title }
+      : {
+          class: ['apl', 'apl-dialog', tone === 'danger' && 'apl-dialog--danger'],
+          'aria-labelledby': titleId,
+          'aria-describedby': message ? msgId : undefined,
+        },
+    bare
+      ? null
+      : h(
+          'div',
+          { class: 'apl-dialog-head' },
+          icon ? h('span', { class: 'apl-dialog-well', 'aria-hidden': 'true' }, iconNode(icon, 24)) : null,
+          h('h2', { class: 'apl-dialog-title', id: titleId }, title),
+          message ? h('p', { class: 'apl-dialog-msg', id: msgId }, message) : null,
+        ),
+    body ? h('div', { class: 'apl-dialog-body' }, body) : null,
+    h('div', { class: 'apl-dialog-actions' }, actions),
+  );
+}
+
+/** A short message that floats above the tab bar for a few seconds (the app's toast layer). */
+export function Toast({ message }) {
+  return h('div', { class: 'apl apl-toast' }, message);
 }

@@ -136,7 +136,6 @@ function whenSection(ctx, { setup, set, quiet }, { duration = false } = {}) {
           max: todayIso(),
           marks: sessionDates(ctx),
           fk: 'when-date',
-          apl: true,
           onChange: (date) => setWhen({ date }),
         }),
         timePicker({

@@ -202,6 +202,26 @@ function render() {
       }),
     ),
     story(
+      'Dialog',
+      h(
+        'div',
+        { class: 'apl-grid-2' },
+        APL.Button({
+          children: 'Open',
+          variant: 'secondary',
+          onClick: () => openDialog(false),
+          fk: 'dialog-open',
+        }),
+        APL.Button({
+          children: 'Destructive',
+          variant: 'secondary',
+          onClick: () => openDialog(true),
+          fk: 'dialog-danger',
+        }),
+      ),
+    ),
+    story('Toast', APL.Toast({ message: 'Backup merged.' })),
+    story(
       'StatTile',
       APL.StatTiles({
         label: 'Session figures',
@@ -332,6 +352,30 @@ function render() {
     ),
   );
   if (focusKey) root.querySelector(`[data-fk="${CSS.escape(focusKey)}"]`)?.focus();
+}
+
+/** Dialog story: a centred dialog, as the app's confirmDialog opens it. */
+function openDialog(danger) {
+  const close = () => dialog.close();
+  const dialog = APL.Dialog({
+    title: danger ? 'Delete session?' : 'Finish session?',
+    message: danger
+      ? 'The session moves to Recently deleted.'
+      : 'Training · 20 ends. The session opens in History.',
+    icon: danger ? 'close' : 'target',
+    tone: danger ? 'danger' : 'neutral',
+    actions: [
+      APL.Button({ children: 'Cancel', variant: 'secondary', onClick: close }),
+      APL.Button({
+        children: danger ? 'Delete' : 'OK',
+        variant: danger ? 'danger' : 'primary',
+        onClick: close,
+      }),
+    ],
+  });
+  dialog.addEventListener('close', () => dialog.remove());
+  document.body.append(dialog);
+  dialog.showModal();
 }
 
 render();

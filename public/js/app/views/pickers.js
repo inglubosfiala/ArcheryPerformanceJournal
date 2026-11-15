@@ -2,7 +2,15 @@
 // or hour and minute grids). The panel manages its own DOM while open (paging, keyboard focus) and
 // only calls `onChange` when a value is picked, so the page re-renders once, with the new value.
 import { h, formatDate, todayIso } from '../../core/dom.js';
-import { addDays, addMonths, monthGrid, monthStart, inRange, clampIso, weekdayMon } from '../../core/calendar.js';
+import {
+  addDays,
+  addMonths,
+  monthGrid,
+  monthStart,
+  inRange,
+  clampIso,
+  weekdayMon,
+} from '../../core/calendar.js';
 import { icons } from '../icons.js';
 import { Icon } from '../../ui/apl/index.js';
 
@@ -16,28 +24,26 @@ let uid = 0;
 /**
  * Field + popup panel shared by the pickers: opens on tap, closes on Escape, an outside tap or focus
  * leaving it. `render(focus)` fills the panel each time it opens.
- * `apl` ({ icon, value, hint }): the field is drawn as an APL FieldButton (value over hint, with an
- * accent-bright icon) instead of an input.
+ * The field is an APL FieldButton: `field` ({ icon, value, hint }) gives its accent-bright icon and
+ * the value over the hint.
  */
-function popupField({ fieldClass, icon, text, ariaLabel, dialogLabel, fk, render, apl = null }) {
+function popupField({ fieldClass, ariaLabel, dialogLabel, fk, render, field }) {
   const id = `pk-${++uid}`;
   let open = false;
-  const content = apl
-    ? [
-        Icon({ name: apl.icon }),
-        h(
-          'span',
-          { class: 'apl-stack' },
-          h('span', { class: 'apl-t' }, apl.value),
-          apl.hint ? h('span', { class: 'apl-cap' }, apl.hint) : null,
-        ),
-      ]
-    : [h('span', { class: 'picker-field-icon' }, icon), h('span', { class: 'picker-field-text' }, text)];
+  const content = [
+    Icon({ name: field.icon }),
+    h(
+      'span',
+      { class: 'apl-stack' },
+      h('span', { class: 'apl-t' }, field.value),
+      field.hint ? h('span', { class: 'apl-cap' }, field.hint) : null,
+    ),
+  ];
   const trigger = h(
     'button',
     {
       type: 'button',
-      class: apl ? ['apl', 'apl-field', 'picker-apl', fieldClass] : ['input', 'picker-field', fieldClass],
+      class: ['apl', 'apl-field', 'picker-apl', fieldClass],
       'aria-haspopup': 'dialog',
       'aria-expanded': 'false',
       'aria-controls': id,
@@ -47,7 +53,13 @@ function popupField({ fieldClass, icon, text, ariaLabel, dialogLabel, fk, render
     },
     content,
   );
-  const panel = h('div', { class: 'picker-panel', id, role: 'dialog', 'aria-label': dialogLabel, hidden: true });
+  const panel = h('div', {
+    class: 'picker-panel',
+    id,
+    role: 'dialog',
+    'aria-label': dialogLabel,
+    hidden: true,
+  });
   const wrap = h('div', { class: 'picker' }, trigger, panel);
 
   const onDocPointer = (e) => {
@@ -120,21 +132,26 @@ function gridKeys(container, cols) {
  * @param {Set<string>} [o.marks] dates shown with a dot (days that already have a session)
  * @param {string} [o.label]    accessible name of the field
  * @param {string} [o.fk]       focus key, so focus returns to the field after the re-render
- * @param {boolean} [o.apl]     draw the field as an APL FieldButton ("Today" over "Sun, 15 Nov")
  */
-export function datePicker({ value, onChange, min = null, max = null, marks = new Set(), label = 'Date', fk, apl = false }) {
+export function datePicker({
+  value,
+  onChange,
+  min = null,
+  max = null,
+  marks = new Set(),
+  label = 'Date',
+  fk,
+}) {
   const today = todayIso();
   let view = monthStart(value || today); // first day of the month shown
   let focused = value || today; // the day with the roving tab stop
 
   const { wrap, panel, close } = popupField({
     fieldClass: 'date-field',
-    icon: icons.calendar(),
-    text: formatDate(value, { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' }),
     ariaLabel: `${label}: ${formatDate(value, LONG_DATE)}`,
     dialogLabel: `Choose ${label.toLowerCase()}`,
     fk,
-    apl: apl ? aplDate(value, today) : null,
+    field: aplDate(value, today),
     render: ({ focus }) => {
       view = monthStart(value || today);
       focused = clampIso(value || today, min, max);
@@ -189,7 +206,13 @@ export function datePicker({ value, onChange, min = null, max = null, marks = ne
       'button',
       {
         type: 'button',
-        class: ['cal-day', outside && 'is-outside', iso === today && 'is-today', selected && 'is-selected', marked && 'has-mark'],
+        class: [
+          'cal-day',
+          outside && 'is-outside',
+          iso === today && 'is-today',
+          selected && 'is-selected',
+          marked && 'has-mark',
+        ],
         role: 'gridcell',
         tabindex: iso === focused ? '0' : '-1',
         disabled: !inRange(iso, min, max),
@@ -207,7 +230,12 @@ export function datePicker({ value, onChange, min = null, max = null, marks = ne
   const quick = (text, iso) =>
     h(
       'button',
-      { type: 'button', class: ['picker-quick', iso === value && 'is-on'], disabled: !inRange(iso, min, max), onClick: () => pick(iso) },
+      {
+        type: 'button',
+        class: ['picker-quick', iso === value && 'is-on'],
+        disabled: !inRange(iso, min, max),
+        onClick: () => pick(iso),
+      },
       text,
     );
 
@@ -217,17 +245,51 @@ export function datePicker({ value, onChange, min = null, max = null, marks = ne
       h(
         'div',
         { class: 'cal-head' },
-        h('button', { type: 'button', class: 'cal-nav', 'aria-label': 'Previous month', disabled: !canPrev(), onClick: () => page(-1) }, icons.back()),
+        h(
+          'button',
+          {
+            type: 'button',
+            class: 'cal-nav',
+            'aria-label': 'Previous month',
+            disabled: !canPrev(),
+            onClick: () => page(-1),
+          },
+          icons.back(),
+        ),
         h('div', { class: 'cal-title', 'aria-live': 'polite' }, title),
-        h('button', { type: 'button', class: 'cal-nav', 'aria-label': 'Next month', disabled: !canNext(), onClick: () => page(1) }, icons.forward()),
+        h(
+          'button',
+          {
+            type: 'button',
+            class: 'cal-nav',
+            'aria-label': 'Next month',
+            disabled: !canNext(),
+            onClick: () => page(1),
+          },
+          icons.forward(),
+        ),
       ),
       h(
         'div',
-        { class: ['cal-grid', slide > 0 && 'slide-next', slide < 0 && 'slide-prev'], role: 'grid', 'aria-label': title },
+        {
+          class: ['cal-grid', slide > 0 && 'slide-next', slide < 0 && 'slide-prev'],
+          role: 'grid',
+          'aria-label': title,
+        },
         h(
           'div',
           { class: 'cal-row cal-weekdays', role: 'row' },
-          WEEKDAYS.map((d, i) => h('span', { class: ['cal-weekday', i > 4 && 'is-weekend'], role: 'columnheader', title: WEEKDAYS_FULL[i] }, d)),
+          WEEKDAYS.map((d, i) =>
+            h(
+              'span',
+              {
+                class: ['cal-weekday', i > 4 && 'is-weekend'],
+                role: 'columnheader',
+                title: WEEKDAYS_FULL[i],
+              },
+              d,
+            ),
+          ),
         ),
         monthGrid(view).map((week) => h('div', { class: 'cal-row', role: 'row' }, week.map(dayCell))),
       ),
@@ -248,9 +310,16 @@ export function datePicker({ value, onChange, min = null, max = null, marks = ne
  * @param {boolean} [o.clearable] offer Clear (the time is optional)
  * @param {string} [o.label]
  * @param {string} [o.fk]
- * @param {string} [o.hint]     with it, the field is drawn as an APL FieldButton (the time over the hint)
+ * @param {string} [o.hint]     the line under the time ("Now", "Start time")
  */
-export function timePicker({ value, onChange, clearable = false, label = 'Start time', fk, hint = null }) {
+export function timePicker({
+  value,
+  onChange,
+  clearable = false,
+  label = 'Start time',
+  fk,
+  hint = 'Start time',
+}) {
   const now = () => {
     const d = new Date();
     return { hh: d.getHours(), mm: d.getMinutes() };
@@ -265,12 +334,10 @@ export function timePicker({ value, onChange, clearable = false, label = 'Start 
 
   const { wrap, panel, close } = popupField({
     fieldClass: ['time-field', !value && 'is-empty'],
-    icon: icons.clock(),
-    text: value || 'No time',
     ariaLabel: `${label}: ${value || 'not set'}`,
     dialogLabel: `Choose ${label.toLowerCase()}`,
     fk,
-    apl: hint == null ? null : { icon: 'clock', value: value || 'No time', hint },
+    field: { icon: 'clock', value: value || 'No time', hint },
     render: ({ focus }) => {
       draft = parse(value) || now();
       part = 'hh';
@@ -291,7 +358,8 @@ export function timePicker({ value, onChange, clearable = false, label = 'Start 
   };
 
   function render({ focus = false, keep = false } = {}) {
-    const keepFocus = keep && panel.contains(document.activeElement) ? document.activeElement.dataset.tk : null;
+    const keepFocus =
+      keep && panel.contains(document.activeElement) ? document.activeElement.dataset.tk : null;
     const seg = (key, text, name) =>
       h(
         'button',
@@ -311,7 +379,14 @@ export function timePicker({ value, onChange, clearable = false, label = 'Start 
     const cell = (n, on, onClick, name) =>
       h(
         'button',
-        { type: 'button', class: ['tp-cell', on && 'is-selected'], 'aria-label': name, 'aria-pressed': String(on), dataset: { tk: `c-${n}` }, onClick },
+        {
+          type: 'button',
+          class: ['tp-cell', on && 'is-selected'],
+          'aria-label': name,
+          'aria-pressed': String(on),
+          dataset: { tk: `c-${n}` },
+          onClick,
+        },
         pad(n),
       );
     const grid =
@@ -320,11 +395,16 @@ export function timePicker({ value, onChange, clearable = false, label = 'Start 
             'div',
             { class: 'tp-grid tp-hours', role: 'group', 'aria-label': 'Hour' },
             Array.from({ length: 24 }, (_, n) =>
-              cell(n, n === draft.hh, () => {
-                draft = { ...draft, hh: n };
-                part = 'mm';
-                render({ focus: true });
-              }, `${pad(n)} hours`),
+              cell(
+                n,
+                n === draft.hh,
+                () => {
+                  draft = { ...draft, hh: n };
+                  part = 'mm';
+                  render({ focus: true });
+                },
+                `${pad(n)} hours`,
+              ),
             ),
           )
         : h(
@@ -339,7 +419,17 @@ export function timePicker({ value, onChange, clearable = false, label = 'Start 
       h(
         'div',
         { class: 'tp-head' },
-        h('button', { type: 'button', class: 'cal-nav', 'aria-label': 'One minute earlier', dataset: { tk: 'minus' }, onClick: () => nudge(-1) }, '−1'),
+        h(
+          'button',
+          {
+            type: 'button',
+            class: 'cal-nav',
+            'aria-label': 'One minute earlier',
+            dataset: { tk: 'minus' },
+            onClick: () => nudge(-1),
+          },
+          '−1',
+        ),
         h(
           'div',
           { class: 'tp-display', 'aria-live': 'polite' },
@@ -347,7 +437,17 @@ export function timePicker({ value, onChange, clearable = false, label = 'Start 
           h('span', { class: 'tp-colon', 'aria-hidden': 'true' }, ':'),
           seg('mm', pad(draft.mm), 'Minute'),
         ),
-        h('button', { type: 'button', class: 'cal-nav', 'aria-label': 'One minute later', dataset: { tk: 'plus' }, onClick: () => nudge(1) }, '+1'),
+        h(
+          'button',
+          {
+            type: 'button',
+            class: 'cal-nav',
+            'aria-label': 'One minute later',
+            dataset: { tk: 'plus' },
+            onClick: () => nudge(1),
+          },
+          '+1',
+        ),
       ),
       h('div', { class: 'tp-hint muted small' }, part === 'hh' ? 'Pick the hour' : 'Pick the minute'),
       grid,
@@ -355,8 +455,14 @@ export function timePicker({ value, onChange, clearable = false, label = 'Start 
         'div',
         { class: 'picker-foot' },
         h('button', { type: 'button', class: 'picker-quick', onClick: () => commit(fmt(now())) }, 'Now'),
-        clearable && value ? h('button', { type: 'button', class: 'picker-quick', onClick: () => commit(null) }, 'Clear') : null,
-        h('button', { type: 'button', class: 'picker-quick is-primary', onClick: () => commit(fmt(draft)) }, 'Set'),
+        clearable && value
+          ? h('button', { type: 'button', class: 'picker-quick', onClick: () => commit(null) }, 'Clear')
+          : null,
+        h(
+          'button',
+          { type: 'button', class: 'picker-quick is-primary', onClick: () => commit(fmt(draft)) },
+          'Set',
+        ),
       ),
     );
     const target = keepFocus
