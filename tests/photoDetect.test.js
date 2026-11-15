@@ -202,6 +202,15 @@ describe('photo arrow detection', () => {
     }
   });
 
+  it('finds an arrow in the outer ring whose shaft lies mostly over the paper between the spots', () => {
+    const shafts = [{ spot: 1, x: 0.44, y: -0.83, dx: -1.7, dy: -0.45 }];
+    const res = detectArrows(photo('40t', [], { shafts, scale: 70, width: 360, height: 800, rot: 0.1, squash: 0.95 }), '40t', 3);
+    expect(res.arrows).toHaveLength(1);
+    expect(res.arrows[0].spot).toBe(1);
+    expect(Math.hypot(res.arrows[0].x - 0.44, res.arrows[0].y + 0.83)).toBeLessThan(0.08);
+    expect(scoreFromPoint(res.arrows[0].x, res.arrows[0].y, '40t')).toBe(6);
+  });
+
   it('uses a photo of one spot for a three-spot sheet, on the hinted spot', () => {
     const img = photo('40s', [{ x: 0.2, y: -0.1 }], { scale: 150 });
     const res = detectArrows(img, '40t', 3, { spotHint: 2 });

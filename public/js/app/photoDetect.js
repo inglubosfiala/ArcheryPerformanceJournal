@@ -365,6 +365,26 @@ function findShafts({ width, height, data, nearest, spotPx, face, rejects = null
       }
     }
   }
+  // The light is not even over the sheet: a ring in the shade of one side can be darker than "clearly
+  // darker than the ring's median". So a dark pixel must also be darker than what is around it
+  // (the mean brightness of a small window, from a summed-area table).
+  const sums = new Float64Array((width + 1) * (height + 1));
+  for (let y = 0; y < height; y++) {
+    let row = 0;
+    for (let x = 0; x < width; x++) {
+      row += bright(y * width + x);
+      sums[(y + 1) * (width + 1) + x + 1] = sums[y * (width + 1) + x + 1] + row;
+    }
+  }
+  const half = Math.max(3, Math.round(0.15 * spotPx));
+  const around = (x, y) => {
+    const x1 = Math.max(0, x - half);
+    const y1 = Math.max(0, y - half);
+    const x2 = Math.min(width, x + half + 1);
+    const y2 = Math.min(height, y + half + 1);
+    const total = sums[y2 * (width + 1) + x2] - sums[y1 * (width + 1) + x2] - sums[y2 * (width + 1) + x1] + sums[y1 * (width + 1) + x1];
+    return total / ((x2 - x1) * (y2 - y1));
+  };
   const maxRef = Math.max(0, ...Object.values(refs));
   const raw = new Uint8Array(width * height);
   for (let i = 0; i < width * height; i++) {
@@ -380,7 +400,7 @@ function findShafts({ width, height, data, nearest, spotPx, face, rejects = null
     // the colour under the shaft is one of the two rings: it must be darker than both, or the line
     // would break at every ring it crosses.
     const ref = Math.min(...[d - 0.03, d + 0.03].map((dd) => (dd >= 1 ? Infinity : (refs[expectedColour(Math.max(0, dd), face, 0)] ?? 160))));
-    if (v <= 0.78 * ref) raw[i] = 1;
+    if (v <= 0.78 * ref && v <= 0.85 * around(i % width, (i / width) | 0)) raw[i] = 1;
   }
   // dark pixels on or around the faces (the sheet), but not on a full face's black rings
   const isDarkPx = (i) => raw[i] === 1;
@@ -404,7 +424,9 @@ function findShafts({ width, height, data, nearest, spotPx, face, rejects = null
     const x = i % width;
     const y = (i / width) | 0;
     const at = nearest(x, y);
-    if (at.d > 1.12) continue; // stay on the faces: what is behind the sheet is full of lines
+    // Stay near the faces: what is behind the sheet is full of lines. But well past their edge: a
+    // shaft in the outer ring lies mostly over the paper between the spots.
+    if (at.d > 1.8) continue;
     if (!isSpotFace(face) && at.d > 0.58 && at.d < 0.82) continue;
     if (!thinAt(x, y)) continue;
     dark[i] = 1;
@@ -620,7 +642,7 @@ function findShafts({ width, height, data, nearest, spotPx, face, rejects = null
     const atB = nearest(b.x, b.y);
     // the entry point is the end inside a face; the other end leans out (towards the camera)
     const [tip, tipAt, out] = atA.d <= atB.d ? [a, atA, atB] : [b, atB, atA];
-    if (tipAt.d > 0.95 || out.d < tipAt.d + 0.25) {
+    if (tipAt.d > 1 || out.d < tipAt.d + 0.25) {
       rejects?.push({ why: 'ends', votes: bestV, t, rho, tip: +tipAt.d.toFixed(2), out: +out.d.toFixed(2), a, b });
       continue;
     }
@@ -631,11 +653,14 @@ function findShafts({ width, height, data, nearest, spotPx, face, rejects = null
     const line = { a, b, length: run.u1 - run.u0, tip, tipAt, t, fitted: isFitted };
     const near = 0.15 * spotPx;
     const same = found.findIndex((f) => {
-      const da = Math.min(Math.abs(f.t - t), T - Math.abs(f.t - t));
+      // the angle between the two segments as they lie (a fitted line has left its grid angle)
+      const cosAngle =
+        Math.abs((f.b.x - f.a.x) * (b.x - a.x) + (f.b.y - f.a.y) * (b.y - a.y)) /
+        (Math.hypot(f.b.x - f.a.x, f.b.y - f.a.y) * Math.hypot(b.x - a.x, b.y - a.y) || 1);
       const apart = Math.hypot(f.tip.x - tip.x, f.tip.y - tip.y);
       // also a line of any direction ending at the same point: the shaft's shadow starts there too
       if (apart < near) return true;
-      if (da > 12) return false;
+      if (cosAngle < 0.978) return false; // more than 12° apart
       const on = (p, q) => distToSegment(p.x, p.y, q.a, q.b) < near;
       return on(a, f) || on(b, f) || on(f.a, line) || on(f.b, line);
     });
