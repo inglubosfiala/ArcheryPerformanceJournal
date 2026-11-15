@@ -43,6 +43,7 @@ export const icons = {
   moon: () => icon(18, p('M20 14.5A8 8 0 1 1 9.5 4a6.5 6.5 0 0 0 10.5 10.5z')),
   device: () => icon(18, s('rect', { x: 3, y: 4, width: 18, height: 12, rx: 2 }), p('M8 20h8M12 16v4')),
   erase: () => icon(22, p('M21 5H9l-6 7 6 7h12a1 1 0 0 0 1-1V6a1 1 0 0 0-1-1z'), p('M17 9l-5 6M12 9l5 6')),
+  camera: () => icon(20, p('M4 8h3l2-3h6l2 3h3a1 1 0 0 1 1 1v9a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V9a1 1 0 0 1 1-1z'), c(12, 13, 3.5)),
   plus: () => icon(20, p('M12 5v14M5 12h14')),
   check: () => icon(18, p('M5 12.5l4.5 4.5L19 7.5')),
   clock: () => icon(18, c(12, 12, 9), p('M12 7v5l3 2')),

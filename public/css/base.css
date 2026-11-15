@@ -3739,3 +3739,23 @@ button.arrow-count:hover {
 .target-btn [data-arrow].is-grabbed {
   opacity: 0.25;
 }
+
+/* scoring from a photo: the camera button next to the timer, and the preview in the dialog */
+.photo-btn-wrap {
+  display: inline-flex;
+}
+
+.photo-preview {
+  display: block;
+  width: 100%;
+  height: auto;
+  max-height: 50vh;
+  object-fit: contain;
+  border-radius: 12px;
+  background: #000000;
+}
+
+.end-totals {
+  display: flex;
+  gap: 8px;
+}

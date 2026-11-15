@@ -26,6 +26,7 @@ import { gearChoices, gearForChoice } from '../gearFields.js';
 import { faceSheet, faceViewBox, VB } from './face.js';
 import { SESSION_TYPES, TYPE_LABELS, isScored, hourMinute, sessionType } from '../sessionTypes.js';
 import { emptyForm, formSections } from './sessionForms.js';
+import { detectArrows } from '../photoDetect.js';
 
 export function findActive(repo) {
   return repo.list('sessions', { filter: (x) => x.status === 'active' })[0] || null;
@@ -633,7 +634,7 @@ function renderActive(ctx, session) {
           h('span', { class: 'end-of muted' }, totalEnds > 1 ? ` / ${totalEnds}` : ''),
         ),
       ),
-      h('div', { class: 'end-totals' }, timerBtn),
+      h('div', { class: 'end-totals' }, photoButton(ctx, session), timerBtn),
     ),
     input,
     grades,
@@ -846,6 +847,131 @@ function renderActive(ctx, session) {
       h('button', { type: 'button', class: 'btn btn-text danger', onClick: discard }, T.discardSession),
     ),
   };
+}
+
+// ---------------------------------------------------------------- arrows from a photo
+
+const PHOTO_MAX = 640; // the photo is scaled down to this many pixels on its long side before detection
+
+/**
+ * Camera button: take (or pick) a photo of the target; arrows found on it fill the empty slots of
+ * the end after a preview. Best effort: wrong ones are dragged on the face afterwards. The photo is
+ * only used in memory and is never stored.
+ */
+function photoButton(ctx, session) {
+  const input = h('input', {
+    type: 'file',
+    accept: 'image/*',
+    capture: 'environment',
+    class: 'sr-only',
+    tabindex: '-1',
+    'aria-hidden': 'true',
+    onChange: (e) => {
+      const file = e.target.files?.[0];
+      e.target.value = '';
+      if (file) scoreFromPhoto(ctx, file);
+    },
+  });
+  return h(
+    'span',
+    { class: 'photo-btn-wrap' },
+    h(
+      'button',
+      {
+        type: 'button',
+        class: 'icon-btn',
+        'aria-label': 'Score arrows from a photo of the target',
+        dataset: { fk: 'photo' },
+        disabled: L.viewIndex(session) !== session.ends.length,
+        onClick: () => input.click(),
+      },
+      icons.camera(),
+    ),
+    input,
+  );
+}
+
+async function scoreFromPhoto(ctx, file) {
+  const session = findActive(ctx.repo);
+  if (!session) return;
+  const face = session.face;
+  const empty = L.shownEnd(session).arrows.filter((a) => a.v == null).length;
+  if (!empty) {
+    ctx.toast('This end is full. Clear an arrow or go to the next end first.');
+    return;
+  }
+  let bitmap;
+  try {
+    bitmap = await createImageBitmap(file);
+  } catch {
+    ctx.toast('Could not open the photo.');
+    return;
+  }
+  const k = Math.min(1, PHOTO_MAX / Math.max(bitmap.width, bitmap.height));
+  const canvas = h('canvas', { class: 'photo-preview' });
+  canvas.width = Math.round(bitmap.width * k);
+  canvas.height = Math.round(bitmap.height * k);
+  const g = canvas.getContext('2d', { willReadFrequently: true });
+  g.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+  bitmap.close();
+  // A photo of a three-spot sheet may show only one spot (a close-up): its arrows then go on the
+  // first spot of the sheet that has no arrow yet in this end.
+  const used = new Set(L.shownEnd(session).arrows.filter((a) => a.v != null && a.spot != null).map((a) => a.spot));
+  const freeSpot = spotCentres(face).findIndex((_, k) => !used.has(k));
+  const spotHint = Math.max(0, freeSpot);
+  const res = detectArrows(g.getImageData(0, 0, canvas.width, canvas.height), face, empty, { spotHint });
+  if (res.error) {
+    ctx.toast(res.error);
+    return;
+  }
+
+  // preview: the face edge found, and each arrow numbered with its score
+  const line = Math.max(2, canvas.width / 220);
+  g.lineWidth = line;
+  g.strokeStyle = '#00e5ff';
+  for (const s of res.spots) {
+    g.beginPath();
+    g.ellipse(s.outer.cx, s.outer.cy, s.outer.rx, s.outer.ry, s.outer.angle, 0, Math.PI * 2);
+    g.stroke();
+  }
+  const values = res.arrows.map((a) => scoreFromPoint(a.x, a.y, face));
+  res.arrows.forEach((a, i) => {
+    const r = Math.max(9, canvas.width / 40);
+    g.beginPath();
+    g.arc(a.image.x, a.image.y, r, 0, Math.PI * 2);
+    g.fillStyle = '#E5007E';
+    g.fill();
+    g.lineWidth = line;
+    g.strokeStyle = '#ffffff';
+    g.stroke();
+    g.fillStyle = '#ffffff';
+    g.font = `700 ${Math.round(r * 1.1)}px system-ui, sans-serif`;
+    g.textAlign = 'center';
+    g.textBaseline = 'middle';
+    g.fillText(String(i + 1), a.image.x, a.image.y + 1);
+  });
+
+  const n = res.arrows.length;
+  const ok = await confirmDialog({
+    title: n ? `Found ${n} ${n === 1 ? 'arrow' : 'arrows'}` : 'No arrows found',
+    message: n
+      ? `${values.join(' · ')}. ${
+          res.partial && isMultiSpot(face)
+            ? `The photo shows one spot, so they go on spot ${spotHint + 1} of the sheet. `
+            : 'They fill the empty slots. '
+        }Drag any arrow on the target to correct it.`
+      : 'Try a photo taken straight at the target, close enough that the face fills the picture.',
+    confirmLabel: n ? 'Use' : 'OK',
+    icon: 'camera',
+    body: canvas,
+  });
+  if (!ok || !n) return;
+  update(ctx, (cur) =>
+    res.arrows.reduce((s, a, i) => {
+      const onFace = Math.hypot(a.x, a.y) < 1.05;
+      return L.enterScore(s, values[i], onFace ? round3(a.x) : null, onFace ? round3(a.y) : null, a.spot);
+    }, { ...cur, pinned: false }),
+  );
 }
 
 function findSightMark(repo, distance) {

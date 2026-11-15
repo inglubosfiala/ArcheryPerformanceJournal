@@ -38,6 +38,7 @@ const SHELL = [
   './js/app/gearFields.js',
   './js/app/icons.js',
   './js/app/scoring.js',
+  './js/app/photoDetect.js',
   './js/app/sessionLogic.js',
   './js/app/stats.js',
   './js/app/strings.js',
