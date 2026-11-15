@@ -13,6 +13,7 @@ import {
   locateOnSheet,
   sheetPoint,
   isMultiSpot,
+  spotCentres,
   zoneOf,
 } from '../scoring.js';
 import { sumArrows, computeStats, fmt } from '../stats.js';
@@ -22,7 +23,7 @@ import { icons } from '../icons.js';
 import { card, chip, sectionLabel, gearPicker, gearCard, sessionDates } from './common.js';
 import { datePicker, timePicker } from './pickers.js';
 import { gearChoices, gearForChoice } from '../gearFields.js';
-import { faceSheet, faceViewBox } from './face.js';
+import { faceSheet, faceViewBox, VB } from './face.js';
 import { SESSION_TYPES, TYPE_LABELS, isScored, hourMinute, sessionType } from '../sessionTypes.js';
 import { emptyForm, formSections } from './sessionForms.js';
 
@@ -916,6 +917,9 @@ function arrowDots(session) {
 /**
  * Target face input. Touch (or press) shows a magnifier with the exact hit point and its score;
  * moving the finger fine-tunes the position; releasing registers the arrow. Cancel = no arrow.
+ * Multi-spot sheets (triple, Vegas): the first tap zooms into the spot tapped, so it fills the
+ * target area; the arrow is then placed on it the same way, and the view zooms back out.
+ * The magnifier's place is chosen when the finger lands and stays there until it lifts.
  */
 function targetInput(session, enter, slots) {
   const selectedValue = L.shownEnd(session).arrows[session.cursor]?.v ?? null;
@@ -941,7 +945,9 @@ function targetInput(session, enter, slots) {
   const loupeScore = h('span', { class: 'score-chip loupe-score' });
   const loupe = h('div', { class: 'loupe', 'aria-hidden': 'true', hidden: true }, loupeSvg, loupeScore);
 
-  let active = null; // { id, p } with p in sheet coordinates (one spot's radius = 1)
+  let active = null; // { id, p, mode } with p in sheet coordinates (one spot's radius = 1)
+  const multi = isMultiSpot(session.face);
+  let zoomed = null; // index of the spot zoomed into (multi-spot sheets), or null
   const sheet = s(
     'svg',
     { viewBox: faceViewBox(session.face), 'aria-hidden': 'true', focusable: 'false' },
@@ -952,12 +958,49 @@ function targetInput(session, enter, slots) {
     'button',
     {
       type: 'button',
-      class: ['target-btn', isMultiSpot(session.face) && 'target-sheet'],
-      'aria-label':
-        'Target face: touch where the arrow landed, slide to fine-tune, release to score (keyboard users: use Keypad)',
+      class: ['target-btn', multi && 'target-sheet'],
+      'aria-label': multi
+        ? 'Target sheet: tap a spot to zoom in, then touch where the arrow landed, slide to fine-tune, release to score (keyboard users: use Keypad)'
+        : 'Target face: touch where the arrow landed, slide to fine-tune, release to score (keyboard users: use Keypad)',
     },
     sheet,
   );
+
+  // --- zoom (multi-spot sheets): animate the sheet's viewBox between the whole sheet and one spot
+  const fullBox = faceViewBox(session.face).split(' ').map(Number);
+  const spotBox = (i) => {
+    const [cx, cy] = spotCentres(session.face)[i];
+    return [cx - VB, cy - VB, VB * 2, VB * 2];
+  };
+  let anim = 0;
+  const setBox = (to) => {
+    cancelAnimationFrame(anim);
+    const from = sheet.getAttribute('viewBox').split(' ').map(Number);
+    if (matchMedia('(prefers-reduced-motion: reduce)').matches) {
+      sheet.setAttribute('viewBox', to.join(' '));
+      return;
+    }
+    const t0 = performance.now();
+    const step = (t) => {
+      const k = Math.min(1, (t - t0) / 200);
+      const e = 1 - (1 - k) ** 3; // ease-out
+      sheet.setAttribute('viewBox', from.map((f, j) => f + (to[j] - f) * e).join(' '));
+      if (k < 1) anim = requestAnimationFrame(step);
+    };
+    anim = requestAnimationFrame(step);
+  };
+  const zoomOutBtn = h(
+    'button',
+    { type: 'button', class: 'zoom-out-btn', hidden: true, 'aria-label': 'Show all spots', onClick: () => zoomTo(null) },
+    icons.back(),
+    'All spots',
+  );
+  function zoomTo(i) {
+    zoomed = i;
+    setBox(i == null ? fullBox : spotBox(i));
+    btn.classList.toggle('is-zoomed', i != null);
+    zoomOutBtn.hidden = i == null;
+  }
 
   const toFace = (ev) => {
     const r = btn.getBoundingClientRect();
@@ -973,22 +1016,22 @@ function targetInput(session, enter, slots) {
     };
   };
 
-  // The loupe floats above the target face (over the arrow slots), centred, so it never covers the face.
-  // If the page is scrolled so there is no room above, it stays just below the header and moves
-  // sideways away from the finger.
+  // The loupe's place is chosen once, when the finger lands, and kept until it lifts (it never jumps).
+  // Above the target face when there is room; otherwise over the face, centred, on the half away
+  // from the finger (finger on the top half: loupe at the bottom, and the other way round).
+  const visibleTop = () => {
+    const header = document.querySelector('.app-header');
+    if (header && !header.hidden) return header.getBoundingClientRect().bottom;
+    return document.querySelector('.main')?.getBoundingClientRect().top ?? 0;
+  };
   const placeLoupe = (p) => {
     const size = loupe.offsetWidth || 132;
     const gap = 10;
     const stage = btn.getBoundingClientRect();
-    const headerBottom = document.querySelector('.app-header')?.getBoundingClientRect().bottom ?? 0;
+    const left = stage.left + stage.width / 2 - size / 2;
     let top = stage.top - size - gap;
-    let left = stage.left + stage.width / 2 - size / 2;
-    if (top < headerBottom + gap) {
-      top = headerBottom + gap;
-      const fingerX = stage.left + p.px;
-      const fingerY = stage.top + p.py;
-      const covers = fingerY < top + size + 30 && fingerX > left - 30 && fingerX < left + size + 30;
-      if (covers) left = fingerX < stage.left + stage.width / 2 ? stage.right - size : stage.left;
+    if (top < visibleTop() + gap) {
+      top = p.py < stage.height / 2 ? stage.bottom - size - gap : Math.max(visibleTop() + gap, stage.top + gap);
     }
     loupe.style.top = `${Math.round(top)}px`;
     loupe.style.left = `${Math.round(left)}px`;
@@ -1007,16 +1050,20 @@ function targetInput(session, enter, slots) {
     loupeScore.textContent = String(v);
     loupeScore.className = `score-chip loupe-score z-${zoneOf(v)}`;
     loupe.hidden = false;
-    placeLoupe(p);
   };
 
   const end = (ev, commit) => {
     if (!active || ev.pointerId !== active.id) return;
-    const p = active.p;
+    const { p, mode } = active;
     active = null;
     loupe.hidden = true;
     btn.classList.remove('aiming');
     if (!commit) return;
+    // a tap on the whole sheet zooms into the spot tapped
+    if (mode === 'pick') {
+      zoomTo(locateOnSheet(p.x, p.y, session.face).spot);
+      return;
+    }
     const hit = locateOnSheet(p.x, p.y, session.face);
     const keep = Math.hypot(hit.x, hit.y) < 1.05;
     enter(
@@ -1035,14 +1082,21 @@ function targetInput(session, enter, slots) {
     } catch {
       /* pointer already gone */
     }
-    active = { id: ev.pointerId, p: toFace(ev) };
+    const p = toFace(ev);
+    // multi-spot sheet not zoomed yet: this touch only picks the spot
+    if (multi && zoomed == null) {
+      active = { id: ev.pointerId, p, mode: 'pick' };
+      return;
+    }
+    active = { id: ev.pointerId, p, mode: 'aim' };
     btn.classList.add('aiming');
-    show(active.p);
+    show(p);
+    placeLoupe(p);
   });
   btn.addEventListener('pointermove', (ev) => {
     if (!active || ev.pointerId !== active.id) return;
     active.p = toFace(ev);
-    show(active.p);
+    if (active.mode === 'aim') show(active.p);
   });
   btn.addEventListener('pointerup', (ev) => end(ev, true));
   btn.addEventListener('pointercancel', (ev) => end(ev, false));
@@ -1056,7 +1110,7 @@ function targetInput(session, enter, slots) {
       'div',
       { class: ['aim-row', session.arrowsPerEnd > 6 && 'aim-row-wide'] },
       slots,
-      h('div', { class: 'target-stage' }, btn, loupe),
+      h('div', { class: 'target-stage' }, btn, multi ? zoomOutBtn : null, loupe),
     ),
     h(
       'div',

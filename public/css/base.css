@@ -3662,3 +3662,33 @@ button.arrow-count:hover {
   font-weight: 600;
   color: var(--ink-2);
 }
+
+/* multi-spot sheets: a zoomed spot gets an "All spots" button to go back to the whole sheet */
+.zoom-out-btn {
+  position: absolute;
+  top: 4px;
+  left: 4px;
+  z-index: 2;
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  height: 34px;
+  padding: 0 12px 0 6px;
+  border: 0;
+  border-radius: 17px;
+  background: color-mix(in srgb, var(--surface) 88%, transparent);
+  color: var(--ink);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  box-shadow: 0 1px 6px rgba(0, 0, 0, 0.25);
+}
+
+.zoom-out-btn[hidden] {
+  display: none;
+}
+
+.zoom-out-btn svg {
+  width: 18px;
+  height: 18px;
+}
