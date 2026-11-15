@@ -47,7 +47,6 @@ export const T = {
   arrowN: (n) => `Arrow ${n}`,
   arrowScored: (n, v) => `Arrow ${n}: ${v}`,
   nextArrow: 'Next arrow',
-  saveEndNow: (n) => `Save end ${n} now`,
   scoreOnly: 'or enter the score only',
   nextSpot: (n) => `Next: spot ${n}`,
   spotOf: (n, count) => `Spot ${n} of ${count}`,

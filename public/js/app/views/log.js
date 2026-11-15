@@ -127,11 +127,10 @@ function announceArrow(ctx) {
   if (a?.v != null) announce(T.arrowScored(s.cursor + 1, a.v));
 }
 
-// the bottom bar's primary button for each L.primaryAction ('place' and 'grade' have none): its label,
+// the bottom bar's primary button for each L.primaryAction ('place', 'grade' and 'done' have none): its label,
 // and what it does
 const PRIMARY = {
   next: { label: () => T.nextArrow, run: L.nextArrow },
-  save: { label: (pa) => T.saveEnd(pa.end), run: L.nextEnd },
   back: { label: (pa) => T.backToEnd(pa.end), run: (c) => L.goToEnd(c, null) },
 };
 
@@ -221,19 +220,17 @@ function renderActive(ctx, session) {
       label,
       trailing ? trailing() : null,
     );
-  const emptyLeft = L.nextEmpty(current.arrows) >= 0;
   const endLinks = h(
     'nav',
     { class: 'end-links', 'aria-label': 'Ends' },
     L.canPrevEnd(session)
       ? endLink(T.endN(endNo - 1), { icon: icons.back, onClick: () => update(ctx, L.prevEnd), fk: 'end-prev' })
       : h('span'),
-    viewing
+    // the next end opens only from here (there is no Save end step: every change is saved as it is
+    // made); from the end being shot it needs at least one arrow, so empty ends do not pile up
+    L.canNextEnd(session)
       ? endLink(T.endN(endNo + 1), { trailing: icons.forward, onClick: () => update(ctx, L.nextEnd), fk: 'end-next' })
-      : // an end with arrows still empty can be saved early (the full end is saved by the primary button)
-        L.canNextEnd(session) && emptyLeft
-        ? endLink(T.saveEndNow(endNo), { trailing: icons.forward, onClick: () => update(ctx, L.nextEnd), fk: 'end-next' })
-        : h('span'),
+      : h('span'),
   );
 
   // --- the face (multi-spot sheets: the spot suggested for an empty selected arrow is outlined)
@@ -336,9 +333,11 @@ function renderActive(ctx, session) {
     APL.Button({ children: T.finish, variant: 'secondary', disabled: !canFinish, onClick: finish, fk: 'finish' }),
   );
 
-  // --- saved ends (newest first)
+  // --- the session's ends, newest first: the end being shot is listed from the moment it opens
+  // (even empty); every change to it is saved as it is made
   let run = 0;
-  const rows = session.ends.map((e, i) => {
+  const shownIdx = L.viewIndex(session);
+  const rows = [...session.ends, session.current].map((e, i) => {
     const sc = sumArrows(e.arrows);
     run += sc;
     const st = computeStats([e]);
@@ -349,9 +348,9 @@ function renderActive(ctx, session) {
         'button',
         {
           type: 'button',
-          class: ['saved-end', session.view === i && 'is-viewed'],
+          class: ['saved-end', i === shownIdx && 'is-viewed'],
           'aria-label': `Open end ${i + 1}`,
-          'aria-current': session.view === i ? 'true' : null,
+          'aria-current': i === shownIdx ? 'true' : null,
           onClick: () => update(ctx, (c) => L.goToEnd(c, i)),
         },
         h('span', { class: 'saved-end-no' }, `E${i + 1}`),
@@ -395,12 +394,10 @@ function renderActive(ctx, session) {
         h('section', { class: 'score-screen', 'aria-label': T.endN(endNo) }, header, strip, endLinks, input, under),
         pills,
         details,
-        rows.length
-          ? card(
-              { class: 'card-list', 'aria-label': 'Saved ends' },
-              h('ol', { class: 'saved-ends', reversed: true }, rows.reverse()),
-            )
-          : null,
+        card(
+          { class: 'card-list', 'aria-label': T.ends },
+          h('ol', { class: 'saved-ends', reversed: true }, rows.reverse()),
+        ),
         gearCard(ctx, session),
         h('button', { type: 'button', class: 'btn btn-text danger apl-discard', onClick: discard }, T.discardSession),
       ),

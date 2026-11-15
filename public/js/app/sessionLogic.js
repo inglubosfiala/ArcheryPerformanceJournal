@@ -249,7 +249,8 @@ export function nextArrow(session) {
 /**
  * The scoring screen's primary action for the selected arrow: `place` it (nothing to do yet),
  * `grade` it (M and S still missing while grades are asked for after each arrow), move to the
- * `next` empty arrow, `save` the full end, or go `back` to the end being shot from an earlier one.
+ * `next` empty arrow, nothing (`done`: the end is full; every change is saved as it is made, and
+ * the next end is opened with its own link), or go `back` to the end being shot from an earlier one.
  * `slot` and `end` are 1-based, for the button's label.
  */
 export function primaryAction(session, { askGrades = true } = {}) {
@@ -261,7 +262,7 @@ export function primaryAction(session, { askGrades = true } = {}) {
   if (a.v == null) return { action: 'place', slot, end, enabled: false };
   if (askGrades && (a.m == null || a.s == null)) return { action: 'grade', slot, end, enabled: false };
   if (nextEmpty(arrows) >= 0) return { action: 'next', slot, end, enabled: true };
-  return { action: 'save', slot, end, enabled: true };
+  return { action: 'done', slot, end, enabled: false };
 }
 
 /** Clear the last scored arrow in the shown end. */

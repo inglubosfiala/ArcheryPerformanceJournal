@@ -85,10 +85,10 @@ describe('primaryAction – the bottom bar button follows the selected arrow', (
     expect(L.primaryAction(L.selectArrow(s, 1))).toMatchObject({ action: 'next', slot: 2, enabled: true });
   });
 
-  it('the end is full and the selected arrow graded: Save end n', () => {
+  it('the end is full and the selected arrow graded: nothing left to do (no Save end step)', () => {
     let s = L.enterScore(L.enterScore(L.enterScore(start(), 9), 8), 7);
     s = graded(s);
-    expect(L.primaryAction(s)).toEqual({ action: 'save', slot: 3, end: 1, enabled: true });
+    expect(L.primaryAction(s)).toEqual({ action: 'done', slot: 3, end: 1, enabled: false });
   });
 
   it('an earlier end opened for editing: back to the end being shot', () => {
