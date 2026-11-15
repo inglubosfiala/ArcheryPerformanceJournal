@@ -1035,7 +1035,7 @@ async function previewAndApply(ctx, canvas, res, { face }, { cancelLabel = 'Canc
       g.ellipse(s.outer.cx, s.outer.cy, s.outer.rx, s.outer.ry, s.outer.angle, 0, Math.PI * 2);
       g.stroke();
     }
-    drawArrowMarks(g, res.spots, arrows, values, { active: dragging });
+    drawArrowMarks(g, res.spots, arrows, values, { active: dragging, long: true });
   };
   redraw();
 
@@ -1085,7 +1085,7 @@ async function previewAndApply(ctx, canvas, res, { face }, { cancelLabel = 'Canc
     // the nearest label (or its point of impact) within about a fingertip
     let best = null;
     arrows.forEach((a, i) => {
-      const m = arrowMarkLayout(canvas.width, canvas.height, res.spots, a);
+      const m = arrowMarkLayout(canvas.width, canvas.height, res.spots, a, { long: true });
       const d = Math.min(Math.hypot(m.lx - p.x, m.ly - p.y) - m.r, Math.hypot(a.image.x - p.x, a.image.y - p.y));
       if (d <= 26 * p.k && (!best || d < best.d)) best = { i, d };
     });

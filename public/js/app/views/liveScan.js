@@ -21,7 +21,7 @@ const WINDOW_MS = 5000; // readings older than this are dropped
  * with the score read there.
  */
 /** Where an arrow's score label sits on a picture of the given size: its centre and radius. */
-export function arrowMarkLayout(width, height, spots, a) {
+export function arrowMarkLayout(width, height, spots, a, { long = false } = {}) {
   const o = (spots[a.spot ?? 0] || spots[0]).outer;
   const spotR = (o.rx + o.ry) / 2;
   const p = a.image;
@@ -42,7 +42,9 @@ export function arrowMarkLayout(width, height, spots, a) {
     dx /= dist;
     dy /= dist;
   }
-  const reach = r + Math.max(0.28 * spotR, 1.2 * r);
+  // `long`: where the labels are dragged by finger, the line is long enough that the finger on the
+  // label does not cover the point of impact
+  const reach = r + (long ? Math.max(0.75 * spotR, 3.4 * r) : Math.max(0.28 * spotR, 1.2 * r));
   return {
     r,
     lx: Math.max(r + 2, Math.min(width - r - 2, p.x + dx * reach)),
@@ -50,13 +52,13 @@ export function arrowMarkLayout(width, height, spots, a) {
   };
 }
 
-export function drawArrowMarks(g, spots, arrows, labels, { hollow = false, active = -1 } = {}) {
+export function drawArrowMarks(g, spots, arrows, labels, { hollow = false, active = -1, long = false } = {}) {
   const { width, height } = g.canvas;
   g.save();
   g.lineCap = 'round';
   arrows.forEach((a, i) => {
     const p = a.image;
-    const { r, lx, ly } = arrowMarkLayout(width, height, spots, a);
+    const { r, lx, ly } = arrowMarkLayout(width, height, spots, a, { long });
     const thin = Math.max(1.5, width / 320);
     const stroke = (colour, w, path) => {
       g.beginPath();
