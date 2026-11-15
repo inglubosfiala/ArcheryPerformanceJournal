@@ -13,6 +13,7 @@ import {
   locateOnSheet,
   sheetPoint,
   isMultiSpot,
+  isSpotFace,
   spotCentres,
   zoneOf,
 } from '../scoring.js';
@@ -651,11 +652,12 @@ function renderActive(ctx, session) {
           type: 'button',
           class: 'btn btn-outline end-step-btn',
           disabled: !L.canPrevEnd(session),
+          'aria-label': T.prevEnd, // the button itself says just "Previous", so it fits on one line
           dataset: { fk: 'end-prev' },
           onClick: () => update(ctx, L.prevEnd),
         },
         icons.back(),
-        T.prevEnd,
+        T.prevShort,
       ),
       h(
         'button',
@@ -994,15 +996,39 @@ async function previewAndApply(ctx, canvas, res, { face }, { cancelLabel = 'Canc
   const arrows = res.arrows.map((a) => ({ ...a, image: { ...a.image } }));
   let values = arrows.map((a) => scoreFromPoint(a.x, a.y, face));
   let dragging = -1;
+  // Where the detector thinks the scoring rings are, as fractions of the spot's radius (the X ring
+  // first): drawn over the photo, so a ring that does not sit on the printed one shows at a glance.
+  const rings = isSpotFace(face) ? [0.1, 0.2, 0.4, 0.6, 0.8, 1] : [0.05, ...Array.from({ length: 10 }, (_, k) => (k + 1) / 10)];
+  const ringPath = (o, f) => g.ellipse(o.cx, o.cy, o.rx * f, o.ry * f, o.angle, 0, Math.PI * 2);
   const redraw = () => {
     g.drawImage(photo, 0, 0);
-    g.lineWidth = Math.max(2, canvas.width / 220);
+    // while an arrow is dragged, the ring it is in right now is tinted
+    const held = dragging >= 0 ? arrows[dragging] : null;
+    if (held) {
+      const d = Math.hypot(held.x, held.y);
+      const k = rings.findIndex((f) => d <= f);
+      if (k >= 0) {
+        const o = (res.spots[res.partial ? 0 : (held.spot ?? 0)] || res.spots[0]).outer;
+        g.beginPath();
+        ringPath(o, rings[k]);
+        if (k > 0) ringPath(o, rings[k - 1]);
+        g.fillStyle = 'rgba(0, 229, 255, 0.38)';
+        g.fill('evenodd');
+      }
+    }
+    const line = Math.max(2, canvas.width / 220);
     g.strokeStyle = '#00e5ff';
     for (const s of res.spots) {
-      g.beginPath();
-      g.ellipse(s.outer.cx, s.outer.cy, s.outer.rx, s.outer.ry, s.outer.angle, 0, Math.PI * 2);
-      g.stroke();
+      rings.forEach((f) => {
+        // the outer edge as before; the rings inside it thinner, so the photo stays readable
+        g.lineWidth = f === 1 ? line : Math.max(1, line * 0.45);
+        g.globalAlpha = f === 1 ? 1 : 0.8;
+        g.beginPath();
+        ringPath(s.outer, f);
+        g.stroke();
+      });
     }
+    g.globalAlpha = 1;
     drawArrowMarks(g, res.spots, arrows, values, { active: dragging, long: true });
   };
   redraw();

@@ -52,6 +52,7 @@ export const T = {
   saveEnd: (n) => `Save end ${n}`,
   backToEnd: (n) => `Back to end ${n}`,
   prevEnd: 'Previous end',
+  prevShort: 'Previous',
   nextEnd: 'Next end',
   saveAndNext: 'Save this end and start the next',
   finish: 'Finish session',
