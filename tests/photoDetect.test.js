@@ -9,6 +9,7 @@ const RGB = {
   black: [25, 25, 25],
   white: [245, 245, 240],
   paper: [200, 196, 188],
+  cloth: [150, 146, 140],
   nock: [60, 220, 90], // a green nock
   shaft: [40, 40, 44], // a dark carbon shaft
 };
@@ -24,7 +25,7 @@ function ringColour(d, face) {
  * angle `rot` for the tilt),
  * with round nocks at the given arrows ({ x, y, spot } relative to the spot centre, spot radius 1).
  */
-function photo(face, arrows, { width = 360, height = 480, scale = 70, squash = 0.85, rot = 0.25, nockR = 0.06, shafts = [] } = {}) {
+function photo(face, arrows, { width = 360, height = 480, scale = 70, squash = 0.85, rot = 0.25, nockR = 0.06, shafts = [], centreOnly = false } = {}) {
   const centres = spotCentres(face).map(([x, y]) => [x / 100, y / 100]);
   const cos = Math.cos(rot);
   const sin = Math.sin(rot);
@@ -46,6 +47,8 @@ function photo(face, arrows, { width = 360, height = 480, scale = 70, squash = 0
         if (d < best) {
           best = d;
           colour = ringColour(d, face);
+          // a full face printed only out to the blue: a square of white paper, a grey cloth behind it
+          if (centreOnly && d >= 0.6) colour = Math.max(Math.abs(sx - cx), Math.abs(sy - cy)) < 0.72 ? 'white' : 'cloth';
         }
         for (const a of arrows) {
           if ((a.spot ?? 0) === k && Math.hypot(sx - cx - a.x, sy - cy - a.y) < nockR) colour = 'nock';
@@ -210,6 +213,40 @@ describe('photo arrow detection', () => {
     expect(res.arrows[0].spot).toBe(1);
     expect(Math.hypot(res.arrows[0].x - 0.44, res.arrows[0].y + 0.83)).toBeLessThan(0.08);
     expect(scoreFromPoint(res.arrows[0].x, res.arrows[0].y, '40t')).toBe(6);
+  });
+
+  it('finds arrows on a 60 cm face printed only out to the blue, shafts running off the picture', () => {
+    // the face fills the picture; where its black and white rings would be is paper and cloth
+    const shafts = [
+      { x: 0.02, y: -0.3, dx: 0.02, dy: -1.4 }, // from the top, into the red
+      { x: -0.2, y: -0.12, dx: -1.3, dy: -0.25 }, // from the left, on the edge of the gold
+      { x: 0.0, y: 0.52, dx: -0.6, dy: 1.2 }, // from below, into the blue
+    ];
+    const img = photo('60', [], { shafts, centreOnly: true, scale: 330, width: 480, height: 800, squash: 0.97, rot: 0.1 });
+    const res = detectArrows(img, '60', 3);
+    expect(res.error).toBeUndefined();
+    expect(res.arrows).toHaveLength(3);
+    for (const sh of shafts) {
+      const found = res.arrows.find((f) => Math.hypot(f.x - sh.x, f.y - sh.y) < 0.05);
+      expect(found, `shaft entering at ${sh.x},${sh.y}`).toBeTruthy();
+    }
+  });
+
+  it('finds arrows on a reduced 60 cm face (10-6) that fills the picture', () => {
+    const shafts = [
+      { x: 0.03, y: -0.5, dx: 0.02, dy: -1.6 }, // from the top, into the red
+      { x: -0.33, y: -0.2, dx: -1.5, dy: -0.3 }, // from the left, on the edge of the gold
+      { x: 0.0, y: 0.87, dx: -0.6, dy: 1.2 }, // from below, into the blue
+    ];
+    const img = photo('60s', [], { shafts, scale: 200, width: 480, height: 800, squash: 0.97, rot: 0.1 });
+    const res = detectArrows(img, '60s', 3);
+    expect(res.error).toBeUndefined();
+    expect(res.arrows).toHaveLength(3);
+    for (const sh of shafts) {
+      const found = res.arrows.find((f) => Math.hypot(f.x - sh.x, f.y - sh.y) < 0.07);
+      expect(found, `shaft entering at ${sh.x},${sh.y}`).toBeTruthy();
+      expect(scoreFromPoint(found.x, found.y, '60s')).toBe(scoreFromPoint(sh.x, sh.y, '60s'));
+    }
   });
 
   it('uses a photo of one spot for a three-spot sheet, on the hinted spot', () => {

@@ -355,7 +355,13 @@ function findShafts({ width, height, data, nearest, spotPx, face, rejects = null
   // over a ring is "dark" when it is clearly darker than that ring, even if it is brownish rather
   // than black (carbon in the light, wood): otherwise the line would stop where the shaft enters
   // the gold.
-  const hist = { gold: new Int32Array(256), red: new Int32Array(256), blue: new Int32Array(256), white: new Int32Array(256) };
+  const hist = {
+    gold: new Int32Array(256),
+    red: new Int32Array(256),
+    blue: new Int32Array(256),
+    black: new Int32Array(256),
+    white: new Int32Array(256),
+  };
   const dist = new Float32Array(width * height);
   for (let i = 0; i < width * height; i++) {
     const d = nearest(i % width, (i / width) | 0).d;
@@ -395,6 +401,12 @@ function findShafts({ width, height, data, nearest, spotPx, face, rejects = null
     const total = sums[y2 * (width + 1) + x2] - sums[y1 * (width + 1) + x2] - sums[y2 * (width + 1) + x1] + sums[y1 * (width + 1) + x1];
     return total / ((x2 - x1) * (y2 - y1));
   };
+  // Is the black ring of a full face really there, and black? Indoor faces of 60 and 80 cm are
+  // often printed only out to the blue (the 10-6 centre): where the black ring would be there is
+  // white paper, or whatever is behind the sheet. Then that zone is like any other, and a shaft
+  // shows on it; with a real black ring a dark shaft cannot be seen there.
+  const hasBlack = !isSpotFace(face) && refs.black != null && refs.black < 110 && refs.black <= 0.6 * (refs.blue ?? 255);
+  if (hasBlack) delete refs.black;
   const maxRef = Math.max(0, ...Object.values(refs));
   const raw = new Uint8Array(width * height);
   for (let i = 0; i < width * height; i++) {
@@ -437,7 +449,7 @@ function findShafts({ width, height, data, nearest, spotPx, face, rejects = null
     // Stay near the faces: what is behind the sheet is full of lines. But well past their edge: a
     // shaft in the outer ring lies mostly over the paper between the spots.
     if (at.d > 1.8) continue;
-    if (!isSpotFace(face) && at.d > 0.58 && at.d < 0.82) continue;
+    if (hasBlack && at.d > 0.58 && at.d < 0.82) continue;
     if (!thinAt(x, y)) continue;
     dark[i] = 1;
     pts.push(x, y);
@@ -474,7 +486,7 @@ function findShafts({ width, height, data, nearest, spotPx, face, rejects = null
   };
 
   const blackZone = (x, y) => {
-    if (isSpotFace(face)) return false;
+    if (!hasBlack) return false;
     const d = nearest(x, y).d;
     return d > 0.56 && d < 0.84;
   };
@@ -482,7 +494,8 @@ function findShafts({ width, height, data, nearest, spotPx, face, rejects = null
   // small breaks in a shaft (glare, a pale stretch) are bridged; a real gap, like the distance to an
   // old hole further along the line, ends it. Tuned on real photos: 4 px, a little more on big spots.
   const maxGap = shaftGap ?? Math.max(4, Math.round(0.03 * spotPx));
-  const minRun = 0.45 * spotPx;
+  // a single face fills the picture, so less of a shaft is in it before the picture's edge cuts it off
+  const minRun = (isMultiSpot(face) ? 0.45 : 0.25) * spotPx;
   /** The longest dark run on the line through (px, py) along the unit vector (dx, dy). */
   const longestRun = (px, py, dx, dy) => {
     let run = null;

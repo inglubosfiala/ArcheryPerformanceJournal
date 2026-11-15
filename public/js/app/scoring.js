@@ -1,9 +1,9 @@
 // Scoring rules (HANDOFF §5). Pure functions, unit-tested.
 
 export const DISTANCES = [7, 18, 25, 30, 50, 60, 70];
-export const FACE_IDS = ['40s', '40t', '40v', '40', '60', '80', '122'];
-/** Faces offered for a new session ('40s', the single 10–6 spot, stays valid for older sessions). */
-export const SETUP_FACES = ['40t', '40v', '40', '60', '80', '122'];
+export const FACE_IDS = ['40s', '40t', '40v', '40', '60s', '60', '80s', '80', '122'];
+/** Faces offered for a new session: every size also as its reduced 10–6 face where that exists. */
+export const SETUP_FACES = ['40t', '40v', '40s', '40', '60s', '60', '80s', '80', '122'];
 export const ARROWS_PER_END_MIN = 1;
 export const ARROWS_PER_END_MAX = 12;
 export const DEFAULT_ARROWS_PER_END = 3;
@@ -22,15 +22,16 @@ export const DISTANCE_DEFAULTS = {
   70: { face: '122' },
 };
 
-const FACE_LABELS = { '40s': '40 cm 10–6', '40t': '40 cm triple', '40v': '40 cm Vegas' };
+// '60s' / '80s': the reduced face (the centre of the 60 / 80 cm face, printed out to the 6 ring only)
+const FACE_LABELS = { '40s': '40 cm 10–6', '40t': '40 cm triple', '40v': '40 cm Vegas', '60s': '60 cm 10–6', '80s': '80 cm 10–6' };
 
 export function faceLabel(face) {
   return FACE_LABELS[face] || `${face} cm`;
 }
 
-/** Faces scored 10–6 (the indoor 40 cm spot, single or three on one sheet). */
+/** Faces scored 10–6: the indoor 40 cm spot (single or three on one sheet) and the reduced 60 / 80 cm faces. */
 export function isSpotFace(face) {
-  return face === '40s' || face === '40t' || face === '40v';
+  return face === '40s' || face === '40t' || face === '40v' || face === '60s' || face === '80s';
 }
 
 /**

@@ -1045,24 +1045,13 @@ let zoomOutFrom = null;
 
 function arrowDots(session) {
   const at = (a) => sheetPoint(a, session.face);
-  const prev = L.otherEnds(session)
-    .flatMap((e) => e.arrows)
-    .filter((a) => a.x != null);
+  // only the shown end's arrows: dots of the other ends lay under these and looked like arrows that
+  // would not delete
   const cur = L.shownEnd(session)
     .arrows.map((a, i) => ({ a, i }))
     .filter(({ a }) => a.x != null);
   const movingIdx = L.isEditing(session) ? session.cursor : -1;
   return [
-    ...prev.map((a) =>
-      s('circle', {
-        cx: at(a).x,
-        cy: at(a).y,
-        r: 3.2,
-        fill: 'rgba(20,24,28,0.6)',
-        stroke: '#FFFFFF',
-        'stroke-width': 1.2,
-      }),
-    ),
     ...cur.map(({ a, i }) =>
       s(
         'g',
