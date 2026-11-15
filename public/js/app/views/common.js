@@ -3,7 +3,7 @@ import { h, todayIso, formatDate } from '../../core/dom.js';
 import * as APL from '../../ui/apl/index.js';
 import { zoneOf } from '../scoring.js';
 import { RUBRIC, T } from '../strings.js';
-import { gearChoices, gearForChoice } from '../gearFields.js';
+import { gearChoices } from '../gearFields.js';
 import { isScored } from '../sessionTypes.js';
 import { datePicker, timePicker } from './pickers.js';
 
@@ -133,21 +133,14 @@ export function gearCards(ctx, { options, value, onChange, snapshots }) {
 }
 
 /**
- * The equipment a session used, changeable on the running session and later in History
- * (picking a saved setup copies its fields into the session). `pick(choice)` stores the choice
- * (History passes the finished session's); by default it is stored on the running session here.
+ * The equipment a finished session used, changeable in History (picking a saved setup copies its
+ * fields into the session). `onChange(choice)` stores the choice. A running session shows none:
+ * its equipment is chosen when it is set up.
  */
-export function gearCard(ctx, ss, pick = null) {
+export function gearCard(ctx, ss, onChange) {
   const settings = ctx.repo.getSettings();
   const snapshots = ctx.repo.list('gearSnapshots', { sort: (a, b) => b.createdAt.localeCompare(a.createdAt) });
   const choices = gearChoices({ settings, snapshots, session: ss });
-  const onChange =
-    pick ||
-    ((v) => {
-      const cur = ctx.repo.get('sessions', ss.id);
-      const next = gearForChoice(v, { settings, snapshots });
-      if (cur && next && ctx.save('sessions', { ...cur, ...next })) ctx.rerender();
-    });
   return card(
     { class: 'gear-card' },
     APL.Section({ label: 'Equipment', id: 'gear', children: gearCards(ctx, { ...choices, onChange, snapshots }) }),

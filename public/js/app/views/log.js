@@ -14,7 +14,7 @@ import { sumArrows, computeStats, fmt } from '../stats.js';
 import * as L from '../sessionLogic.js';
 import { T } from '../strings.js';
 import { icons } from '../icons.js';
-import { card, gearCard } from './common.js';
+import { card } from './common.js';
 import { faceSheet, faceViewBox, VB } from './face.js';
 import { SESSION_TYPES, TYPE_LABELS, isScored, sessionType } from '../sessionTypes.js';
 import { renderTypeChoice, renderScoredSetup, renderFormSetup } from './sessionSetup.js';
@@ -391,7 +391,6 @@ function renderActive(ctx, session) {
           h('div', { class: 'ends-total' }, h('span', null, T.total), h('strong', null, String(total))),
           h('ol', { class: 'saved-ends', reversed: true }, rows.reverse()),
         ),
-        gearCard(ctx, session),
         h('button', { type: 'button', class: 'btn btn-text danger apl-discard', onClick: discard }, T.discardSession),
       ),
       APL.BottomBar({ children: h('div', { class: 'score-actions' }, prevBtn, nextBtn, photoButton(ctx, session)) }),
