@@ -443,7 +443,7 @@ function loadView(sessions) {
       `Week of ${weekLabel(w.week)}`,
       ...CHART_TYPES.filter((t) => w[t]).map((t) => `${TYPE_LABELS[t]}: ${w[t]}`),
       w.arrows ? `Arrows: ${w.arrows}` : null,
-      w.strengthMin ? `Strength: ${w.strengthMin} min` : null,
+      w.strengthMin ? `SPT: ${w.strengthMin} min` : null,
       w.mentalMin ? `Mental: ${w.mentalMin} min` : null,
     ].filter(Boolean),
   }));
@@ -471,7 +471,7 @@ function loadView(sessions) {
     ...CHART_TYPES.map((t) => [TYPE_LABELS[t], (w) => String(w[t] || '–')]),
     ['Arrows', (w) => String(w.arrows || '–')],
     ['Time', (w) => (w.totalMin ? fmtMin(w.totalMin) : '–')],
-    ['Strength min', (w) => String(w.strengthMin || '–')],
+    ['SPT min', (w) => String(w.strengthMin || '–')],
     ['Mental min', (w) => String(w.mentalMin || '–')],
   ];
   return h(

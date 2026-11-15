@@ -77,7 +77,8 @@ export function askAboutOpenFormSession(q) {
   }
   return confirmDialog({
     title: 'Discard session?',
-    message: `This ${TYPE_LABELS[q.type].toLowerCase()} session is not saved, and its timer stops.`,
+    // "blank bale session", but "SPT session": an abbreviation keeps its capitals
+    message: `This ${TYPE_LABELS[q.type] === TYPE_LABELS[q.type].toUpperCase() ? TYPE_LABELS[q.type] : TYPE_LABELS[q.type].toLowerCase()} session is not saved, and its timer stops.`,
     confirmLabel: 'Discard',
     danger: true,
   });
@@ -107,7 +108,7 @@ const TYPE_HINTS = {
   training: 'Score arrow by arrow with M / S grades',
   blank: 'Count arrows at the blank bale, no score',
   competition: 'Scored like training, with event and placement',
-  strength: 'SPT, holding and draw drills, effort',
+  strength: 'Holding and draw drills, effort',
   mental: 'Visualisation, breathing, shot routine…',
   manual: 'Type in the arrows or the duration afterwards',
 };
@@ -120,7 +121,6 @@ function renderTypeChoice(ctx) {
       'div',
       { class: 'stack' },
       backBar('#/home', 'Back to dashboard'),
-      h('h1', { class: 'page-title sm' }, T.newSession),
       card(
         { class: 'setup-card', 'aria-label': 'Session type' },
         sectionLabel('Session type'),
@@ -242,13 +242,15 @@ function renderSetup(ctx, type, active = null) {
     past ? h('p', { class: 'muted small' }, 'Logged afterwards: no running timer.') : null,
   );
 
-  // equipment: the Gear tab's setup by default, or any saved setup (not asked for mental sessions)
+  // equipment: the Gear tab's setup by default, or any saved setup (not asked for mental and SPT
+  // sessions: the bow's setup says nothing about them)
   const snapshots = ctx.repo.list('gearSnapshots', { sort: (a, b) => b.createdAt.localeCompare(a.createdAt) });
   const gearOpts = gearChoices({ settings, snapshots });
   const gearChoice = gearOpts.options.some((o) => o[0] === setup.gear) ? setup.gear : gearOpts.value;
   const chosenGear = () => gearForChoice(gearChoice, { settings, snapshots }) || { gear: null, gearSnapshotId: null };
+  const noGear = type === 'mental' || type === 'strength';
   const gearSection =
-    type === 'mental'
+    noGear
       ? null
       : h(
           'section',
@@ -332,7 +334,7 @@ function renderSetup(ctx, type, active = null) {
       date: whenDate,
       time: whenTime,
       past,
-      gear: type === 'mental' ? {} : chosenGear(),
+      gear: noGear ? {} : chosenGear(),
     });
     if (res.status !== 'saved') return;
     dropPageDraft();
@@ -403,19 +405,41 @@ function renderSetup(ctx, type, active = null) {
             )
           : null,
         gearSection,
-        h('button', { type: 'button', class: 'btn btn-primary btn-xl', onClick: start }, T.start),
+        // Cancel gives the setup up (what was picked is forgotten) and goes back to the session types.
+        // This page has no title and no back button at the top, to keep the room for the setup.
+        h(
+          'div',
+          { class: 'grid-2 setup-actions' },
+          h(
+            'button',
+            {
+              type: 'button',
+              class: 'btn btn-outline btn-xl',
+              dataset: { fk: 'setup-cancel' },
+              onClick: () => {
+                ctx.ui.quietSet({ setup: null });
+                ctx.navigate('new', { replace: true });
+              },
+            },
+            'Cancel',
+          ),
+          h('button', { type: 'button', class: 'btn btn-primary btn-xl', dataset: { fk: 'setup-start' }, onClick: start }, T.start),
+        ),
       ]
     : [
         whenSection,
         // blank bale: the timer sits beside the arrow count (in the form), without a label
-        timed && !past && type !== 'blank'
-          ? h(
-              'div',
-              { class: 'spread align-center' },
-              h('span', { class: 'field-label' }, 'Timer'),
-              timerButton(formTimer, toggleFormTimer),
-            )
-          : null,
+        // SPT: the same big timer as on the blank bale page (no label, no border), on the right
+        timed && !past && type === 'strength'
+          ? h('div', { class: 'arrow-count-row timer-alone' }, timerButton(formTimer, toggleFormTimer, { large: true }))
+          : timed && !past && type !== 'blank'
+            ? h(
+                'div',
+                { class: 'spread align-center' },
+                h('span', { class: 'field-label' }, 'Timer'),
+                timerButton(formTimer, toggleFormTimer),
+              )
+            : null,
         ...formSections(type, form, changeForm, {
           live: timed && !past,
           timer: type === 'blank' && timed && !past ? timerButton(formTimer, toggleFormTimer, { large: true }) : null,
@@ -431,8 +455,9 @@ function renderSetup(ctx, type, active = null) {
     content: h(
       'div',
       { class: 'stack' },
-      backBar('#/new', 'Back to session type'),
-      h('h1', { class: 'page-title sm' }, `${TYPE_LABELS[type]} session`),
+      isScored(type) ? null : backBar('#/new', 'Back to session type'),
+      // no title on the scored setups and the SPT page: the room goes to the form
+      isScored(type) || type === 'strength' ? null : h('h1', { class: 'page-title sm' }, `${TYPE_LABELS[type]} session`),
       active && isScored(type)
         ? h(
             'div',
@@ -445,7 +470,7 @@ function renderSetup(ctx, type, active = null) {
             h('a', { class: 'btn btn-primary btn-sm', href: '#/log' }, T.continueSession),
           )
         : null,
-      card({ class: 'setup-card' }, body),
+      card({ class: 'setup-card', 'aria-label': `${TYPE_LABELS[type]} session` }, body),
     ),
   };
 }

@@ -150,7 +150,7 @@ function renderFormDetail(ctx, ss) {
       ...detailHeader(ss, null),
       card({ class: 'setup-card', 'aria-label': `${TYPE_LABELS[ss.type]} session` }, formSections(ss.type, ss, change)),
       whenCard(ctx, ss),
-      ss.type === 'mental' ? null : gearCard(ctx, ss, finishedGear(ctx, ss)),
+      ss.type === 'mental' || ss.type === 'strength' ? null : gearCard(ctx, ss, finishedGear(ctx, ss)),
       reviewCard(ctx, ss),
       h('button', { type: 'button', class: 'btn btn-text danger', onClick: () => deleteSession(ctx, ss) }, T.deleteSession),
     ),

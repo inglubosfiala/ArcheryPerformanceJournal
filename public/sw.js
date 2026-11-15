@@ -42,6 +42,8 @@ const SHELL = [
   './js/app/photoWorker.js',
   './js/app/scanGeometry.js',
   './js/app/scan.js',
+  './js/app/tabata.js',
+  './js/app/views/tabataTimer.js',
   './js/app/views/liveScan.js',
   './js/app/runningSession.js',
   './js/app/openFormSession.js',

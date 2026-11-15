@@ -3448,6 +3448,11 @@ html.theme-switching * {
   min-width: 0;
 }
 
+/* the timer by itself (SPT page): at the right end, where it sits on the blank bale page */
+.arrow-count-row.timer-alone {
+  justify-content: flex-end;
+}
+
 /* on this row the dashed border and the play icon already say paused */
 .arrow-count-row .timer-btn.is-paused .timer-value::after {
   content: none;
@@ -3900,4 +3905,165 @@ button.arrow-count:hover {
   background: transparent;
   color: #ffffff;
   border-color: rgba(255, 255, 255, 0.6);
+}
+
+/* ---------------------------------------------------------------- interval (Tabata) timer */
+.btn.drill-timer-btn {
+  min-height: 44px;
+  gap: 6px;
+}
+
+.btn.drill-timer-btn svg {
+  width: 18px;
+  height: 18px;
+}
+
+/* full screen; the whole screen takes the colour of the phase, so it reads from across the room */
+.tabata {
+  width: 100vw;
+  height: 100vh;
+  height: 100dvh;
+  max-width: none;
+  max-height: none;
+  margin: 0;
+  padding: 12px 16px calc(16px + env(safe-area-inset-bottom));
+  border: 0;
+  background: #14181c;
+  color: #ffffff;
+  flex-direction: column;
+  gap: 12px;
+  transition: background-color 200ms ease;
+}
+
+.tabata[open] {
+  display: flex;
+}
+
+.tabata[data-phase='work'] {
+  background: #0b6b47;
+}
+
+.tabata[data-phase='rest'],
+.tabata[data-phase='setRest'] {
+  background: #17456e;
+}
+
+.tabata[data-phase='done'] {
+  background: #14181c;
+}
+
+.tabata-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex: none;
+}
+
+.tabata-title {
+  font-size: 16px;
+  font-weight: 600;
+  opacity: 0.85;
+}
+
+.tabata .icon-btn {
+  color: #ffffff;
+  background: rgba(255, 255, 255, 0.12);
+  border-color: transparent;
+}
+
+.tabata-face {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  text-align: center;
+}
+
+.tabata-phase {
+  margin: 0;
+  font-size: clamp(26px, 8vw, 44px);
+  font-weight: 700;
+  letter-spacing: 0.01em;
+}
+
+.tabata-clock {
+  margin: 0;
+  font-size: clamp(96px, 34vw, 220px);
+  font-weight: 800;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+
+.tabata.is-paused .tabata-clock {
+  opacity: 0.55;
+}
+
+.tabata-counts {
+  margin: 6px 0 0;
+  font-size: clamp(18px, 5.5vw, 26px);
+  font-weight: 600;
+  opacity: 0.9;
+}
+
+.tabata-bar {
+  flex: none;
+  height: 8px;
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.22);
+  overflow: hidden;
+}
+
+.tabata-bar-fill {
+  height: 100%;
+  width: 0;
+  background: #ffffff;
+  transition: width 100ms linear;
+}
+
+.tabata-total {
+  flex: none;
+  margin: 0;
+  min-height: 20px;
+  text-align: center;
+  font-size: 14px;
+  opacity: 0.8;
+  font-variant-numeric: tabular-nums;
+}
+
+.tabata-actions {
+  flex: none;
+  display: grid;
+  grid-template-columns: 1fr 1.6fr 1fr;
+  gap: 10px;
+}
+
+.tabata-actions .btn {
+  min-height: 60px;
+  gap: 6px;
+  font-size: 16px;
+}
+
+.tabata-actions .btn-outline {
+  background: transparent;
+  color: #ffffff;
+  border-color: rgba(255, 255, 255, 0.6);
+}
+
+.tabata-actions .btn-primary {
+  background: #ffffff;
+  color: #14181c;
+  border-color: #ffffff;
+}
+
+.tabata-actions .btn:disabled {
+  opacity: 0.35;
+}
+
+.tabata-actions .btn svg {
+  width: 22px;
+  height: 22px;
 }

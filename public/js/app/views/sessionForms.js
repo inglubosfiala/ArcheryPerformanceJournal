@@ -2,6 +2,7 @@
 // session (New session page) and to edit a saved one (History detail).
 import { h } from '../../core/dom.js';
 import { DRILLS, drillLabel, emptyDrill, MENTAL_TECHNIQUES, EFFORT_MAX, FOCUS_MAX } from '../sessionTypes.js';
+import { tabataTimer } from './tabataTimer.js';
 import { icons } from '../icons.js';
 import { chip, sectionLabel } from './common.js';
 
@@ -255,7 +256,6 @@ export function formSections(type, value, change, { live = false, timer = null }
         'section',
         { class: 'setup-section', 'aria-label': 'Drills' },
         sectionLabel('Drills'),
-        drills.length ? null : h('p', { class: 'muted small' }, 'Add the drills you did.'),
         drills.map((d, i) => {
           const hold = DRILLS.find((x) => x.id === d.kind)?.hold;
           return h(
@@ -278,17 +278,43 @@ export function formSections(type, value, change, { live = false, timer = null }
             ),
             h(
               'div',
-              { class: hold ? 'grid-3' : 'grid-2' },
+              { class: hold ? 'grid-4' : 'grid-2' },
               drillInput(i, d, 'sets', 'Sets'),
               drillInput(i, d, 'reps', 'Reps'),
               hold ? drillInput(i, d, 'holdSec', 'Hold (s)') : null,
+              hold ? drillInput(i, d, 'restSec', 'Rest (s)') : null,
             ),
+            // a drill with a hold can be run on the interval timer: it counts the holds and rests
+            // typed in above (read when it starts, so what was just typed counts)
+            hold
+              ? h(
+                  'button',
+                  {
+                    type: 'button',
+                    class: 'btn btn-outline drill-timer-btn',
+                    dataset: { fk: `drill-${i}-timer` },
+                    onClick: () => {
+                      let now = d;
+                      change(
+                        (cur) => {
+                          now = (cur.drills || [])[i] || d;
+                          return {};
+                        },
+                        { rerender: false },
+                      );
+                      tabataTimer({ title: drillLabel(now.kind), work: now.holdSec, rest: now.restSec ?? 0, reps: now.reps, sets: now.sets });
+                    },
+                  },
+                  icons.play(),
+                  'Start timer',
+                )
+              : null,
           );
         }),
         h(
           'div',
-          { class: 'grid-2' },
-          DRILLS.map((d) =>
+          { class: 'grid-3' },
+          DRILLS.filter((d) => !d.retired).map((d) =>
             h(
               'button',
               {
@@ -302,7 +328,9 @@ export function formSections(type, value, change, { live = false, timer = null }
           ),
         ),
       ),
-      numberField('Duration', 'minutes', 'minutes', { suffix: 'min' }),
+      // while the session runs the timer is the duration (as on the blank bale page); it can be
+      // changed on the saved session
+      live ? null : numberField('Duration', 'minutes', 'minutes', { suffix: 'min' }),
       scale(`Effort (1–${EFFORT_MAX})`, 'effort', EFFORT_MAX, 'effort'),
       noteField('…'),
     ];

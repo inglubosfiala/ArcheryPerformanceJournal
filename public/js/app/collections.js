@@ -48,7 +48,8 @@ function validateForm(r) {
     else
       r.drills.forEach((d, i) => {
         if (!d || !DRILL_IDS.includes(d.kind)) errs.push(`drill ${i + 1}: unknown drill`);
-        else if (!isOptInt(d.sets, 0, 999) || !isOptInt(d.reps, 0, 9999) || !isOptInt(d.holdSec, 0, 3600)) errs.push(`drill ${i + 1}: invalid numbers`);
+        else if (!isOptInt(d.sets, 0, 999) || !isOptInt(d.reps, 0, 9999) || !isOptInt(d.holdSec, 0, 3600) || !isOptInt(d.restSec, 0, 3600))
+          errs.push(`drill ${i + 1}: invalid numbers`);
       });
   } else {
     if (!isOptInt(r.focus, 1, FOCUS_MAX)) errs.push('invalid focus');
