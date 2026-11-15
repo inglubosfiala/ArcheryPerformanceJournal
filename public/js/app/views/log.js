@@ -103,10 +103,6 @@ function update(ctx, fn, { rerender = true } = {}) {
 
 // ---------------------------------------------------------------- active session
 
-// The arrow whose score is being changed with the keypad ("Change score"), as `<end index>:<slot>`.
-// Kept across re-renders of the page; any score entered, or another arrow selected, ends it.
-let rescoring = null;
-
 // One polite live region for the whole app (it outlives the page's re-renders, so screen readers
 // hear every announcement): "Arrow 2: 9" when an arrow is scored.
 let liveRegion = null;
@@ -151,10 +147,7 @@ function renderActive(ctx, session) {
   const sight = findSightMark(ctx.repo, session.distance);
   const picked = current.arrows[cursor];
 
-  const slotKey = `${L.viewIndex(session)}:${cursor}`;
-  if (rescoring !== slotKey) rescoring = null;
   const enter = (v, x, y, spot) => {
-    rescoring = null;
     if (update(ctx, (cur) => L.enterScore(cur, v, x, y, spot))) announceArrow(ctx);
   };
 
@@ -253,80 +246,31 @@ function renderActive(ctx, session) {
     },
   });
 
-  // --- under the face, in one place: the score keypad while the selected arrow has no score (or its
-  // score is being changed), else its M / S grades
-  const keypadMode = picked.v == null || rescoring === slotKey;
-  const under = keypadMode
-    ? h(
-        'div',
-        { class: 'score-under' },
-        picked.v == null
-          ? h('div', { class: 'or-divider' }, h('span', null, T.scoreOnly))
-          : h(
-              'div',
-              { class: 'under-head' },
-              h('span', null, T.changingScore(cursor + 1)),
-              h(
-                'button',
-                {
-                  type: 'button',
-                  class: 'text-link',
-                  onClick: () => {
-                    rescoring = null;
-                    if (!update(ctx, L.doneEditing)) ctx.rerender();
-                  },
-                },
-                T.keepScore,
-              ),
-            ),
-        APL.ScoreKeypad({
-          label: 'Score without position',
-          keys: ['X', 10, 9, 8, 7, 6, 'M'].map((k) => ({
-            value: k,
-            zone: zoneOf(k),
-            ariaLabel: `Score ${k === 'M' ? 'miss' : k}`,
-          })),
-          value: picked.v,
-          onKey: (k) => enter(k, null, null),
-          // changing a score: Clear at the thumb's end of the row empties the arrow instead
-          clear:
-            picked.v == null
-              ? null
-              : {
-                  enabled: true,
-                  label: T.clearArrow(cursor + 1),
-                  onClick: () => {
-                    rescoring = null;
-                    update(ctx, L.clearArrow);
-                  },
-                },
-          fk: 'quick',
-        }),
-      )
-    : h(
-        'div',
-        { class: 'score-under' },
-        gradePanel(session, { onGrade: (kind, g) => update(ctx, (c) => L.gradeArrow(c, kind, g)) }),
-        h(
+  // --- under the face, in one place: the score keypad while the selected arrow has no score, else
+  // its M / S grades
+  const under =
+    picked.v == null
+      ? h(
           'div',
-          { class: 'under-foot' },
-          h(
-            'button',
-            {
-              type: 'button',
-              class: 'text-link',
-              dataset: { fk: 'change-score' },
-              onClick: () => {
-                rescoring = slotKey;
-                // selected for editing: the next key or touch on the face replaces this arrow
-                if (!session.pinned) update(ctx, (c) => L.selectArrow(c, cursor));
-                else ctx.rerender();
-              },
-            },
-            T.changeScore(cursor + 1),
-          ),
-        ),
-      );
+          { class: 'score-under' },
+          h('div', { class: 'or-divider' }, h('span', null, T.scoreOnly)),
+          APL.ScoreKeypad({
+            label: 'Score without position',
+            keys: ['X', 10, 9, 8, 7, 6, 'M'].map((k) => ({
+              value: k,
+              zone: zoneOf(k),
+              ariaLabel: `Score ${k === 'M' ? 'miss' : k}`,
+            })),
+            value: picked.v,
+            onKey: (k) => enter(k, null, null),
+            fk: 'quick',
+          }),
+        )
+      : h(
+          'div',
+          { class: 'score-under' },
+          gradePanel(session, { onGrade: (kind, g) => update(ctx, (c) => L.gradeArrow(c, kind, g)) }),
+        );
 
   // --- bottom bar, in thumb reach: Undo, Scan (the most used), and the primary action
   const pa = L.primaryAction(session, { askGrades });
@@ -343,10 +287,7 @@ function renderActive(ctx, session) {
       class: 'score-undo',
       'aria-label': T.undo,
       disabled: !current.arrows.some((a) => a.v != null),
-      onClick: () => {
-        rescoring = null;
-        update(ctx, L.undo);
-      },
+      onClick: () => update(ctx, L.undo),
       dataset: { fk: 'undo' },
     },
     icons.undo(),

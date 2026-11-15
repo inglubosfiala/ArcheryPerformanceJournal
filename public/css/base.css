@@ -1877,8 +1877,7 @@ button.arrow-count:hover {
   min-height: var(--tap-min);
 }
 
-.end-link,
-.text-link {
+.end-link {
   display: inline-flex;
   align-items: center;
   gap: 2px;
@@ -1974,20 +1973,6 @@ button.arrow-count:hover {
   flex: 1;
   height: 1px;
   background: var(--border-soft);
-}
-
-.under-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  font-size: 13px;
-  color: var(--muted);
-}
-
-.under-foot {
-  display: flex;
-  justify-content: flex-end;
-  margin-top: -4px;
 }
 
 .score-under .apl-keypad .apl-key {
