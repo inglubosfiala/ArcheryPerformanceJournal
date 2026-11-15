@@ -27,7 +27,7 @@ import { faceSheet, faceViewBox, VB } from './face.js';
 import { SESSION_TYPES, TYPE_LABELS, isScored, hourMinute, sessionType } from '../sessionTypes.js';
 import { emptyForm, formSections } from './sessionForms.js';
 import { detectArrows } from '../photoDetect.js';
-import { liveScan } from './liveScan.js';
+import { drawArrowMarks, liveScan } from './liveScan.js';
 
 export function findActive(repo) {
   return repo.list('sessions', { filter: (x) => x.status === 'active' })[0] || null;
@@ -1026,23 +1026,7 @@ async function previewAndApply(ctx, canvas, res, { face, spotHint }, { cancelLab
     g.stroke();
   }
   const values = res.arrows.map((a) => scoreFromPoint(a.x, a.y, face));
-  // markers sized to the spots, so they do not cover a small target
-  const spotR = res.spots.reduce((sum, s) => sum + (s.outer.rx + s.outer.ry) / 2, 0) / Math.max(1, res.spots.length);
-  res.arrows.forEach((a, i) => {
-    const r = Math.max(canvas.width / 70, Math.min(canvas.width / 26, 0.14 * spotR));
-    g.beginPath();
-    g.arc(a.image.x, a.image.y, r, 0, Math.PI * 2);
-    g.fillStyle = '#E5007E';
-    g.fill();
-    g.lineWidth = line;
-    g.strokeStyle = '#ffffff';
-    g.stroke();
-    g.fillStyle = '#ffffff';
-    g.font = `700 ${Math.round(r * 1.1)}px system-ui, sans-serif`;
-    g.textAlign = 'center';
-    g.textBaseline = 'middle';
-    g.fillText(String(i + 1), a.image.x, a.image.y + 1);
-  });
+  drawArrowMarks(g, res.spots, res.arrows, values);
 
   const n = res.arrows.length;
   const ok = await confirmDialog({
@@ -1155,7 +1139,22 @@ function targetInput(session, enter, slots, { clearable = false, clearLabel = 'C
     marker,
   );
   const loupeScore = h('span', { class: 'score-chip loupe-score' });
-  const loupe = h('div', { class: 'loupe', 'aria-hidden': 'true', hidden: true }, loupeSvg, loupeScore);
+  // shown while a placed arrow is dragged: which arrow moves, and the score it had
+  const loupeTag = h('span', { class: 'loupe-tag', hidden: true });
+  const loupe = h('div', { class: 'loupe', 'aria-hidden': 'true', hidden: true }, loupeSvg, loupeTag, loupeScore);
+  // on the sheet, a move looks different from a new arrow: the arrow's own numbered dot travels with
+  // the finger, tied to the place it came from by a dashed line
+  const guideLine = s('line', { stroke: '#E5007E', 'stroke-width': 1.6, 'stroke-dasharray': '3.5 2.5', 'stroke-linecap': 'round' });
+  const guideFrom = s('circle', { r: 9.5, fill: 'none', stroke: '#E5007E', 'stroke-width': 1.4, 'stroke-dasharray': '2.5 2' });
+  const guideNumber = s('text', { y: 2.6, 'text-anchor': 'middle', 'font-size': 7.5, 'font-weight': 700, fill: '#FFFFFF' });
+  const guideDot = s(
+    'g',
+    null,
+    s('circle', { r: 11, fill: 'rgba(229, 0, 126, 0.25)' }),
+    s('circle', { r: 7.4, fill: '#E5007E', stroke: '#FFFFFF', 'stroke-width': 1.5 }),
+    guideNumber,
+  );
+  const moveGuide = s('g', { class: 'move-guide', visibility: 'hidden' }, guideLine, guideFrom, guideDot);
 
   let active = null; // { id, p, mode } with p in sheet coordinates (one spot's radius = 1)
   const multi = isMultiSpot(session.face);
@@ -1165,6 +1164,7 @@ function targetInput(session, enter, slots, { clearable = false, clearLabel = 'C
     { viewBox: faceViewBox(session.face), 'aria-hidden': 'true', focusable: 'false' },
     faceSheet(session.face),
     arrowDots(session),
+    moveGuide,
   );
   const btn = h(
     'button',
@@ -1267,6 +1267,16 @@ function targetInput(session, enter, slots, { clearable = false, clearLabel = 'C
     loupeScore.textContent = String(v);
     loupeScore.className = `score-chip loupe-score z-${zoneOf(v)}`;
     loupe.hidden = false;
+    if (active?.mode === 'move') {
+      const from = active.origin;
+      guideLine.setAttribute('x1', from.x * 100);
+      guideLine.setAttribute('y1', from.y * 100);
+      guideLine.setAttribute('x2', cx);
+      guideLine.setAttribute('y2', cy);
+      guideFrom.setAttribute('cx', from.x * 100);
+      guideFrom.setAttribute('cy', from.y * 100);
+      guideDot.setAttribute('transform', `translate(${cx} ${cy})`);
+    }
   };
 
   // the aimed point: the finger's, shifted by the grab offset (finger px / py stay the finger's)
@@ -1293,7 +1303,10 @@ function targetInput(session, enter, slots, { clearable = false, clearLabel = 'C
     const { p, mode, idx, tapPicks, moved } = active;
     active = null;
     loupe.hidden = true;
-    btn.classList.remove('aiming');
+    loupe.classList.remove('is-moving');
+    loupeTag.hidden = true;
+    moveGuide.setAttribute('visibility', 'hidden');
+    btn.classList.remove('aiming', 'moving');
     sheet.querySelector('.is-grabbed')?.classList.remove('is-grabbed');
     if (!commit) return;
     // a tap on the whole sheet zooms into the spot tapped
@@ -1338,9 +1351,18 @@ function targetInput(session, enter, slots, { clearable = false, clearLabel = 'C
     }
     const from = { x: ev.clientX, y: ev.clientY, moved: 0 };
     active = grab
-      ? { id: ev.pointerId, mode: 'move', idx: grab.i, off: grab.off, p: aimFrom(p, grab.off), from, moved: 0, tapPicks: whole }
+      ? { id: ev.pointerId, mode: 'move', idx: grab.i, off: grab.off, p: aimFrom(p, grab.off), origin: aimFrom(p, grab.off), from, moved: 0, tapPicks: whole }
       : { id: ev.pointerId, mode: 'aim', off: { x: 0, y: 0 }, p, from, moved: 0 };
-    if (grab) sheet.querySelector(`[data-arrow="${grab.i}"]`)?.classList.add('is-grabbed');
+    if (grab) {
+      sheet.querySelector(`[data-arrow="${grab.i}"]`)?.classList.add('is-grabbed');
+      guideNumber.textContent = String(grab.i + 1);
+      moveGuide.setAttribute('visibility', 'visible');
+      loupeTag.textContent = `Move ${grab.i + 1} · was ${L.shownEnd(session).arrows[grab.i].v}`;
+      loupeTag.hidden = false;
+      loupe.classList.add('is-moving');
+      btn.classList.add('moving');
+      if (navigator.vibrate) navigator.vibrate(15);
+    }
     btn.classList.add('aiming');
     show(active.p);
     placeLoupe(active.p);

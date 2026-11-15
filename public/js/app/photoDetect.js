@@ -266,7 +266,13 @@ export function detectArrows(img, face, maxArrows, { debug = false, spotHint = 0
   }
 
   const candidates = [
-    ...shafts.map((sh) => ({ rank: 1e6 + sh.length, image: sh.tip, at: sh.tipAt, area: Math.round(sh.length) })),
+    ...shafts.map((sh) => {
+      // which way the shaft leans in the picture (from the point towards the nock)
+      const far = sh.tip === sh.a ? sh.b : sh.a;
+      const len = Math.hypot(far.x - sh.tip.x, far.y - sh.tip.y) || 1;
+      const lean = { x: (far.x - sh.tip.x) / len, y: (far.y - sh.tip.y) / len };
+      return { rank: 1e6 + sh.length, image: sh.tip, at: sh.tipAt, area: Math.round(sh.length), lean };
+    }),
     ...blobs,
   ];
 
@@ -303,6 +309,7 @@ export function detectArrows(img, face, maxArrows, { debug = false, spotHint = 0
       spot: isMultiSpot(face) ? (partial ? spotHint : c.at.k) : null,
       area: c.area,
       image: c.image,
+      lean: c.lean ?? null, // for a shaft seen from the side; null for a nock seen head-on
     }));
 
   return debug ? { spots, arrows, partial, debug: { odd, grown, shafts, blobs, rejects } } : { spots, arrows, partial };

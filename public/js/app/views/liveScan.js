@@ -16,6 +16,71 @@ const WINDOW_FRAMES = 8; // how many recent readings are compared
 const WINDOW_MS = 5000; // readings older than this are dropped
 
 /**
+ * Mark the found arrows on a picture so the hit itself stays visible: nothing is drawn over the
+ * point of impact; beside it (on a thin line that ends on the point, away from the shaft) is a label
+ * with the score read there.
+ */
+export function drawArrowMarks(g, spots, arrows, labels, { hollow = false } = {}) {
+  const { width, height } = g.canvas;
+  g.save();
+  g.lineCap = 'round';
+  arrows.forEach((a, i) => {
+    const o = (spots[a.spot ?? 0] || spots[0]).outer;
+    const spotR = (o.rx + o.ry) / 2;
+    const p = a.image;
+    const r = Math.max(width / 45, Math.min(width / 18, 0.17 * spotR)); // the label's radius
+    // On the far side of the point from the shaft (the shaft leans one way, the label goes the
+    // other), so it never lies on the arrow. With no shaft seen: outwards from the spot's middle,
+    // and for an arrow in the very middle up and to the right.
+    let dx = p.x - o.cx;
+    let dy = p.y - o.cy;
+    const dist = Math.hypot(dx, dy);
+    if (a.lean) {
+      dx = -a.lean.x;
+      dy = -a.lean.y;
+    } else if (dist < 0.12 * spotR) {
+      dx = 0.7;
+      dy = -0.7;
+    } else {
+      dx /= dist;
+      dy /= dist;
+    }
+    const reach = r + Math.max(0.28 * spotR, 1.2 * r);
+    const lx = Math.max(r + 2, Math.min(width - r - 2, p.x + dx * reach));
+    const ly = Math.max(r + 2, Math.min(height - r - 2, p.y + dy * reach));
+    const thin = Math.max(1.5, width / 320);
+    const stroke = (colour, w, path) => {
+      g.beginPath();
+      path();
+      g.strokeStyle = colour;
+      g.lineWidth = w;
+      g.stroke();
+    };
+    const leader = () => {
+      g.moveTo(p.x, p.y); // the line ends exactly on the point of impact, with nothing drawn over it
+      g.lineTo(lx, ly);
+    };
+    // white under pink, so the marks show on any ring colour
+    stroke('#ffffff', thin * 2.4, leader);
+    stroke('#E5007E', thin, leader);
+    g.beginPath();
+    g.arc(lx, ly, r, 0, Math.PI * 2);
+    g.fillStyle = hollow ? 'rgba(229, 0, 126, 0.45)' : '#E5007E';
+    g.fill();
+    g.strokeStyle = '#ffffff';
+    g.lineWidth = thin * 1.3;
+    g.stroke();
+    g.fillStyle = '#ffffff';
+    const text = String(labels[i]);
+    g.font = `700 ${Math.round(r * (text.length > 1 ? 1 : 1.2))}px system-ui, sans-serif`;
+    g.textAlign = 'center';
+    g.textBaseline = 'middle';
+    g.fillText(text, lx, ly + 1);
+  });
+  g.restore();
+}
+
+/**
  * Open the live view. Resolves with
  *   { canvas, res }  the locked (or taken) frame and its detection result,
  *   { file }         a photo chosen instead (the Photo button), or
@@ -166,22 +231,7 @@ export function liveScan({ face, maxArrows, spotHint = 0 }) {
         octx.ellipse(s.outer.cx, s.outer.cy, s.outer.rx, s.outer.ry, s.outer.angle, 0, Math.PI * 2);
         octx.stroke();
       }
-      // markers sized to the spots, so they do not cover a small target
-      const spotR = res.spots.reduce((sum, s) => sum + (s.outer.rx + s.outer.ry) / 2, 0) / Math.max(1, res.spots.length);
-      res.arrows.forEach((a, i) => {
-        const r = Math.max(overlay.width / 70, Math.min(overlay.width / 26, 0.14 * spotR));
-        octx.beginPath();
-        octx.arc(a.image.x, a.image.y, r, 0, Math.PI * 2);
-        octx.fillStyle = hollow ? 'rgba(229, 0, 126, 0.25)' : '#E5007E';
-        octx.fill();
-        octx.strokeStyle = '#ffffff';
-        octx.stroke();
-        octx.fillStyle = '#ffffff';
-        octx.font = `700 ${Math.round(r * 1.1)}px system-ui, sans-serif`;
-        octx.textAlign = 'center';
-        octx.textBaseline = 'middle';
-        octx.fillText(String(i + 1), a.image.x, a.image.y + 1);
-      });
+      drawArrowMarks(octx, res.spots, res.arrows, values(res.arrows), { hollow });
     }
 
     // The result to hand over: the agreed arrows (their average place on the face over the frames
