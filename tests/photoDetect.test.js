@@ -110,6 +110,7 @@ describe('photo arrow detection', () => {
     const res = detectArrows(photo('40t', arrows, { scale: 40, width: 300, height: 560, rot: 0.1 }), '40t', 3);
     expect(res.error).toBeUndefined();
     expect(res.spots).toHaveLength(3);
+    expect(res.arrows.map((a) => a.spot)).toEqual([0, 1, 2]); // listed top to bottom
     for (const a of arrows) {
       const found = res.arrows.find((f) => f.spot === a.spot);
       expect(found, `arrow on spot ${a.spot}`).toBeTruthy();

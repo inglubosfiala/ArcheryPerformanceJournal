@@ -1271,12 +1271,12 @@ function targetInput(session, enter, slots, { clearable = false, clearLabel = 'C
 
   // the aimed point: the finger's, shifted by the grab offset (finger px / py stay the finger's)
   const aimFrom = (f, off) => ({ ...f, x: f.x + off.x, y: f.y + off.y });
-  // the placed arrow of the shown end nearest the finger, within about a fingertip (26 px)
-  const grabAt = (f) => {
+  // the placed arrow of the shown end nearest the pointer, within `reachPx` on the screen
+  const grabAt = (f, reachPx) => {
     const vb = sheet.getAttribute('viewBox').split(' ').map(Number);
     const r = btn.getBoundingClientRect();
     const unitsPerPx = Math.max(vb[2] / r.width, vb[3] / r.height); // the sheet is letterboxed (meet)
-    const reach = (26 * unitsPerPx) / 100;
+    const reach = (reachPx * unitsPerPx) / 100;
     let best = null;
     L.shownEnd(session).arrows.forEach((a, i) => {
       if (a.v == null || a.x == null) return;
@@ -1290,14 +1290,15 @@ function targetInput(session, enter, slots, { clearable = false, clearLabel = 'C
 
   const end = (ev, commit) => {
     if (!active || ev.pointerId !== active.id) return;
-    const { p, mode, idx } = active;
+    const { p, mode, idx, tapPicks, moved } = active;
     active = null;
     loupe.hidden = true;
     btn.classList.remove('aiming');
     sheet.querySelector('.is-grabbed')?.classList.remove('is-grabbed');
     if (!commit) return;
     // a tap on the whole sheet zooms into the spot tapped
-    if (mode === 'pick') {
+    // (also a tap on an arrow there: only a drag moves it)
+    if (mode === 'pick' || (tapPicks && moved < 8)) {
       zoomTo(locateOnSheet(p.x, p.y, session.face).spot);
       return;
     }
@@ -1324,17 +1325,21 @@ function targetInput(session, enter, slots, { clearable = false, clearLabel = 'C
       /* pointer already gone */
     }
     const p = toFace(ev);
-    // multi-spot sheet not zoomed yet: this touch only picks the spot
-    if (multi && zoomed == null) {
+    // Touching a placed arrow of this end grabs it: dragging moves it (the pointer keeps its distance
+    // to the dot, so the dot does not jump under the finger). A finger covers the dot and lands
+    // less exactly than a mouse, so it reaches further. On a sheet of several spots this works on
+    // the whole sheet too, without zooming in first.
+    const whole = multi && zoomed == null;
+    const grab = onMove ? grabAt(p, ev.pointerType === 'mouse' ? 26 : whole ? 34 : 44) : null;
+    // multi-spot sheet not zoomed yet: a touch off the arrows only picks the spot
+    if (whole && !grab) {
       active = { id: ev.pointerId, p, mode: 'pick' };
       return;
     }
-    // touching a placed arrow of this end grabs it: dragging moves it (the finger keeps its distance
-    // to the dot, so the dot does not jump under the finger)
-    const grab = onMove ? grabAt(p) : null;
+    const from = { x: ev.clientX, y: ev.clientY, moved: 0 };
     active = grab
-      ? { id: ev.pointerId, mode: 'move', idx: grab.i, off: grab.off, p: aimFrom(p, grab.off) }
-      : { id: ev.pointerId, mode: 'aim', off: { x: 0, y: 0 }, p };
+      ? { id: ev.pointerId, mode: 'move', idx: grab.i, off: grab.off, p: aimFrom(p, grab.off), from, moved: 0, tapPicks: whole }
+      : { id: ev.pointerId, mode: 'aim', off: { x: 0, y: 0 }, p, from, moved: 0 };
     if (grab) sheet.querySelector(`[data-arrow="${grab.i}"]`)?.classList.add('is-grabbed');
     btn.classList.add('aiming');
     show(active.p);
@@ -1346,6 +1351,7 @@ function targetInput(session, enter, slots, { clearable = false, clearLabel = 'C
       active.p = toFace(ev);
       return;
     }
+    active.moved = Math.max(active.moved, Math.hypot(ev.clientX - active.from.x, ev.clientY - active.from.y));
     active.p = aimFrom(toFace(ev), active.off);
     show(active.p);
   });

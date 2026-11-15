@@ -294,6 +294,9 @@ export function detectArrows(img, face, maxArrows, { debug = false, spotHint = 0
       return true;
     })
     .slice(0, Math.max(0, maxArrows))
+    // always in the same order, whatever was found first: spot by spot in the sheet's order (top
+    // to bottom on a triple), and on one spot from the middle outwards (the best arrow first)
+    .sort((p, q) => (partial ? 0 : p.at.k - q.at.k) || p.at.d - q.at.d)
     .map((c) => ({
       x: c.at.p.x,
       y: c.at.p.y,

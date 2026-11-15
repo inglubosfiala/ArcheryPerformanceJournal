@@ -309,7 +309,9 @@ export function liveScan({ face, maxArrows, spotHint = 0 }) {
             x1 = Math.min(vw, Math.ceil(x1));
             y1 = Math.min(vh, Math.ceil(y1));
             const box = { x: x0, y: y0, w: x1 - x0, h: y1 - y0 };
-            region = box.w > 16 && box.h > 16 && box.w * box.h < 0.8 * vw * vh ? box : null;
+            // …but only once every spot of the sheet is seen. While only some are (the camera came
+            // in on one spot first), keep looking at the whole frame, or the others are never found.
+            region = !res.partial && box.w > 16 && box.h > 16 && box.w * box.h < 0.8 * vw * vh ? box : null;
             onResult({ ...res, spots, arrows });
           }
         } catch (err) {
