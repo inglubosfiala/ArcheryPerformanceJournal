@@ -202,6 +202,48 @@ function render() {
       }),
     ),
     story(
+      'StatTile',
+      APL.StatTiles({
+        label: 'Session figures',
+        items: [
+          ['Total', '541'],
+          ['Avg arrow', '9.02'],
+          ['10s (X)', '28 (11)'],
+        ],
+      }),
+    ),
+    story(
+      'DataTable',
+      APL.DataTable({
+        label: 'Ends',
+        columns: [
+          { label: 'End' },
+          { label: 'Arrows', strong: true, nowrap: true },
+          { label: 'Score', align: 'end' },
+          { label: 'Note', muted: true },
+        ],
+        rows: [
+          ['1', '10 9 9', '28', 'Good rhythm'],
+          ['2', 'X 10 8', '28', '—'],
+        ],
+      }),
+    ),
+    story(
+      'SessionRow',
+      APL.SessionRow({
+        href: '#',
+        when: 'Sun 15 Nov 2026 · 18:00',
+        type: 'Training',
+        summary: '18 m · 40 cm triple · 20 ends',
+        score: { total: 541, max: 600 },
+        stats: [
+          ['M', '1.8'],
+          ['S', '2.1'],
+          ['Program', '82%'],
+        ],
+      }),
+    ),
+    story(
       'ScoreKeypad',
       APL.ScoreKeypad({
         label: 'Quick score',

@@ -14,10 +14,6 @@ export const gradeBadge = (g, extra = '') => h('span', { class: `grade-badge g${
 
 export const card = (props, ...children) => h('section', { ...props, class: ['card', props?.class] }, ...children);
 
-/** The back button, the same on every page: alone on its row, at the right (thumb side). */
-export const backBar = (href, label) =>
-  h('div', { class: 'back-bar' }, h('a', { class: 'icon-btn', href, 'aria-label': label, dataset: { fk: 'back' } }, icons.back()));
-
 /** Bottom sheet with the full M/S rubric. */
 export function guideSheet(onClose) {
   return {
@@ -58,51 +54,49 @@ export function whenCard(ctx, ss) {
   const redraw = ({ status }) => status === 'saved' && ctx.rerender();
   const change = (when) => redraw(ctx.finished.setWhen(ss.id, when));
   return card(
-    // no heading: the date and the time speak for themselves
-    { 'aria-label': 'When' },
-    h(
-      'div',
-      { class: 'grid-2' },
-      datePicker({
-        label: 'Date',
-        value: ss.date,
-        max: todayIso(),
-        marks: sessionDates(ctx),
-        fk: 'edit-date',
-        onChange: (date) => change({ date }),
-      }),
-      timePicker({
-        label: 'Start time',
-        value: ss.time || '',
-        clearable: true,
-        fk: 'edit-time',
-        onChange: (time) => change({ time }),
-      }),
-    ),
-    // scored sessions take their duration from the timer; it can be corrected here
-    // (the other types have a Duration field in their form)
-    isScored(ss.type)
-      ? h(
-          'label',
-          { class: 'field' },
-          h('span', { class: 'field-label' }, 'Duration'),
-          h(
-            'div',
-            { class: 'input-suffix' },
-            h('input', {
-              class: 'input',
+    { class: 'apl-card' },
+    APL.Section({
+      label: 'When',
+      id: 'edit-when',
+      children: [
+        h(
+          'div',
+          { class: 'apl-grid-2' },
+          datePicker({
+            label: 'Date',
+            value: ss.date,
+            max: todayIso(),
+            marks: sessionDates(ctx),
+            fk: 'edit-date',
+            apl: true,
+            onChange: (date) => change({ date }),
+          }),
+          timePicker({
+            label: 'Start time',
+            value: ss.time || '',
+            clearable: true,
+            fk: 'edit-time',
+            hint: 'Start time',
+            onChange: (time) => change({ time }),
+          }),
+        ),
+        // scored sessions take their duration from the timer; it can be corrected here
+        // (the other types have a Duration field in their form)
+        isScored(ss.type)
+          ? APL.TextField({
+              label: 'Duration',
               type: 'number',
               inputmode: 'numeric',
               min: 0,
               max: 1440,
+              suffix: 'min',
               value: ss.minutes ?? '',
-              dataset: { fk: 'edit-minutes' },
+              fk: 'edit-minutes',
               onChange: (e) => redraw(ctx.finished.setMinutes(ss.id, e.target.value)),
-            }),
-            h('span', { class: 'muted small' }, 'min'),
-          ),
-        )
-      : null,
+            })
+          : null,
+      ],
+    }),
   );
 }
 

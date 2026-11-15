@@ -669,3 +669,114 @@ export function GradeKeys({ label, rowLabel, value, onChange, max = 5, keyLabel 
     ),
   );
 }
+
+/**
+ * A figure with its name: caption label over a value-lg number. Put tiles in a `dl.apl-stats` grid
+ * (StatTiles builds one).
+ */
+export function StatTile({ label, value }) {
+  return h('div', { class: 'apl-stat' }, h('dt', null, label), h('dd', null, value));
+}
+
+/** A grid of StatTiles (`items`: [label, value] pairs), three to a row by default. */
+export function StatTiles({ label, items, columns = 3 }) {
+  return h(
+    'dl',
+    { class: 'apl apl-stats', 'aria-label': label, style: { '--apl-cols': String(columns) } },
+    items.map(([l, v]) => StatTile({ label: l, value: v })),
+  );
+}
+
+/**
+ * A table that scrolls sideways inside its own focusable region. `columns`: { label, align, nowrap,
+ * strong, muted }, where `label` may be a node (a sort button); `rows`: arrays of cell contents in
+ * column order. `rowProps(i)` adds attributes to a row (a link, a click handler).
+ */
+export function DataTable({ label, columns, rows, rowProps = null }) {
+  const cellClass = (c) => [
+    c.align === 'end' && 'is-end',
+    c.nowrap && 'is-nowrap',
+    c.strong && 'is-strong',
+    c.muted && 'is-muted',
+  ];
+  return h(
+    'div',
+    { class: 'apl apl-table-scroll', tabindex: '0', role: 'region', 'aria-label': label },
+    h(
+      'table',
+      { class: 'apl-table' },
+      h(
+        'thead',
+        null,
+        h(
+          'tr',
+          null,
+          columns.map((c) => h('th', { scope: 'col', class: cellClass(c), 'aria-sort': c.sort }, c.label)),
+        ),
+      ),
+      h(
+        'tbody',
+        null,
+        rows.map((cells, i) =>
+          h(
+            'tr',
+            rowProps ? rowProps(i) : null,
+            cells.map((v, j) => h('td', { class: cellClass(columns[j] || {}) }, v)),
+          ),
+        ),
+      ),
+    ),
+  );
+}
+
+/**
+ * A session in a list: when, a neutral type badge, the setup line, and for a scored session its score
+ * (`score`: { total, max }) with the M / S figures (`stats`: [label, value] pairs). With `href` the row
+ * is a link; `actions` (buttons) go at the bottom (Recently deleted).
+ */
+export function SessionRow({
+  href,
+  when,
+  type,
+  summary,
+  score = null,
+  stats = [],
+  note = null,
+  foot = null,
+  actions = null,
+  fk,
+}) {
+  return h(
+    href ? 'a' : 'div',
+    { class: 'apl apl-sessionrow', href, dataset: fkData(fk) },
+    h(
+      'span',
+      { class: 'apl-sessionrow-head' },
+      h('span', { class: 'apl-t' }, when),
+      type ? Badge({ children: type, tone: 'neutral' }) : null,
+    ),
+    summary ? h('span', { class: 'apl-cap' }, summary) : null,
+    score
+      ? h(
+          'span',
+          { class: 'apl-sessionrow-score' },
+          h(
+            'span',
+            { class: 'apl-big' },
+            String(score.total),
+            h('span', { class: 'apl-sessionrow-max' }, ` / ${score.max}`),
+          ),
+          stats.length
+            ? h(
+                'span',
+                { class: 'apl-sessionrow-stats' },
+                stats.map(([l, v]) => h('span', null, `${l} `, h('strong', null, v))),
+              )
+            : null,
+        )
+      : null,
+    note ? h('span', { class: 'apl-sessionrow-note' }, note) : null,
+    foot ? h('span', { class: 'apl-cap' }, foot) : null,
+    actions ? h('span', { class: 'apl-sessionrow-actions' }, actions) : null,
+  );
+}
