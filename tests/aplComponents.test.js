@@ -308,6 +308,10 @@ describe('APL navigation and status', () => {
 
   it('NavRow is a link with href, a button otherwise', () => {
     expect(APL.NavRow({ href: '#/gear', title: 'Equipment' }).tagName).toBe('A');
+    expect(APL.NavRow({ href: '#/gear', title: 'Equipment' }).hasAttribute('target')).toBe(false);
+    const out = APL.NavRow({ href: 'https://ko-fi.com/x', newTab: true, title: 'Coffee' });
+    expect(out.target).toBe('_blank');
+    expect(out.rel).toBe('noopener noreferrer');
     const onClick = vi.fn();
     const b = APL.NavRow({ title: 'Grades', onClick });
     expect(b.tagName).toBe('BUTTON');

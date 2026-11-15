@@ -24,6 +24,7 @@ const p = (d) => s('path', { d });
 const c = (cx, cy, r) => s('circle', { cx, cy, r });
 
 export const icons = {
+  coffee: () => icon(22, p('M4 9h13v5a5 5 0 0 1-5 5H9a5 5 0 0 1-5-5z'), p('M17 11h1.5a2.5 2.5 0 0 1 0 5H17'), p('M8 3v3M12 3v3')),
   help: () => icon(16, c(12, 12, 9), p('M9.5 9.5a2.5 2.5 0 1 1 3.5 2.3c-.6.3-1 .8-1 1.5V14'), p('M12 17h.01')),
   settings: () =>
     icon(

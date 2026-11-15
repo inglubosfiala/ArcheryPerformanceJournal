@@ -5,6 +5,7 @@ import { h } from '../../core/dom.js';
 import * as APL from '../../ui/apl/index.js';
 import { T } from '../strings.js';
 import { icons } from '../icons.js';
+import { SUPPORT_URL } from '../../config.js';
 
 export function renderDashboard(ctx) {
   const finished = ctx.finished.list();
@@ -46,7 +47,25 @@ export function renderDashboard(ctx) {
             fk: 'hub-settings',
           }),
         ),
+        supportRow(),
       ),
     ),
   };
+}
+
+/** A quiet offer under the sections: the tip page, in a new tab. Nothing when no link is set. */
+export function supportRow(url = SUPPORT_URL) {
+  if (!url) return null;
+  return h(
+    'nav',
+    { class: 'apl-list', 'aria-label': 'Support' },
+    APL.NavRow({
+      href: url,
+      newTab: true,
+      icon: icons.coffee(),
+      title: 'Buy me a coffee',
+      detail: 'The journal is free. Support it on Ko-fi',
+      fk: 'hub-support',
+    }),
+  );
 }

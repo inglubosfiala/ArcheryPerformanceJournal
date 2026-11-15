@@ -535,10 +535,19 @@ export function TabBar({ label, items }) {
  * detail line, an optional badge and a chevron. For navigation lists, where SelectCard would wrongly
  * suggest a choice.
  */
-export function NavRow({ title, detail, icon, href, onClick, badge = null, fk }) {
+export function NavRow({ title, detail, icon, href, newTab = false, onClick, badge = null, fk }) {
+  // app addition: `newTab` opens an outside page (href) in a new browser tab, without a referrer
   return h(
     href ? 'a' : 'button',
-    { class: 'apl apl-navrow', href, type: href ? undefined : 'button', onClick, dataset: fkData(fk) },
+    {
+      class: 'apl apl-navrow',
+      href,
+      type: href ? undefined : 'button',
+      target: href && newTab ? '_blank' : undefined,
+      rel: href && newTab ? 'noopener noreferrer' : undefined,
+      onClick,
+      dataset: fkData(fk),
+    },
     icon ? h('span', { class: 'apl-navrow-well' }, iconNode(icon)) : null,
     h(
       'span',
