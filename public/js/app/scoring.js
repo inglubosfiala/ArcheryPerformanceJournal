@@ -62,7 +62,7 @@ export function spotCentres(face) {
 }
 
 /**
- * The spot suggested for the arrow in slot `cursor` of an end on a three-spot sheet (a hint only:
+ * The spot suggested for the arrow in slot `cursor` of an end on a triple or Vegas sheet (a hint only:
  * any spot can be shot at). Slot n suggests spot n; when that spot is already used by another arrow
  * of the end (or there is no spot n), the first spot not used yet; when all are used, they repeat.
  * Null on a single face.

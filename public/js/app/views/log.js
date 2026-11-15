@@ -110,13 +110,16 @@ let rescoring = null;
 // One polite live region for the whole app (it outlives the page's re-renders, so screen readers
 // hear every announcement): "Arrow 2: 9" when an arrow is scored.
 let liveRegion = null;
+let announceTimer = 0;
 function announce(text) {
   if (!liveRegion?.isConnected) {
     liveRegion = h('div', { class: 'sr-only', role: 'status', 'aria-live': 'polite' });
     document.body.append(liveRegion);
   }
+  // emptied first, so the same text is announced again; only the latest one is spoken
+  clearTimeout(announceTimer);
   liveRegion.textContent = '';
-  setTimeout(() => {
+  announceTimer = setTimeout(() => {
     liveRegion.textContent = text;
   }, 50);
 }
@@ -125,20 +128,16 @@ function announce(text) {
 function announceArrow(ctx) {
   const s = ctx.running.get();
   const a = s && L.shownEnd(s).arrows[s.cursor];
-  if (a?.v != null) announce(`Arrow ${s.cursor + 1}: ${a.v}`);
+  if (a?.v != null) announce(T.arrowScored(s.cursor + 1, a.v));
 }
 
-const PRIMARY_LABELS = {
-  place: (pa) => `Place arrow ${pa.slot}`,
-  grade: () => 'Grade M and S',
-  next: () => 'Next arrow',
-  save: (pa) => `Save end ${pa.end}`,
-  back: (pa) => T.backToEnd(pa.end),
-};
-const PRIMARY_RUNS = {
-  next: L.nextArrow,
-  save: L.nextEnd,
-  back: (c) => L.goToEnd(c, null),
+// the bottom bar's primary button for each L.primaryAction: its label, and what it does
+const PRIMARY = {
+  place: { label: (pa) => T.placeArrow(pa.slot) },
+  grade: { label: () => T.gradeMAndS },
+  next: { label: () => T.nextArrow, run: L.nextArrow },
+  save: { label: (pa) => T.saveEnd(pa.end), run: L.nextEnd },
+  back: { label: (pa) => T.backToEnd(pa.end), run: (c) => L.goToEnd(c, null) },
 };
 
 function renderActive(ctx, session) {
@@ -178,15 +177,15 @@ function renderActive(ctx, session) {
       h(
         'h2',
         { class: 'score-title' },
-        `${T.end} ${endNo}`,
-        viewing ? h('span', { class: 'end-of muted' }, ` of ${totalEnds}`) : null,
+        T.endN(endNo),
+        viewing ? h('span', { class: 'end-of muted' }, T.endOf(totalEnds)) : null,
       ),
-      h('p', { class: 'score-sub' }, [`Total ${total}`, `${session.distance} m`, faceLabel(session.face)].join(' · ')),
+      h('p', { class: 'score-sub' }, [`${T.total} ${total}`, `${session.distance} m`, faceLabel(session.face)].join(' · ')),
     ),
     timerBtn,
   );
 
-  // --- slot strip: one card per slot; tapping one makes it the current arrow
+  // --- slot strip: one card per slot; tapping one makes it the selected arrow
   const compact = current.arrows.length > 6;
   const cols = compact ? 4 : current.arrows.length === 4 ? 2 : Math.min(3, current.arrows.length);
   const strip = h(
@@ -205,7 +204,7 @@ function renderActive(ctx, session) {
         {
           type: 'button',
           class: ['slot-card', active && 'is-active', active && editing && 'is-moving'],
-          'aria-label': `Arrow ${i + 1}${a.v == null ? ', empty' : `, ${a.v}`}${a.m ? `, M${a.m}` : ''}${a.s ? `, S${a.s}` : ''}${active ? ', selected' : ''}`,
+          'aria-label': `${T.arrowN(i + 1)}${a.v == null ? ', empty' : `, ${a.v}`}${a.m ? `, M${a.m}` : ''}${a.s ? `, S${a.s}` : ''}${active ? ', selected' : ''}`,
           'aria-pressed': String(active),
           dataset: { fk: `slot-${i}` },
           onClick: () => update(ctx, (cur) => L.selectArrow(cur, i)),
@@ -214,7 +213,7 @@ function renderActive(ctx, session) {
         h(
           'span',
           { class: 'slot-card-text', 'aria-hidden': 'true' },
-          compact ? null : h('span', { class: 'slot-card-name' }, `Arrow ${i + 1}`),
+          compact ? null : h('span', { class: 'slot-card-name' }, T.arrowN(i + 1)),
           h('span', { class: 'slot-card-grades' }, grades),
         ),
       );
@@ -235,17 +234,17 @@ function renderActive(ctx, session) {
     'nav',
     { class: 'end-links', 'aria-label': 'Ends' },
     L.canPrevEnd(session)
-      ? endLink(`End ${endNo - 1}`, { icon: icons.back, onClick: () => update(ctx, L.prevEnd), fk: 'end-prev' })
+      ? endLink(T.endN(endNo - 1), { icon: icons.back, onClick: () => update(ctx, L.prevEnd), fk: 'end-prev' })
       : h('span'),
     viewing
-      ? endLink(`End ${endNo + 1}`, { trailing: icons.forward, onClick: () => update(ctx, L.nextEnd), fk: 'end-next' })
+      ? endLink(T.endN(endNo + 1), { trailing: icons.forward, onClick: () => update(ctx, L.nextEnd), fk: 'end-next' })
       : // an end with arrows still empty can be saved early (the full end is saved by the primary button)
         L.canNextEnd(session) && emptyLeft
-        ? endLink(`Save end ${endNo} now`, { trailing: icons.forward, onClick: () => update(ctx, L.nextEnd), fk: 'end-next' })
+        ? endLink(T.saveEndNow(endNo), { trailing: icons.forward, onClick: () => update(ctx, L.nextEnd), fk: 'end-next' })
         : h('span'),
   );
 
-  // --- the face (multi-spot sheets: the spot suggested for an empty current slot is outlined)
+  // --- the face (multi-spot sheets: the spot suggested for an empty selected arrow is outlined)
   const hintSpot = picked.v == null ? suggestedSpot(session.face, current.arrows, cursor) : null;
   const input = targetInput(session, enter, {
     hintSpot,
@@ -254,7 +253,7 @@ function renderActive(ctx, session) {
     },
   });
 
-  // --- under the face, in one place: the score keypad while the current arrow has no score (or its
+  // --- under the face, in one place: the score keypad while the selected arrow has no score (or its
   // score is being changed), else its M / S grades
   const keypadMode = picked.v == null || rescoring === slotKey;
   const under = keypadMode
@@ -262,11 +261,11 @@ function renderActive(ctx, session) {
         'div',
         { class: 'score-under' },
         picked.v == null
-          ? h('div', { class: 'or-divider' }, h('span', null, 'or enter the score only'))
+          ? h('div', { class: 'or-divider' }, h('span', null, T.scoreOnly))
           : h(
               'div',
               { class: 'under-head' },
-              h('span', null, `Change the score of arrow ${cursor + 1}`),
+              h('span', null, T.changingScore(cursor + 1)),
               h(
                 'button',
                 {
@@ -277,7 +276,7 @@ function renderActive(ctx, session) {
                     if (!update(ctx, L.doneEditing)) ctx.rerender();
                   },
                 },
-                'Keep score',
+                T.keepScore,
               ),
             ),
         APL.ScoreKeypad({
@@ -295,7 +294,7 @@ function renderActive(ctx, session) {
               ? null
               : {
                   enabled: true,
-                  label: `Clear arrow ${cursor + 1}`,
+                  label: T.clearArrow(cursor + 1),
                   onClick: () => {
                     rescoring = null;
                     update(ctx, L.clearArrow);
@@ -324,7 +323,7 @@ function renderActive(ctx, session) {
                 else ctx.rerender();
               },
             },
-            `Change score of arrow ${cursor + 1}`,
+            T.changeScore(cursor + 1),
           ),
         ),
       );
@@ -332,9 +331,9 @@ function renderActive(ctx, session) {
   // --- bottom bar, in thumb reach: Undo, Scan (the most used), and the primary action
   const pa = L.primaryAction(session, { askGrades });
   const primary = APL.Button({
-    children: PRIMARY_LABELS[pa.action](pa),
+    children: PRIMARY[pa.action].label(pa),
     disabled: !pa.enabled,
-    onClick: () => update(ctx, PRIMARY_RUNS[pa.action]),
+    onClick: () => update(ctx, PRIMARY[pa.action].run),
     fk: 'primary',
   });
   const undoBtn = h(
@@ -342,7 +341,7 @@ function renderActive(ctx, session) {
     {
       type: 'button',
       class: 'score-undo',
-      'aria-label': 'Undo last arrow',
+      'aria-label': T.undo,
       disabled: !current.arrows.some((a) => a.v != null),
       onClick: () => {
         rescoring = null;
@@ -448,7 +447,7 @@ function renderActive(ctx, session) {
       h(
         'div',
         { class: 'apl-screen-body log-body' },
-        h('section', { class: 'score-screen', 'aria-label': `End ${endNo}` }, header, strip, endLinks, input, under),
+        h('section', { class: 'score-screen', 'aria-label': T.endN(endNo) }, header, strip, endLinks, input, under),
         pills,
         details,
         rows.length
@@ -664,7 +663,8 @@ function findSightMark(repo, distance) {
 const LOUPE_SPAN = 24; // viewBox units shown in the magnifier (the face is 202 wide → ~3× zoom)
 // A finger aiming a new arrow aims this many screen pixels above itself, so it never hides the point.
 const AIM_OFFSET_PX = 64;
-const LOUPE_SIZE = 132; // the loupe's lens, in px (base.css .loupe-lens)
+const LOUPE_SIZE = 132; // the loupe's lens, in px (base.css .loupe-lens, via --loupe-size)
+const LOUPE_MAX_SHARE = 0.4; // …at most this share of the stage's width
 // The spot an arrow was just placed on (multi-spot sheets): placing re-renders the page, and the new
 // target starts zoomed on this spot and animates out to the whole sheet (the reverse of the zoom in).
 let zoomOutFrom = null;
@@ -758,7 +758,7 @@ function targetInput(session, enter, { hintSpot = null, onMove } = {}) {
     'svg',
     { viewBox: faceViewBox(session.face), 'aria-hidden': 'true', focusable: 'false' },
     faceSheet(session.face),
-    // the spot suggested for the current arrow: only a hint, any spot can be tapped
+    // the spot suggested for the selected arrow: only a hint, any spot can be tapped
     hintSpot != null
       ? s('circle', {
           class: 'spot-hint',
@@ -813,7 +813,7 @@ function targetInput(session, enter, { hintSpot = null, onMove } = {}) {
     icons.back(),
     'All spots',
   );
-  const nextSpot = h('span', { class: 'next-spot', hidden: hintSpot == null }, hintSpot == null ? '' : `Next: spot ${hintSpot + 1}`);
+  const nextSpot = h('span', { class: 'next-spot', hidden: hintSpot == null }, hintSpot == null ? '' : T.nextSpot(hintSpot + 1));
   const spotOf = h('span', { class: 'spot-of', hidden: true });
   const faceBar = multi ? h('div', { class: 'face-bar' }, zoomOutBtn, nextSpot, spotOf) : null;
   if (multi && zoomOutFrom != null) {
@@ -827,7 +827,7 @@ function targetInput(session, enter, { hintSpot = null, onMove } = {}) {
     btn.classList.toggle('is-zoomed', i != null);
     zoomOutBtn.hidden = i == null;
     spotOf.hidden = i == null;
-    spotOf.textContent = i == null ? '' : `Spot ${i + 1} of ${spotCentres(session.face).length}`;
+    spotOf.textContent = i == null ? '' : T.spotOf(i + 1, spotCentres(session.face).length);
     nextSpot.hidden = i != null || hintSpot == null;
   }
 
@@ -842,6 +842,8 @@ function targetInput(session, enter, { hintSpot = null, onMove } = {}) {
       inv: sheet.getScreenCTM()?.inverse() ?? null,
       // one screen pixel in SVG units (the sheet is letterboxed with "meet")
       unitsPerPx: Math.max(vb[2] / rect.width, vb[3] / rect.height),
+      // the loupe's lens: 132px, smaller on a small stage so the finger and the aim keep room
+      loupeSize: Math.min(LOUPE_SIZE, Math.round(rect.width * LOUPE_MAX_SHARE)),
     };
   };
   const toSheet = (clientX, clientY) => {
@@ -911,7 +913,7 @@ function targetInput(session, enter, { hintSpot = null, onMove } = {}) {
   // (loupePlacement.js); it changes corner only past a band, so it does not flicker.
   let corner = null;
   const dockLoupe = (p) => {
-    const stage = { stageW: geo.rect.width, stageH: geo.rect.height, size: LOUPE_SIZE };
+    const stage = { stageW: geo.rect.width, stageH: geo.rect.height, size: geo.loupeSize };
     const next = loupeCorner({ fingerX: p.px, fingerY: p.py, aimX: p.apx, aimY: p.apy, ...stage, prevCorner: corner });
     if (next === corner) return;
     corner = next;
@@ -1037,6 +1039,7 @@ function targetInput(session, enter, { hintSpot = null, onMove } = {}) {
       /* pointer already gone */
     }
     geo = readGeometry();
+    loupe.style.setProperty('--loupe-size', `${geo.loupeSize}px`);
     const p = toFace(ev); // the finger itself: picking a spot and grabbing an arrow work under it
     // Touching a placed arrow of this end grabs it: dragging moves it (the pointer keeps its distance
     // to the dot, so the dot does not jump under the finger). A finger covers the dot and lands

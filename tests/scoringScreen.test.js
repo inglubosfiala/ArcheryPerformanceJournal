@@ -6,7 +6,7 @@ const start = (n = 3, face = '40t') => L.createSession({ date: '2026-11-15', dis
 const arrows = (...spots) =>
   spots.map((spot) => (spot === null ? L.emptyArrow() : { ...L.emptyArrow(), v: 9, x: 0.1, y: 0.1, spot }));
 
-describe('suggestedSpot – the hint for the current slot on a three-spot sheet', () => {
+describe('suggestedSpot – the hint for the selected arrow on a triple or Vegas sheet', () => {
   it('slot n suggests spot n', () => {
     expect(suggestedSpot('40t', arrows(null, null, null), 0)).toBe(0);
     expect(suggestedSpot('40t', arrows(0, null, null), 1)).toBe(1);
@@ -23,7 +23,7 @@ describe('suggestedSpot – the hint for the current slot on a three-spot sheet'
     expect(suggestedSpot('40t', arrows(0, 1, 2, null, null, null), 4)).toBe(1);
   });
 
-  it('the current arrow itself does not count as using its spot', () => {
+  it('the selected arrow itself does not count as using its spot', () => {
     expect(suggestedSpot('40t', arrows(0, 1, null), 1)).toBe(1);
   });
 
@@ -54,7 +54,7 @@ describe('nextArrow', () => {
   });
 });
 
-describe('primaryAction – the bottom bar button follows the current slot', () => {
+describe('primaryAction – the bottom bar button follows the selected arrow', () => {
   const graded = (s) => L.gradeArrow(L.gradeArrow(s, 'm', 1), 's', 2);
 
   it('an empty slot: Place arrow n, disabled', () => {
@@ -85,7 +85,7 @@ describe('primaryAction – the bottom bar button follows the current slot', () 
     expect(L.primaryAction(L.selectArrow(s, 1))).toMatchObject({ action: 'next', slot: 2, enabled: true });
   });
 
-  it('the end is full and the current arrow graded: Save end n', () => {
+  it('the end is full and the selected arrow graded: Save end n', () => {
     let s = L.enterScore(L.enterScore(L.enterScore(start(), 9), 8), 7);
     s = graded(s);
     expect(L.primaryAction(s)).toEqual({ action: 'save', slot: 3, end: 1, enabled: true });
