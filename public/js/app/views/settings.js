@@ -3,7 +3,7 @@
 import { h } from '../../core/dom.js';
 import * as APL from '../../ui/apl/index.js';
 import { confirmDialog } from './confirm.js';
-import { APP_VERSION } from '../../config.js';
+import { APP_VERSION, SUPPORT_URL } from '../../config.js';
 import { exportBackup, parseBackup } from '../../backup/backup.js';
 import { checkForUpdate, storageInfo } from '../../pwa/updates.js';
 import { card } from './common.js';
@@ -183,6 +183,7 @@ export function renderSettings(ctx) {
           caption('Light reads better outdoors in daylight. System follows the setting of this device.'),
         ]),
         syncCard(ctx),
+        supportCard(),
         sectionCard('set-backup', 'Backup', [
           caption(
             ctx.sync?.signedIn()
@@ -232,6 +233,32 @@ export function renderSettings(ctx) {
       ),
     ),
   };
+}
+
+// ---------------------------------------------------------------- Support
+
+/**
+ * The "Support the journal" card: a link that opens the tip page in the browser. Nothing when no
+ * link is set. The app stays free; this is only an offer.
+ */
+export function supportCard(url = SUPPORT_URL) {
+  if (!url) return null;
+  return sectionCard('set-support', 'Support the journal', [
+    caption(
+      'The journal is free and stays free, with no ads and no account. If it helps your shooting, you can buy me a coffee to keep it going.',
+    ),
+    h(
+      'a',
+      {
+        class: ['apl', 'apl-btn', 'apl-btn--secondary', 'support-link'],
+        href: url,
+        target: '_blank',
+        rel: 'noopener noreferrer',
+        dataset: { fk: 'support' },
+      },
+      '☕ Buy me a coffee',
+    ),
+  ]);
 }
 
 // ---------------------------------------------------------------- Google Drive sync

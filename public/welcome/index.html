@@ -1,0 +1,323 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; font-src 'self'"
+    />
+    <meta name="theme-color" content="#0b0e10" />
+    <title>Archery Training Journal — Score, Mental Program &amp; SPT Timer | Free</title>
+    <meta
+      name="description"
+      content="Free archery journal: score every arrow, grade your mental program, time your SPT holds and read your arrows live with the camera. No account, works offline."
+    />
+    <meta property="og:title" content="Archery Performance Journal — train the whole archer" />
+    <meta
+      property="og:description"
+      content="Score every arrow, grade the mind behind it, and build the strength to hold. Free, no account, works offline."
+    />
+    <meta property="og:type" content="website" />
+    <link rel="icon" href="../icons/icon.svg" type="image/svg+xml" />
+    <link rel="apple-touch-icon" href="../icons/icon-192.png" />
+    <script src="../js/theme-boot.js"></script>
+    <link rel="stylesheet" href="../css/apl-tokens.css" />
+    <link rel="stylesheet" href="./welcome.css" />
+  </head>
+  <body>
+    <header class="topbar">
+      <a class="brand" href="./">
+        <img src="../icons/icon.svg" alt="" width="28" height="28" />
+        <span>Archery Performance Journal</span>
+      </a>
+      <a class="btn btn-small" href="../">Open the app</a>
+    </header>
+
+    <main>
+      <!-- Hero -->
+      <section class="hero wrap">
+        <div class="hero-text">
+          <p class="eyebrow">Free training journal for archers</p>
+          <h1>Train the whole archer.</h1>
+          <p class="lead">
+            Score every arrow, grade the mind behind it, and build the strength to hold. One journal for the
+            range, the gym and your head.
+          </p>
+          <div class="cta">
+            <a class="btn" href="../">Open the app — it's free</a>
+            <a class="link" href="#how">See how it works ↓</a>
+          </div>
+          <ul class="trust">
+            <li>No account</li>
+            <li>No ads</li>
+            <li>Your data stays on your phone</li>
+            <li>Works offline on the range</li>
+          </ul>
+        </div>
+
+        <!-- Live-scan illustration (replace with the demo clip once it is filmed) -->
+        <figure class="phone" aria-label="Illustration: the live camera marks each arrow on the target with its score">
+          <svg viewBox="0 0 240 300" role="img" aria-hidden="true">
+            <rect x="0" y="0" width="240" height="300" rx="22" class="phone-screen" />
+            <g transform="translate(120 140)">
+              <circle r="100" fill="#ffffff" stroke="#c9ced2" stroke-width="1" />
+              <circle r="90" fill="#ffffff" stroke="#9aa1a7" stroke-width="0.6" />
+              <circle r="80" fill="#1a1a1a" />
+              <circle r="70" fill="#1a1a1a" stroke="#4a4f53" stroke-width="0.6" />
+              <circle r="60" fill="#00a6d6" />
+              <circle r="50" fill="#00a6d6" stroke="#00799c" stroke-width="0.6" />
+              <circle r="40" fill="#ee4049" />
+              <circle r="30" fill="#ee4049" stroke="#b02a31" stroke-width="0.6" />
+              <circle r="20" fill="#ffe14d" />
+              <circle r="10" fill="#ffe14d" stroke="#c9a800" stroke-width="0.6" />
+              <circle r="5" fill="none" stroke="#c9a800" stroke-width="0.6" />
+              <!-- arrows: impact point, leader line, score label -->
+              <g class="hit">
+                <circle cx="-3" cy="2" r="3" />
+                <line x1="-3" y1="2" x2="-46" y2="-58" />
+                <rect x="-62" y="-74" width="30" height="20" rx="6" />
+                <text x="-47" y="-60">X</text>
+              </g>
+              <g class="hit">
+                <circle cx="14" cy="-8" r="3" />
+                <line x1="14" y1="-8" x2="58" y2="-62" />
+                <rect x="44" y="-78" width="30" height="20" rx="6" />
+                <text x="59" y="-64">10</text>
+              </g>
+              <g class="hit">
+                <circle cx="-16" cy="22" r="3" />
+                <line x1="-16" y1="22" x2="-62" y2="72" />
+                <rect x="-78" y="62" width="30" height="20" rx="6" />
+                <text x="-63" y="76">9</text>
+              </g>
+            </g>
+            <rect x="20" y="256" width="200" height="28" rx="14" class="phone-status" />
+            <text x="120" y="275" class="phone-status-text">X · 10 · 9: hold steady…</text>
+          </svg>
+          <figcaption>Live scan: the score appears next to each hit.</figcaption>
+        </figure>
+      </section>
+
+      <!-- Problem -->
+      <section class="band" id="how">
+        <div class="wrap narrow">
+          <h2>Your score only tells you what happened.</h2>
+          <p>
+            A 9 can come from a perfect shot the wind moved. A 10 can come from a rushed shot that got lucky. If
+            you only track points, you train the result, not the process that makes it.
+          </p>
+          <p>
+            Most archers juggle a scoring app, an interval timer for holds and a notebook for the mental game.
+            Nothing connects them, so nothing tells you <em>why</em> a day went well.
+          </p>
+        </div>
+      </section>
+
+      <!-- Pillars -->
+      <section class="wrap pillars">
+        <article class="pillar">
+          <div class="pillar-text">
+            <p class="eyebrow">Score</p>
+            <h2>Every arrow, in three taps.</h2>
+            <p>
+              Touch the target face (a magnifier shows the exact spot) or tap X 10 9 8 7 6 M. Let-downs, a note
+              per end, sight marks per distance and your gear setup are saved with each session. Close the app
+              mid-end and it picks up exactly where you left off.
+            </p>
+          </div>
+          <div class="pillar-art keys" aria-hidden="true">
+            <span class="key z-gold">X</span><span class="key z-gold">10</span><span class="key z-gold">9</span>
+            <span class="key z-red">8</span><span class="key z-red">7</span><span class="key z-blue">6</span>
+            <span class="key z-miss">M</span>
+          </div>
+        </article>
+
+        <article class="pillar">
+          <div class="pillar-text">
+            <p class="eyebrow">Mind</p>
+            <h2>Grade the shot, not just the score.</h2>
+            <p>After every arrow, grade two things from 1 (best) to 5:</p>
+            <ul class="ticks">
+              <li><strong>M — mental program:</strong> did you run your routine and keep your focus?</li>
+              <li><strong>S — shooting cycle:</strong> did the technique hold together?</li>
+            </ul>
+            <p>
+              Then the journal shows what no score sheet can: <strong>your average arrow at each mental
+              grade.</strong> Once you see what a lost routine costs you, you stop hoping for good days and start
+              building them.
+            </p>
+            <p class="note">
+              <strong>Program %</strong> is the share of arrows shot with your full mental program (M1–2). It's
+              the number to raise first. You can also log mental-only sessions: visualisation, breathing, shot
+              routine, relaxation, blank boss, self-talk.
+            </p>
+          </div>
+          <figure class="pillar-art chart">
+            <svg viewBox="0 0 280 200" role="img" aria-labelledby="chart-title">
+              <title id="chart-title">Example chart: average arrow by mental grade, from 9.4 at M1 down to 7.9 at M5</title>
+              <text x="0" y="14" class="chart-title">Avg arrow by mental grade</text>
+              <line x1="34" y1="170" x2="276" y2="170" class="axis" />
+              <g class="bars">
+                <rect x="44" y="46" width="34" height="124" fill="#0b6e4f" />
+                <rect x="92" y="58" width="34" height="112" fill="#7cc29a" />
+                <rect x="140" y="80" width="34" height="90" fill="#f2d65c" />
+                <rect x="188" y="96" width="34" height="74" fill="#f2994a" />
+                <rect x="236" y="118" width="34" height="52" fill="#b3261e" />
+              </g>
+              <g class="vals">
+                <text x="61" y="40">9.4</text><text x="109" y="52">9.1</text><text x="157" y="74">8.7</text>
+                <text x="205" y="90">8.4</text><text x="253" y="112">7.9</text>
+              </g>
+              <g class="cats">
+                <text x="61" y="188">M1</text><text x="109" y="188">M2</text><text x="157" y="188">M3</text>
+                <text x="205" y="188">M4</text><text x="253" y="188">M5</text>
+              </g>
+            </svg>
+            <figcaption>Example data. Yours will show your own pattern.</figcaption>
+          </figure>
+        </article>
+
+        <article class="pillar">
+          <div class="pillar-text">
+            <p class="eyebrow">Body</p>
+            <h2>A built-in SPT timer for holds.</h2>
+            <p>
+              Set the hold, rest, reps and sets. Clear prepare, hold and rest phases count you through every rep,
+              so you watch the bow, not the clock. Each SPT session goes into the same journal as your scores, so
+              your whole training load is in one place.
+            </p>
+            <p>Train on the days you can't reach the range: in winter, on rest days, when you travel.</p>
+          </div>
+          <figure class="pillar-art timer" aria-label="Illustration: the SPT timer during a hold">
+            <svg viewBox="0 0 200 200" aria-hidden="true">
+              <circle cx="100" cy="100" r="80" class="ring-bg" />
+              <circle cx="100" cy="100" r="80" class="ring" pathLength="100" stroke-dasharray="70 100" />
+              <text x="100" y="86" class="timer-phase">HOLD</text>
+              <text x="100" y="124" class="timer-sec">0:07</text>
+              <text x="100" y="148" class="timer-rep">Set 2 / 3 · Rep 4 / 6</text>
+            </svg>
+          </figure>
+        </article>
+
+        <article class="pillar">
+          <div class="pillar-text">
+            <p class="eyebrow">See</p>
+            <h2>Your phone sees your arrows. Live.</h2>
+            <p>
+              Point the camera at the target. The app finds the face, reads where each arrow landed and puts the
+              score next to the hit, in real time. Hold steady for a second and it takes the end; move any arrow
+              with one touch if it read one wrong.
+            </p>
+            <p class="note">
+              Frames are analysed on your phone and thrown away. Nothing is recorded or uploaded. Works best on
+              standard target faces in good light.
+            </p>
+          </div>
+          <div class="pillar-art badges" aria-hidden="true">
+            <span>On-device</span><span>Real time</span><span>Nothing stored</span>
+          </div>
+        </article>
+      </section>
+
+      <!-- Insights -->
+      <section class="band">
+        <div class="wrap narrow">
+          <p class="eyebrow">Insights</p>
+          <h2>Score, mind and body in one view.</h2>
+          <p>
+            Trends over 30 days, 90 days, a year or all time, filtered by distance and session type. Average arrow,
+            Avg M, Avg S, program % and training minutes side by side, so you spot the weeks where the process
+            slipped before the score did.
+          </p>
+        </div>
+      </section>
+
+      <!-- Privacy -->
+      <section class="wrap narrow">
+        <p class="eyebrow">Privacy</p>
+        <h2>Your journal is yours.</h2>
+        <ul class="ticks">
+          <li>No sign-up, no account, no tracking of your training.</li>
+          <li>Everything lives on your device and works with no signal on the field.</li>
+          <li>Optional Google Drive sync keeps a copy in a private folder of <em>your own</em> Drive.</li>
+          <li>Export a backup any time and import it anywhere.</li>
+        </ul>
+      </section>
+
+      <!-- Install -->
+      <section class="band">
+        <div class="wrap narrow">
+          <h2>Install in three steps</h2>
+          <ol class="steps">
+            <li>Open the app on your phone.</li>
+            <li>Tap <strong>Install</strong> (Android) or <strong>Share → Add to Home Screen</strong> (iPhone).</li>
+            <li>Start your first session. No store, no account.</li>
+          </ol>
+          <a class="btn" href="../">Open the app</a>
+        </div>
+      </section>
+
+      <!-- Maker -->
+      <section class="wrap narrow maker">
+        <h2>Who made this</h2>
+        <p>
+          I'm a recurve archer. I built this journal for my own training because I wanted to know <em>why</em> my
+          scores moved, not just what I shot. It's free, and it stays free. If it helps you shoot better, you can
+          buy me a coffee and keep it going.
+        </p>
+        <!-- TODO: replace with your Buy Me a Coffee / Ko-fi page -->
+        <a class="btn btn-coffee" href="https://buymeacoffee.com/" rel="noopener">☕ Buy me a coffee</a>
+      </section>
+
+      <!-- FAQ -->
+      <section class="band">
+        <div class="wrap narrow faq">
+          <h2>Questions</h2>
+          <details>
+            <summary>Is it really free?</summary>
+            <p>Yes. Every feature is free. Coffees cover the hosting and the time.</p>
+          </details>
+          <details>
+            <summary>Which bows does it support?</summary>
+            <p>
+              It was built for Olympic recurve and works for any bow shooting at standard target faces: compound,
+              barebow, longbow.
+            </p>
+          </details>
+          <details>
+            <summary>Does it work without internet?</summary>
+            <p>Yes. Once it's installed, everything works offline.</p>
+          </details>
+          <details>
+            <summary>What happens to my data if I change phones?</summary>
+            <p>Turn on Google Drive sync, or export a backup file and import it on the new phone.</p>
+          </details>
+          <details>
+            <summary>How accurate is the camera?</summary>
+            <p>
+              It reads standard target faces in good light and marks each arrow it finds. You can move any arrow
+              with one touch before the end is saved.
+            </p>
+          </details>
+          <details>
+            <summary>Is the mental grade a scientific test?</summary>
+            <p>
+              No. It's an honest self-rating after every shot. Its value comes from doing it every time and seeing
+              the pattern over weeks.
+            </p>
+          </details>
+        </div>
+      </section>
+    </main>
+
+    <footer class="wrap footer">
+      <p>Archery Performance Journal · Free · No account · Data on your device</p>
+      <p>
+        <a href="../">Open the app</a> ·
+        <a href="https://github.com/vladicek79/ArcheryPerformanceJournal/issues" rel="noopener">Feedback</a> ·
+        <a href="https://buymeacoffee.com/" rel="noopener">☕ Buy me a coffee</a>
+      </p>
+    </footer>
+  </body>
+</html>

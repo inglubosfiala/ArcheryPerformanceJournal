@@ -2067,3 +2067,8 @@ button.arrow-count:hover {
   padding: 0 var(--space-2);
 }
 
+
+/* Settings: the support link looks like a secondary button */
+.support-link {
+  text-decoration: none;
+}
