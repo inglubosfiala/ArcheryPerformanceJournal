@@ -1,10 +1,10 @@
-// Forms of the non-scored session types (strength, mental). The same fields are used to create a
-// session (New session page) and to edit a saved one (History detail).
+// Forms of the non-scored session types (blank bale, SPT, mental, manual), drawn with the APL
+// components. The same fields are used to create a session (New session page) and to edit a saved
+// one (History detail).
 import { h } from '../../core/dom.js';
 import { DRILLS, drillLabel, emptyDrill, MENTAL_TECHNIQUES, EFFORT_MAX, FOCUS_MAX } from '../sessionTypes.js';
 import { tabataTimer } from './tabataTimer.js';
-import { icons } from '../icons.js';
-import { chip, sectionLabel } from './common.js';
+import * as APL from '../../ui/apl/index.js';
 
 /** Empty strength / mental session fields. */
 export function emptyForm(type) {
@@ -14,6 +14,9 @@ export function emptyForm(type) {
     ? { minutes: null, effort: null, drills: [], note: '' }
     : { minutes: null, focus: null, techniques: [] };
 }
+
+// mid-sentence: "Draws with the bow" → "draws with the bow"; an acronym ("SPT holds") stays
+const sentenceCase = (label) => (/^[A-Z]{2}/.test(label) ? label : label[0].toLowerCase() + label.slice(1));
 
 const toInt = (v) => {
   const n = parseInt(v, 10);
@@ -31,60 +34,41 @@ const toInt = (v) => {
  */
 export function formSections(type, value, change, { live = false, timer = null } = {}) {
   const numberField = (label, key, fk, { suffix = '' } = {}) =>
-    h(
-      'label',
-      { class: 'field' },
-      h('span', { class: 'field-label' }, label),
-      h(
-        'div',
-        { class: 'input-suffix' },
-        h('input', {
-          class: 'input',
-          type: 'number',
-          inputmode: 'numeric',
-          min: 0,
-          value: value[key] ?? '',
-          dataset: { fk },
-          onInput: (e) => change(() => ({ [key]: toInt(e.target.value) }), { rerender: false }),
-        }),
-        suffix ? h('span', { class: 'muted small' }, suffix) : null,
-      ),
-    );
+    APL.TextField({
+      label,
+      type: 'number',
+      inputmode: 'numeric',
+      min: 0,
+      suffix,
+      value: value[key] ?? '',
+      fk,
+      onInput: (e) => change(() => ({ [key]: toInt(e.target.value) }), { rerender: false }),
+    });
 
+  // 1…max as numeric chips, five to a row; tapping the chosen value again clears it
   const scale = (label, key, max, fk) =>
-    h(
-      'section',
-      { class: 'setup-section', 'aria-label': label },
-      sectionLabel(label),
-      h(
-        'div',
-        { class: 'grid-5' },
-        Array.from({ length: max }, (_, i) => i + 1).map((n) =>
-          chip({
-            label: String(n),
-            pressed: value[key] === n,
-            fk: `${fk}-${n}`,
-            // tapping the chosen value again clears it
-            onClick: () => change((cur) => ({ [key]: cur[key] === n ? null : n })),
-          }),
-        ),
-      ),
-    );
+    APL.Section({
+      label,
+      id: `form-${key}`,
+      children: APL.ChipGrid({
+        label,
+        numeric: true,
+        columns: 5,
+        value: value[key],
+        options: Array.from({ length: max }, (_, i) => ({ value: i + 1, label: String(i + 1) })),
+        onChange: (n) => change((cur) => ({ [key]: cur[key] === n ? null : n })),
+        fk,
+      }),
+    });
 
   const noteField = (placeholder) =>
-    h(
-      'label',
-      { class: 'field' },
-      h('span', { class: 'field-label' }, 'Note'),
-      h('textarea', {
-        rows: 3,
-        class: 'review-text',
-        value: value.note || '',
-        placeholder,
-        dataset: { fk: 'form-note' },
-        onInput: (e) => change(() => ({ note: e.target.value }), { rerender: false }),
-      }),
-    );
+    APL.TextArea({
+      label: 'Note',
+      placeholder,
+      value: value.note || '',
+      fk: 'form-note',
+      onInput: (e) => change(() => ({ note: e.target.value }), { rerender: false }),
+    });
 
   if (type === 'blank') {
     // The count is a big number, changed with −1 / +1 / +3 / +6; tapping the number lets you type it
@@ -133,7 +117,11 @@ export function formSections(type, value, change, { live = false, timer = null }
       if (!applied) return;
       replay(count, applied > 0 ? 'is-bumped' : 'is-dropped');
       replay(btn, applied > 0 ? 'is-flashed' : 'is-flashed-minus');
-      const fly = h('span', { class: ['arrow-count-fly', applied < 0 && 'is-minus'], 'aria-hidden': 'true' }, applied > 0 ? `+${applied}` : `−${-applied}`);
+      const fly = h(
+        'span',
+        { class: ['arrow-count-fly', applied < 0 && 'is-minus'], 'aria-hidden': 'true' },
+        applied > 0 ? `+${applied}` : `−${-applied}`,
+      );
       fly.addEventListener('animationend', () => fly.remove());
       countBox.append(fly);
       if (navigator.vibrate) navigator.vibrate(15);
@@ -190,8 +178,10 @@ export function formSections(type, value, change, { live = false, timer = null }
     );
     const counter = h(
       'section',
-      { class: 'setup-section arrow-counter', 'aria-label': 'Arrows shot' },
-      timer ? h('div', { class: 'arrow-count-row' }, countBox, timer) : [sectionLabel('Arrows shot'), countBox],
+      { class: 'apl-section arrow-counter', 'aria-label': 'Arrows shot' },
+      timer
+        ? h('div', { class: 'arrow-count-row' }, countBox, timer)
+        : [h('h2', { class: 'apl-label' }, 'Arrows shot'), countBox],
       h(
         'div',
         { class: 'arrow-add-row' },
@@ -221,7 +211,7 @@ export function formSections(type, value, change, { live = false, timer = null }
     return [
       h(
         'div',
-        { class: 'grid-2' },
+        { class: 'apl-grid-2' },
         numberField('Arrows shot', 'arrows', 'arrows'),
         numberField('Duration', 'minutes', 'minutes', { suffix: 'min' }),
       ),
@@ -237,62 +227,52 @@ export function formSections(type, value, change, { live = false, timer = null }
         opts,
       );
     const drillInput = (i, d, key, label) =>
-      h(
-        'label',
-        { class: 'field' },
-        h('span', { class: 'field-label' }, label),
-        h('input', {
-          class: 'input',
-          type: 'number',
-          inputmode: 'numeric',
-          min: 0,
-          value: d[key] ?? '',
-          dataset: { fk: `drill-${i}-${key}` },
-          onInput: (e) => setDrill(i, { [key]: toInt(e.target.value) }, { rerender: false }),
-        }),
-      );
+      APL.TextField({
+        label,
+        type: 'number',
+        inputmode: 'numeric',
+        min: 0,
+        value: d[key] ?? '',
+        fk: `drill-${i}-${key}`,
+        onInput: (e) => setDrill(i, { [key]: toInt(e.target.value) }, { rerender: false }),
+      });
     return [
-      h(
-        'section',
-        { class: 'setup-section', 'aria-label': 'Drills' },
-        sectionLabel('Drills'),
-        drills.map((d, i) => {
-          const hold = DRILLS.find((x) => x.id === d.kind)?.hold;
-          return h(
-            'div',
-            { class: 'drill-row' },
-            h(
+      APL.Section({
+        label: 'Drills',
+        id: 'form-drills',
+        children: [
+          drills.map((d, i) => {
+            const hold = DRILLS.find((x) => x.id === d.kind)?.hold;
+            return h(
               'div',
-              { class: 'spread align-center' },
-              h('strong', null, drillLabel(d.kind)),
+              { class: 'drill-row' },
               h(
-                'button',
-                {
-                  type: 'button',
-                  class: 'icon-btn',
-                  'aria-label': `Remove ${drillLabel(d.kind)}`,
+                'div',
+                { class: 'drill-row-head' },
+                h('span', { class: 'apl-t' }, drillLabel(d.kind)),
+                APL.IconButton({
+                  icon: 'close',
+                  label: `Remove ${drillLabel(d.kind)}`,
                   onClick: () => change((cur) => ({ drills: (cur.drills || []).filter((_, j) => j !== i) })),
-                },
-                icons.close(),
+                  fk: `drill-${i}-remove`,
+                }),
               ),
-            ),
-            h(
-              'div',
-              { class: hold ? 'grid-4' : 'grid-2' },
-              drillInput(i, d, 'sets', 'Sets'),
-              drillInput(i, d, 'reps', 'Reps'),
-              hold ? drillInput(i, d, 'holdSec', 'Hold (s)') : null,
-              hold ? drillInput(i, d, 'restSec', 'Rest (s)') : null,
-            ),
-            // a drill with a hold can be run on the interval timer: it counts the holds and rests
-            // typed in above (read when it starts, so what was just typed counts)
-            hold
-              ? h(
-                  'button',
-                  {
-                    type: 'button',
-                    class: 'btn btn-outline drill-timer-btn',
-                    dataset: { fk: `drill-${i}-timer` },
+              h(
+                'div',
+                { class: hold ? 'apl-grid-4' : 'apl-grid-2' },
+                drillInput(i, d, 'sets', 'Sets'),
+                drillInput(i, d, 'reps', 'Reps'),
+                hold ? drillInput(i, d, 'holdSec', 'Hold (s)') : null,
+                hold ? drillInput(i, d, 'restSec', 'Rest (s)') : null,
+              ),
+              // a drill with a hold can be run on the interval timer: it counts the holds and rests
+              // typed in above (read when it starts, so what was just typed counts)
+              hold
+                ? APL.Button({
+                    children: 'Start timer',
+                    variant: 'secondary',
+                    trailingIcon: 'play',
+                    fk: `drill-${i}-timer`,
                     onClick: () => {
                       let now = d;
                       change(
@@ -302,32 +282,31 @@ export function formSections(type, value, change, { live = false, timer = null }
                         },
                         { rerender: false },
                       );
-                      tabataTimer({ title: drillLabel(now.kind), work: now.holdSec, rest: now.restSec ?? 0, reps: now.reps, sets: now.sets });
+                      tabataTimer({
+                        title: drillLabel(now.kind),
+                        work: now.holdSec,
+                        rest: now.restSec ?? 0,
+                        reps: now.reps,
+                        sets: now.sets,
+                      });
                     },
-                  },
-                  icons.play(),
-                  'Start timer',
-                )
-              : null,
-          );
-        }),
-        h(
-          'div',
-          { class: 'grid-3' },
-          DRILLS.filter((d) => !d.retired).map((d) =>
-            h(
-              'button',
-              {
-                type: 'button',
-                class: 'btn btn-dashed btn-sm',
-                dataset: { fk: `add-${d.id}` },
+                  })
+                : null,
+            );
+          }),
+          h(
+            'div',
+            { class: 'apl-list' },
+            DRILLS.filter((d) => !d.retired).map((d) =>
+              APL.AddButton({
+                children: `Add ${sentenceCase(d.label)}`,
+                fk: `add-${d.id}`,
                 onClick: () => change((cur) => ({ drills: [...(cur.drills || []), emptyDrill(d.id)] })),
-              },
-              `+ ${d.label}`,
+              }),
             ),
           ),
-        ),
-      ),
+        ],
+      }),
       // While the session runs the page is just the timer and the drills (as on the blank bale
       // page): the timer is the duration, and the duration, effort and note are filled in on the
       // saved session.
@@ -338,29 +317,23 @@ export function formSections(type, value, change, { live = false, timer = null }
   }
 
   // mental
-  const techniques = value.techniques || [];
   return [
-    h(
-      'section',
-      { class: 'setup-section', 'aria-label': 'Techniques' },
-      sectionLabel('What you practised'),
-      h(
-        'div',
-        { class: 'grid-3' },
-        MENTAL_TECHNIQUES.map((t) =>
-          chip({
-            label: t,
-            pressed: techniques.includes(t),
-            fk: `tech-${t}`,
-            onClick: () =>
-              change((cur) => {
-                const list = cur.techniques || [];
-                return { techniques: list.includes(t) ? list.filter((x) => x !== t) : [...list, t] };
-              }),
+    APL.Section({
+      label: 'What you practised',
+      id: 'form-techniques',
+      children: APL.OptionPills({
+        label: 'What you practised',
+        multiple: true,
+        value: value.techniques || [],
+        options: MENTAL_TECHNIQUES.map((t) => ({ value: t, label: t })),
+        onChange: (t) =>
+          change((cur) => {
+            const list = cur.techniques || [];
+            return { techniques: list.includes(t) ? list.filter((x) => x !== t) : [...list, t] };
           }),
-        ),
-      ),
-    ),
+        fk: 'tech',
+      }),
+    }),
     numberField('Duration', 'minutes', 'minutes', { suffix: 'min' }),
     scale(`Focus / quality (1 best – ${FOCUS_MAX})`, 'focus', FOCUS_MAX, 'focus'),
   ];

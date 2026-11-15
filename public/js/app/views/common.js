@@ -1,8 +1,8 @@
 // Small shared view pieces.
-import { h, todayIso } from '../../core/dom.js';
+import { h, todayIso, formatDate } from '../../core/dom.js';
+import * as APL from '../../ui/apl/index.js';
 import { zoneOf } from '../scoring.js';
 import { RUBRIC, T } from '../strings.js';
-import { icons } from '../icons.js';
 import { gearChoices, gearForChoice } from '../gearFields.js';
 import { isScored } from '../sessionTypes.js';
 import { datePicker, timePicker } from './pickers.js';
@@ -13,49 +13,42 @@ export const gradeBadge = (g, extra = '') => h('span', { class: `grade-badge g${
 
 export const card = (props, ...children) => h('section', { ...props, class: ['card', props?.class] }, ...children);
 
-export const sectionLabel = (text, id) => h('div', { class: 'section-label', id }, text);
-
-/** The back button, the same on every page: alone on its row, at the right (thumb side). */
-export const backBar = (href, label) =>
-  h('div', { class: 'back-bar' }, h('a', { class: 'icon-btn', href, 'aria-label': label, dataset: { fk: 'back' } }, icons.back()));
-
-export function chip({ label, sub, pressed, onClick, fk }) {
-  return h(
-    'button',
-    { type: 'button', class: 'chip', 'aria-pressed': String(!!pressed), onClick, dataset: fk ? { fk } : undefined },
-    sub ? [h('span', { class: 'chip-main' }, label), h('span', { class: 'chip-sub' }, sub)] : label,
-  );
-}
-
 /** Bottom sheet with the full M/S rubric. */
 export function guideSheet(onClose) {
   return {
     onClose,
-    node: h(
-      'div',
-      { class: 'sheet', role: 'dialog', 'aria-modal': 'true', 'aria-labelledby': 'guide-title' },
-      h(
-        'div',
-        { class: 'sheet-head' },
-        h('h2', { class: 'sheet-title', id: 'guide-title' }, T.gradingGuide),
+    node: APL.Dialog({
+      sheet: true,
+      title: T.gradingGuide,
+      idPrefix: 'guide',
+      onClose,
+      closeLabel: 'Close grading guide',
+      children: [
+        h('p', { class: 'apl-cap13' }, T.guideIntro),
         h(
-          'button',
-          { type: 'button', class: 'icon-btn round', 'aria-label': 'Close grading guide', onClick: onClose, dataset: { autofocus: '' } },
-          icons.close(),
+          'table',
+          { class: 'guide-table' },
+          h(
+            'thead',
+            null,
+            h(
+              'tr',
+              null,
+              h('th', { scope: 'col' }, h('span', { class: 'sr-only' }, 'Grade')),
+              h('th', { scope: 'col' }, T.mentalProgram),
+              h('th', { scope: 'col' }, T.shootingCycle),
+            ),
+          ),
+          h(
+            'tbody',
+            null,
+            [1, 2, 3, 4, 5].map((g) =>
+              h('tr', null, h('th', { scope: 'row' }, gradeBadge(g)), h('td', null, RUBRIC.m[g - 1]), h('td', null, RUBRIC.s[g - 1])),
+            ),
+          ),
         ),
-      ),
-      h('p', { class: 'muted small' }, T.guideIntro),
-      h(
-        'table',
-        { class: 'guide-table' },
-        h('thead', null, h('tr', null, h('th', { scope: 'col' }, h('span', { class: 'sr-only' }, 'Grade')), h('th', { scope: 'col' }, T.mentalProgram), h('th', { scope: 'col' }, T.shootingCycle))),
-        h(
-          'tbody',
-          null,
-          [1, 2, 3, 4, 5].map((g) => h('tr', null, h('th', { scope: 'row' }, gradeBadge(g)), h('td', null, RUBRIC.m[g - 1]), h('td', null, RUBRIC.s[g - 1]))),
-        ),
-      ),
-    ),
+      ],
+    }),
   };
 }
 
@@ -67,64 +60,75 @@ export function whenCard(ctx, ss) {
   const redraw = ({ status }) => status === 'saved' && ctx.rerender();
   const change = (when) => redraw(ctx.finished.setWhen(ss.id, when));
   return card(
-    // no heading: the date and the time speak for themselves
-    { 'aria-label': 'When' },
-    h(
-      'div',
-      { class: 'grid-2' },
-      datePicker({
-        label: 'Date',
-        value: ss.date,
-        max: todayIso(),
-        marks: sessionDates(ctx),
-        fk: 'edit-date',
-        onChange: (date) => change({ date }),
-      }),
-      timePicker({
-        label: 'Start time',
-        value: ss.time || '',
-        clearable: true,
-        fk: 'edit-time',
-        onChange: (time) => change({ time }),
-      }),
-    ),
-    // scored sessions take their duration from the timer; it can be corrected here
-    // (the other types have a Duration field in their form)
-    isScored(ss.type)
-      ? h(
-          'label',
-          { class: 'field' },
-          h('span', { class: 'field-label' }, 'Duration'),
-          h(
-            'div',
-            { class: 'input-suffix' },
-            h('input', {
-              class: 'input',
+    { class: 'apl-card' },
+    APL.Section({
+      label: 'When',
+      id: 'edit-when',
+      children: [
+        h(
+          'div',
+          { class: 'apl-grid-2' },
+          datePicker({
+            label: 'Date',
+            value: ss.date,
+            max: todayIso(),
+            marks: sessionDates(ctx),
+            fk: 'edit-date',
+            onChange: (date) => change({ date }),
+          }),
+          timePicker({
+            label: 'Start time',
+            value: ss.time || '',
+            clearable: true,
+            fk: 'edit-time',
+            hint: 'Start time',
+            onChange: (time) => change({ time }),
+          }),
+        ),
+        // scored sessions take their duration from the timer; it can be corrected here
+        // (the other types have a Duration field in their form)
+        isScored(ss.type)
+          ? APL.TextField({
+              label: 'Duration',
               type: 'number',
               inputmode: 'numeric',
               min: 0,
               max: 1440,
+              suffix: 'min',
               value: ss.minutes ?? '',
-              dataset: { fk: 'edit-minutes' },
+              fk: 'edit-minutes',
               onChange: (e) => redraw(ctx.finished.setMinutes(ss.id, e.target.value)),
-            }),
-            h('span', { class: 'muted small' }, 'min'),
-          ),
-        )
-      : null,
+            })
+          : null,
+      ],
+    }),
   );
 }
 
-/** Equipment select for a session (gearChoices output): saved setups by name. */
-export function gearPicker({ options, value, onChange }) {
+/** The line under a saved equipment choice (gearChoices option ids). */
+export function gearDetail(id, snapshots) {
+  if (id === 'none') return 'Log without a bow setup';
+  if (id === 'current') return 'From the Gear tab';
+  if (id === 'recorded') return 'As saved with the session';
+  const sn = snapshots.find((x) => x.id === id);
+  return sn ? `Saved ${formatDate(sn.createdAt.slice(0, 10))}` : null;
+}
+
+/** Equipment choices (gearChoices output) as APL radio cards, ending with Add equipment. */
+export function gearCards(ctx, { options, value, onChange, snapshots }) {
   return h(
     'div',
-    { class: 'field' },
-    h(
-      'select',
-      { class: 'input', 'aria-label': 'Equipment', dataset: { fk: 'gear' }, onChange: (e) => onChange(e.target.value) },
-      options.map(([v, l]) => h('option', { value: v, selected: v === value }, l)),
+    { class: 'apl-list', role: 'group', 'aria-label': 'Equipment' },
+    options.map(([id, name]) =>
+      APL.SelectCard({
+        title: name,
+        detail: gearDetail(id, snapshots),
+        selected: id === value,
+        onClick: () => id !== value && onChange(id),
+        fk: `gear-${id}`,
+      }),
     ),
+    APL.AddButton({ children: 'Add equipment', onClick: () => ctx.navigate('gear'), fk: 'gear-add' }),
   );
 }
 
@@ -145,8 +149,7 @@ export function gearCard(ctx, ss, pick = null) {
       if (cur && next && ctx.save('sessions', { ...cur, ...next })) ctx.rerender();
     });
   return card(
-    { 'aria-labelledby': 'gear-title' },
-    h('h2', { class: 'card-title', id: 'gear-title' }, 'Equipment'),
-    gearPicker({ ...choices, onChange }),
+    { class: 'gear-card' },
+    APL.Section({ label: 'Equipment', id: 'gear', children: gearCards(ctx, { ...choices, onChange, snapshots }) }),
   );
 }

@@ -1,14 +1,7 @@
 // Log tab: new session setup → arrow-by-arrow logging with the M/S grading sheet (HANDOFF §3).
-import { h, s, todayIso } from '../../core/dom.js';
+import { h, s } from '../../core/dom.js';
 import { confirmDialog } from './confirm.js';
 import {
-  DISTANCES,
-  SETUP_FACES,
-  ARROWS_PER_END_MIN,
-  ARROWS_PER_END_MAX,
-  DEFAULT_ARROWS_PER_END,
-  DISTANCE_DEFAULTS,
-  faceLabel,
   scoreFromPoint,
   locateOnSheet,
   sheetPoint,
@@ -20,12 +13,12 @@ import { sumArrows, computeStats, fmt } from '../stats.js';
 import * as L from '../sessionLogic.js';
 import { T } from '../strings.js';
 import { icons } from '../icons.js';
-import { card, chip, sectionLabel, gearPicker, gearCard, sessionDates, backBar } from './common.js';
-import { datePicker, timePicker } from './pickers.js';
-import { gearChoices, gearForChoice } from '../gearFields.js';
+import { card, gearCard } from './common.js';
 import { faceSheet, faceViewBox, VB } from './face.js';
-import { SESSION_TYPES, TYPE_LABELS, isScored, hourMinute, sessionType, setupSummary, emptyCompetition } from '../sessionTypes.js';
-import { emptyForm, formSections } from './sessionForms.js';
+import { SESSION_TYPES, TYPE_LABELS, isScored, sessionType } from '../sessionTypes.js';
+import { renderTypeChoice, renderScoredSetup, renderFormSetup } from './sessionSetup.js';
+import { sessionTimer } from './timer.js';
+import * as APL from '../../ui/apl/index.js';
 import { detectArrows } from '../photoDetect.js';
 import { drawArrowMarks, liveScan } from './liveScan.js';
 import { PREVIEW_MARGIN, spotsBox, resultOnCrop } from '../scanGeometry.js';
@@ -84,12 +77,6 @@ export function askAboutOpenFormSession(q) {
   });
 }
 
-export function logSubtitle(a) {
-  return a
-    ? `${a.type === 'competition' ? 'Competition · ' : ''}${setupSummary(a, `${a.arrowsPerEnd} arrows/end`)}`
-    : T.sub.logIdle;
-}
-
 export function renderLog(ctx) {
   const active = ctx.running.get();
   // no session running (e.g. it was just finished or discarded): choose a type for a new one
@@ -100,452 +87,14 @@ export function renderLog(ctx) {
 /** New session: step 1 picks the type (#/new), step 2 asks that type's details (#/new/<type>). */
 export function renderNewSession(ctx, params = []) {
   const type = params[0];
-  if (SESSION_TYPES.includes(type)) return renderSetup(ctx, type, ctx.running.get());
-  return renderTypeChoice(ctx);
-}
-
-const TYPE_HINTS = {
-  training: 'Score arrow by arrow with M / S grades',
-  blank: 'Count arrows at the blank bale, no score',
-  competition: 'Scored like training, with event and placement',
-  strength: 'Holding and draw drills, effort',
-  mental: 'Visualisation, breathing, shot routine…',
-  manual: 'Type in the arrows or the duration afterwards',
-};
-
-function renderTypeChoice(ctx) {
-  // tapping a type opens it straight away; the last one picked is marked
-  const last = ctx.ui.get().newType;
-  return {
-    content: h(
-      'div',
-      { class: 'stack' },
-      backBar('#/home', 'Back to dashboard'),
-      card(
-        { class: 'setup-card', 'aria-label': 'Session type' },
-        sectionLabel('Session type'),
-        h(
-          'nav',
-          { class: 'type-list', 'aria-label': 'Session type' },
-          SESSION_TYPES.map((t) =>
-            h(
-              'a',
-              {
-                class: ['type-option', last === t && 'is-last'],
-                href: `#/new/${t}`,
-                dataset: { fk: `type-${t}` },
-                onClick: () => ctx.ui.quietSet({ newType: t }),
-              },
-              h(
-                'span',
-                { class: 'type-option-text' },
-                h('span', { class: 'type-option-title' }, TYPE_LABELS[t]),
-                h('span', { class: 'type-option-sub' }, TYPE_HINTS[t]),
-              ),
-              h('span', { class: 'type-option-go', 'aria-hidden': 'true' }, icons.forward()),
-            ),
-          ),
-        ),
-      ),
-    ),
-  };
+  if (!SESSION_TYPES.includes(type)) return renderTypeChoice(ctx);
+  if (isScored(type)) return renderScoredSetup(ctx, type, ctx.running.get());
+  return renderFormSetup(ctx, type);
 }
 
 /** Apply a session transition to the running session; the page is drawn again when it changed. */
 function update(ctx, fn, { rerender = true } = {}) {
   if (ctx.running.apply(fn) && rerender) ctx.rerender();
-}
-
-// ---------------------------------------------------------------- new session
-
-function renderSetup(ctx, type, active = null) {
-  const settings = ctx.repo.getSettings();
-  // distance and face are remembered from the last session; arrows per end always start at the default
-  const last = settings.lastSetup;
-  // a face no longer offered (the single 40 cm 10–6 spot) falls back to the triple
-  const setup = ctx.ui.get().setup || {
-    distance: last.distance,
-    face: SETUP_FACES.includes(last.face) ? last.face : '40t',
-    arrowsPerEnd: DEFAULT_ARROWS_PER_END,
-    competition: emptyCompetition(),
-  };
-  const set = (patch) => ctx.ui.set({ setup: { ...setup, ...patch } });
-  // typing in a text field stores the draft without re-rendering, so the field keeps focus
-  const quiet = (patch) => ctx.ui.quietSet({ setup: Object.assign(setup, patch) });
-  // a remembered distance that is not in the list (e.g. 90 m) steps from the nearest listed one
-  const distIndex = DISTANCES.reduce(
-    (best, d, i) => (Math.abs(d - setup.distance) < Math.abs(DISTANCES[best] - setup.distance) ? i : best),
-    0,
-  );
-
-  // When: now by default; an earlier date / time logs the session afterwards (no running timer).
-  // Fields left untouched follow the clock, so a draft kept open is not dated when it was opened.
-  const when = setup.when || {};
-  const whenDate = when.date || todayIso();
-  const whenTime = when.time || hourMinute(new Date());
-  const past = L.isPastStart(whenDate, whenTime);
-  const setWhen = (patch) => set({ when: { ...when, ...patch } });
-  const whenSection = h(
-    'section',
-    // no "When" label: the date and the time speak for themselves. "Now" (back to the present)
-    // shows only after one of them was changed.
-    { class: 'setup-section', 'aria-label': 'When' },
-    when.date || when.time
-      ? h(
-          'div',
-          { class: 'spread align-center when-now-row' },
-          h('span', null),
-          h('button', { type: 'button', class: 'btn btn-text btn-sm', dataset: { fk: 'when-now' }, onClick: () => set({ when: null, pastMinutes: null }) }, 'Now'),
-        )
-      : null,
-    h(
-      'div',
-      { class: 'grid-2' },
-      datePicker({
-        label: 'Date',
-        value: whenDate,
-        max: todayIso(),
-        marks: sessionDates(ctx),
-        fk: 'when-date',
-        onChange: (date) => setWhen({ date }),
-      }),
-      timePicker({
-        label: 'Start time',
-        value: whenTime,
-        fk: 'when-time',
-        onChange: (time) => time && setWhen({ time }),
-      }),
-    ),
-    // a scored session logged afterwards: its duration is typed in, the timer stays stopped
-    past && isScored(type)
-      ? h(
-          'label',
-          { class: 'field' },
-          h('span', { class: 'field-label' }, 'Duration'),
-          h(
-            'div',
-            { class: 'input-suffix' },
-            h('input', {
-              class: 'input',
-              type: 'number',
-              inputmode: 'numeric',
-              min: 0,
-              value: setup.pastMinutes ?? '',
-              dataset: { fk: 'past-minutes' },
-              onInput: (e) => {
-                const n = parseInt(e.target.value, 10);
-                quiet({ pastMinutes: Number.isFinite(n) && n >= 0 ? n : null });
-              },
-            }),
-            h('span', { class: 'muted small' }, 'min'),
-          ),
-        )
-      : null,
-    past ? h('p', { class: 'muted small' }, 'Logged afterwards: no running timer.') : null,
-  );
-
-  // equipment: the Gear tab's setup by default, or any saved setup (not asked for mental and SPT
-  // sessions: the bow's setup says nothing about them)
-  const snapshots = ctx.repo.list('gearSnapshots', { sort: (a, b) => b.createdAt.localeCompare(a.createdAt) });
-  const gearOpts = gearChoices({ settings, snapshots });
-  const gearChoice = gearOpts.options.some((o) => o[0] === setup.gear) ? setup.gear : gearOpts.value;
-  const chosenGear = () => gearForChoice(gearChoice, { settings, snapshots }) || { gear: null, gearSnapshotId: null };
-  const noGear = type === 'mental' || type === 'strength';
-  const gearSection =
-    noGear
-      ? null
-      : h(
-          'section',
-          { class: 'setup-section', 'aria-labelledby': 'lbl-gear' },
-          sectionLabel('Equipment', 'lbl-gear'),
-          gearPicker({
-            ...gearOpts,
-            value: gearChoice,
-            onChange: (v) => set({ gear: v }),
-          }),
-        );
-
-  const start = async () => {
-    // only one session runs at a time: the running-session module asks about the one in progress
-    const { distance, face, arrowsPerEnd } = setup;
-    const res = await ctx.running.start({
-      date: whenDate,
-      time: whenTime,
-      pastMinutes: past ? (setup.pastMinutes ?? 0) : null,
-      type,
-      distance,
-      face,
-      arrowsPerEnd,
-      competition: type === 'competition' ? { ...emptyCompetition(), ...setup.competition } : null,
-      ...chosenGear(),
-    });
-    if (res.status === 'cancelled') return;
-    ctx.ui.quietSet({ setup: null });
-    if (res.status === 'started') ctx.navigate('log', { replace: true });
-  };
-
-  const compField = (key, label, placeholder) =>
-    h(
-      'label',
-      { class: 'field' },
-      h('span', { class: 'field-label' }, label),
-      h('input', {
-        class: 'input',
-        value: setup.competition?.[key] || '',
-        placeholder,
-        autocomplete: 'off',
-        dataset: { fk: `comp-${key}` },
-        onInput: (e) => quiet({ competition: { ...setup.competition, [key]: e.target.value } }),
-      }),
-    );
-
-  // Form sessions (blank bale / strength / mental / manual): a form saved straight to History.
-  // The open form session (openFormSession.js) owns the timer, the kept draft, saving and
-  // discarding; this page holds the draft being typed and forwards the events.
-  // Opening gives a timed form its timer and, when the page has no draft yet, the kept one.
-  const opened = ctx.openForms.open(type, setup.forms?.[type] || null);
-  if (opened.draft && !setup.forms?.[type]) quiet({ forms: { ...setup.forms, [type]: opened.draft } });
-  const { timed, timer: formTimer } = opened;
-  const form = setup.forms?.[type] || emptyForm(type);
-  // the draft is read at call time: typing stores into `setup` without re-rendering
-  const currentForm = () => setup.forms?.[type] || emptyForm(type);
-  const changeForm = (update, { rerender = true } = {}) => {
-    const cur = currentForm();
-    const forms = { ...setup.forms, [type]: { ...cur, ...update(cur) } };
-    ctx.openForms.keepDraft(type, forms[type]);
-    if (rerender) set({ forms });
-    else quiet({ forms });
-  };
-  const toggleFormTimer = () => {
-    ctx.openForms.toggleTimer(type);
-    ctx.rerender();
-  };
-  // the form session is over: the page's draft goes too
-  const dropPageDraft = () => ctx.ui.quietSet({ setup: { ...setup, when: null, forms: { ...setup.forms, [type]: null } } });
-
-  const discardForm = async () => {
-    const res = await ctx.openForms.discard(type);
-    if (res.status !== 'discarded') return;
-    dropPageDraft();
-    ctx.navigate('home', { replace: true });
-  };
-
-  const saveForm = async () => {
-    const res = await ctx.openForms.save(type, {
-      fields: currentForm(),
-      date: whenDate,
-      time: whenTime,
-      past,
-      gear: noGear ? {} : chosenGear(),
-    });
-    if (res.status !== 'saved') return;
-    dropPageDraft();
-    ctx.navigate(`history/${res.session.id}`, { replace: true });
-  };
-
-  const body = isScored(type)
-    ? [
-        whenSection,
-        h(
-          'section',
-          { class: 'setup-section', 'aria-labelledby': 'lbl-dist' },
-          sectionLabel(T.distance, 'lbl-dist'),
-          stepper({
-            label: 'distance',
-            value: `${setup.distance} m`,
-            canDown: distIndex > 0,
-            canUp: distIndex < DISTANCES.length - 1,
-            fk: 'dist',
-            onStep: (dir) => {
-              const d = DISTANCES[distIndex + dir];
-              set({ distance: d, ...DISTANCE_DEFAULTS[d] });
-            },
-          }),
-        ),
-        h(
-          'section',
-          { class: 'setup-section', 'aria-labelledby': 'lbl-face' },
-          sectionLabel(T.targetFace, 'lbl-face'),
-          h(
-            'div',
-            { class: 'grid-3' },
-            SETUP_FACES.map((f) =>
-              chip({
-                label: faceLabel(f),
-                pressed: setup.face === f,
-                fk: `face-${f}`,
-                onClick: () => set({ face: f }),
-              }),
-            ),
-          ),
-        ),
-        h(
-          'section',
-          { class: 'setup-section', 'aria-labelledby': 'lbl-n' },
-          sectionLabel(T.arrowsPerEnd, 'lbl-n'),
-          stepper({
-            label: 'arrows',
-            value: `${setup.arrowsPerEnd} arrows`,
-            canDown: setup.arrowsPerEnd > ARROWS_PER_END_MIN,
-            canUp: setup.arrowsPerEnd < ARROWS_PER_END_MAX,
-            fk: 'n',
-            onStep: (dir) => set({ arrowsPerEnd: setup.arrowsPerEnd + dir }),
-          }),
-        ),
-        type === 'competition'
-          ? h(
-              'section',
-              { class: 'setup-section', 'aria-label': 'Competition' },
-              sectionLabel('Competition'),
-              compField('event', 'Event', 'e.g. Indoor Cup Bratislava'),
-              h(
-                'div',
-                { class: 'grid-2' },
-                compField('round', 'Round', 'e.g. WA 18 m'),
-                compField('conditions', 'Conditions', 'hall, wind, light'),
-              ),
-            )
-          : null,
-        gearSection,
-        // Cancel gives the setup up (what was picked is forgotten) and goes back to the session types.
-        // This page has no title and no back button at the top, to keep the room for the setup.
-        h(
-          'div',
-          { class: 'grid-2 setup-actions' },
-          h(
-            'button',
-            {
-              type: 'button',
-              class: 'btn btn-outline btn-xl',
-              dataset: { fk: 'setup-cancel' },
-              onClick: () => {
-                ctx.ui.quietSet({ setup: null });
-                ctx.navigate('new', { replace: true });
-              },
-            },
-            'Cancel',
-          ),
-          h('button', { type: 'button', class: 'btn btn-primary btn-xl', dataset: { fk: 'setup-start' }, onClick: start }, T.start),
-        ),
-      ]
-    : [
-        whenSection,
-        // blank bale: the timer sits beside the arrow count (in the form), without a label
-        // SPT: the same big timer as on the blank bale page (no label, no border), on the right
-        timed && !past && type === 'strength'
-          ? h('div', { class: 'arrow-count-row timer-alone' }, timerButton(formTimer, toggleFormTimer, { large: true }))
-          : timed && !past && type !== 'blank'
-            ? h(
-                'div',
-                { class: 'spread align-center' },
-                h('span', { class: 'field-label' }, 'Timer'),
-                timerButton(formTimer, toggleFormTimer),
-              )
-            : null,
-        ...formSections(type, form, changeForm, {
-          live: timed && !past,
-          timer: type === 'blank' && timed && !past ? timerButton(formTimer, toggleFormTimer, { large: true }) : null,
-        }),
-        gearSection,
-        h('button', { type: 'button', class: 'btn btn-primary btn-xl', onClick: saveForm }, 'Save session'),
-        timed && !past
-          ? h('button', { type: 'button', class: 'btn btn-text danger', dataset: { fk: 'discard-form' }, onClick: discardForm }, 'Discard session')
-          : null,
-      ];
-
-  // a timed form whose start is not in the past: its timer runs, it is a running session
-  const running = timed && !past;
-  return {
-    content: h(
-      'div',
-      { class: 'stack' },
-      // no back button on the scored setups (they have Cancel) and on a running SPT or blank bale
-      // session (Save or Discard end it; the tab bar leaves it running)
-      isScored(type) || (running && (type === 'strength' || type === 'blank')) ? null : backBar('#/new', 'Back to session type'),
-      // no title on the scored setups, the SPT page and a running blank bale session: the room goes
-      // to the form
-      isScored(type) || type === 'strength' || (running && type === 'blank') ? null : h('h1', { class: 'page-title sm' }, `${TYPE_LABELS[type]} session`),
-      active && isScored(type)
-        ? h(
-            'div',
-            { class: 'banner', role: 'status' },
-            h(
-              'span',
-              null,
-              T.inProgress(setupSummary(active), active.ends.length),
-            ),
-            h('a', { class: 'btn btn-primary btn-sm', href: '#/log' }, T.continueSession),
-          )
-        : null,
-      card({ class: 'setup-card', 'aria-label': `${TYPE_LABELS[type]} session` }, body),
-    ),
-  };
-}
-
-/** − value + control for the setup card. */
-function stepper({ label, value, canDown, canUp, fk, onStep }) {
-  return h(
-    'div',
-    { class: 'stepper', role: 'group' },
-    h(
-      'button',
-      {
-        type: 'button',
-        'aria-label': `Less ${label}`,
-        disabled: !canDown,
-        dataset: { fk: `${fk}-minus` },
-        onClick: () => onStep(-1),
-      },
-      '−',
-    ),
-    h('output', { 'aria-live': 'polite' }, value),
-    h(
-      'button',
-      {
-        type: 'button',
-        'aria-label': `More ${label}`,
-        disabled: !canUp,
-        dataset: { fk: `${fk}-plus` },
-        onClick: () => onStep(1),
-      },
-      '+',
-    ),
-  );
-}
-
-/** Timer button (tap to pause / resume). The shown time is refreshed every second by the ticker. */
-function timerButton(timer = null, onToggle, { large = false } = {}) {
-  const tm = timer || { running: false, startedAt: null, elapsedMs: 0 };
-  startTimerTicker();
-  return h(
-    'button',
-    {
-      type: 'button',
-      class: ['timer-btn', large && 'timer-btn-lg', !tm.running && 'is-paused'],
-      'aria-label': tm.running ? 'Pause the session timer' : 'Resume the session timer',
-      dataset: { fk: 'timer' },
-      onClick: onToggle,
-    },
-    tm.running ? icons.pause() : icons.play(),
-    h(
-      'span',
-      { class: 'timer-value', dataset: { elapsed: String(tm.elapsedMs || 0), started: tm.running ? tm.startedAt : '' } },
-      L.formatClock(L.timerElapsed(tm)),
-    ),
-  );
-}
-
-/** One ticker for the whole app: refreshes every visible session timer once a second. */
-let ticker = null;
-export function startTimerTicker() {
-  if (ticker) return;
-  ticker = setInterval(() => {
-    for (const el of document.querySelectorAll('.timer-value')) {
-      const started = el.dataset.started;
-      const timer = { running: !!started, startedAt: started || null, elapsedMs: Number(el.dataset.elapsed) || 0 };
-      el.textContent = L.formatClock(L.timerElapsed(timer));
-    }
-  }, 1000);
 }
 
 // ---------------------------------------------------------------- active session
@@ -605,7 +154,7 @@ function renderActive(ctx, session) {
 
   // session timer: tap to pause / resume
   // sessions started before the timer existed show it stopped at 0:00; one tap starts it
-  const timerBtn = timerButton(session.timer, () =>
+  const timerBtn = sessionTimer(session.timer, () =>
     update(ctx, (c) => (c.timer?.running ? L.pauseTimer(c) : L.resumeTimer(c))),
   );
 
@@ -633,74 +182,49 @@ function renderActive(ctx, session) {
     ),
     input,
     grades,
-    // Previous end (disabled on the first end) and Next end: on the newest end Next saves it and
-    // starts a new one (it needs at least one arrow); on an earlier end it moves one end forward.
-    // The camera (score the end from the target) is the third button of the row, at the thumb.
+    // Previous end (disabled on the first end) and the camera (score the end from the target, at the
+    // thumb). Next end is the screen's primary action, in the bottom bar.
     h(
       'div',
-      { class: 'end-step' },
-      h(
-        'button',
-        {
-          type: 'button',
-          class: 'btn btn-outline end-step-btn',
-          disabled: !L.canPrevEnd(session),
-          'aria-label': T.prevEnd, // the button itself says just "Previous", so it fits on one line
-          dataset: { fk: 'end-prev' },
-          onClick: () => update(ctx, L.prevEnd),
-        },
-        icons.back(),
-        T.prevShort,
-      ),
-      h(
-        'button',
-        {
-          type: 'button',
-          class: 'btn btn-primary end-step-btn',
-          'aria-label': viewing ? T.nextEnd : `${T.nextEnd} (saves end ${endNo})`,
-          disabled: !L.canNextEnd(session),
-          dataset: { fk: 'end-next' },
-          onClick: () => update(ctx, L.nextEnd),
-        },
-        T.nextEnd,
-        icons.forward(),
-      ),
+      { class: 'apl-grid-2' },
+      APL.Button({
+        children: T.prevShort,
+        variant: 'secondary',
+        leadingIcon: 'back',
+        // the button itself says just "Previous", so it fits
+        label: T.prevEnd,
+        disabled: !L.canPrevEnd(session),
+        onClick: () => update(ctx, L.prevEnd),
+        fk: 'end-prev',
+      }),
       photoButton(ctx, session),
     ),
   );
 
+  // Next end: on the newest end it saves it and starts a new one (it needs at least one arrow); on
+  // an earlier end it moves one end forward.
+  const nextBtn = APL.Button({
+    children: T.nextEnd,
+    trailingIcon: 'arrowRight',
+    label: viewing ? T.nextEnd : `${T.nextEnd} (saves end ${endNo})`,
+    disabled: !L.canNextEnd(session),
+    onClick: () => update(ctx, L.nextEnd),
+    fk: 'end-next',
+  });
+
   // --- end details
   const stepper = (key, label) =>
-    h(
-      'div',
-      { class: 'field' },
-      h('div', { class: 'field-label', id: `lbl-${key}` }, label),
-      h(
-        'div',
-        { class: 'stepper', role: 'group', 'aria-labelledby': `lbl-${key}` },
-        h(
-          'button',
-          {
-            type: 'button',
-            'aria-label': `Fewer ${label.toLowerCase()}`,
-            dataset: { fk: `${key}-minus` },
-            onClick: () => update(ctx, (c) => L.bump(c, key, -1)),
-          },
-          '−',
-        ),
-        h('output', { 'aria-live': 'polite' }, String(current[key])),
-        h(
-          'button',
-          {
-            type: 'button',
-            'aria-label': `More ${label.toLowerCase()}`,
-            dataset: { fk: `${key}-plus` },
-            onClick: () => update(ctx, (c) => L.bump(c, key, 1)),
-          },
-          '+',
-        ),
-      ),
-    );
+    APL.Section({
+      label,
+      id: `end-${key}`,
+      children: APL.Stepper({
+        label: label.toLowerCase(),
+        value: current[key],
+        min: 0,
+        onChange: (v) => update(ctx, (c) => L.bump(c, key, v - current[key])),
+        fk: key,
+      }),
+    });
 
   const canFinish = L.canFinish(session);
   // Finish asks OK / Cancel first; the timer is paused meanwhile and runs on if it is cancelled
@@ -714,42 +238,26 @@ function renderActive(ctx, session) {
   };
 
   const details = card(
-    null,
-    h('div', { class: 'grid-2' }, stepper('ld', T.letDowns), stepper('cld', T.correctLetDowns)),
-    h(
-      'label',
-      { class: 'field' },
-      h('span', { class: 'field-label' }, T.noteForEnd),
-      h('textarea', {
-        rows: 2,
-        placeholder: T.notePh,
-        value: current.note,
-        dataset: { fk: 'note' },
-        onInput: (e) => update(ctx, (c) => L.setNote(c, e.target.value), { rerender: false }),
-      }),
-    ),
-    h(
-      'div',
-      { class: 'row' },
-      // looking at an earlier end: jump straight back to the one being shot
-      viewing
-        ? h(
-            'button',
-            {
-              type: 'button',
-              class: 'btn btn-outline grow-2',
-              dataset: { fk: 'back-current' },
-              onClick: () => update(ctx, (c) => L.goToEnd(c, null)),
-            },
-            T.backToEnd(totalEnds),
-          )
-        : null,
-      h(
-        'button',
-        { type: 'button', class: 'btn btn-outline grow-1', disabled: !canFinish, onClick: finish },
-        T.finish,
-      ),
-    ),
+    { class: 'end-details' },
+    h('div', { class: 'apl-grid-2' }, stepper('ld', T.letDowns), stepper('cld', T.correctLetDowns)),
+    APL.TextArea({
+      label: T.noteForEnd,
+      rows: 2,
+      placeholder: T.notePh,
+      value: current.note,
+      fk: 'note',
+      onInput: (e) => update(ctx, (c) => L.setNote(c, e.target.value), { rerender: false }),
+    }),
+    // looking at an earlier end: jump straight back to the one being shot
+    viewing
+      ? APL.Button({
+          children: T.backToEnd(totalEnds),
+          variant: 'secondary',
+          onClick: () => update(ctx, (c) => L.goToEnd(c, null)),
+          fk: 'back-current',
+        })
+      : null,
+    APL.Button({ children: T.finish, variant: 'secondary', disabled: !canFinish, onClick: finish, fk: 'finish' }),
   );
 
   // --- saved ends (newest first)
@@ -796,30 +304,36 @@ function renderActive(ctx, session) {
     sight && (sight.elevation || sight.windage)
       ? h(
           'div',
-          { class: 'pills' },
-          h(
-            'span',
-            { class: 'pill pill-accent' },
-            `Sight ${[sight.elevation, sight.windage].filter(Boolean).join(' / ')}`,
-          ),
+          { class: 'end-sight' },
+          APL.Badge({ children: `Sight ${[sight.elevation, sight.windage].filter(Boolean).join(' / ')}`, tone: 'neutral' }),
         )
       : null;
 
+  const total =
+    session.ends.reduce((n, e) => n + sumArrows(e.arrows), 0) + (viewing ? 0 : sumArrows(current.arrows));
   return {
     content: h(
       'div',
-      { class: 'stack' },
-      pills,
-      endCard,
-      details,
-      rows.length
-        ? card(
-            { class: 'card-list', 'aria-label': 'Saved ends' },
-            h('ol', { class: 'saved-ends', reversed: true }, rows.reverse()),
-          )
-        : null,
-      gearCard(ctx, session),
-      h('button', { type: 'button', class: 'btn btn-text danger', onClick: discard }, T.discardSession),
+      { class: 'apl-screen' },
+      h(
+        'div',
+        { class: 'apl-screen-body log-body' },
+        pills,
+        endCard,
+        details,
+        rows.length
+          ? card(
+              { class: 'card-list', 'aria-label': 'Saved ends' },
+              h('ol', { class: 'saved-ends', reversed: true }, rows.reverse()),
+            )
+          : null,
+        gearCard(ctx, session),
+        h('button', { type: 'button', class: 'btn btn-text danger apl-discard', onClick: discard }, T.discardSession),
+      ),
+      APL.BottomBar({
+        summary: `${T.end} ${endNo} · Total ${total}`,
+        children: nextBtn,
+      }),
     ),
   };
 }
@@ -832,19 +346,15 @@ function renderActive(ctx, session) {
  * afterwards. Pictures are only used in memory and are never stored.
  */
 function photoButton(ctx, session) {
-  return h(
-    'button',
-    {
-      type: 'button',
-      class: 'btn btn-outline end-step-btn',
-      'aria-label': 'Score arrows with the camera',
-      dataset: { fk: 'photo' },
-      disabled: !canScan(session),
-      onClick: () => scanTarget(ctx),
-    },
-    icons.camera(),
-    'Scan',
-  );
+  return APL.Button({
+    children: 'Scan',
+    variant: 'secondary',
+    leadingIcon: icons.camera(),
+    label: 'Score arrows with the camera',
+    disabled: !canScan(session),
+    onClick: () => scanTarget(ctx),
+    fk: 'photo',
+  });
 }
 
 /**
@@ -1184,11 +694,7 @@ function targetInput(session, enter, slots, { clearable = false, clearLabel = 'C
   // The loupe's place is chosen once, when the finger lands, and kept until it lifts (it never jumps).
   // Above the target face when there is room; otherwise over the face, centred, on the half away
   // from the finger (finger on the top half: loupe at the bottom, and the other way round).
-  const visibleTop = () => {
-    const header = document.querySelector('.app-header');
-    if (header && !header.hidden) return header.getBoundingClientRect().bottom;
-    return document.querySelector('.main')?.getBoundingClientRect().top ?? 0;
-  };
+  const visibleTop = () => document.querySelector('.main')?.getBoundingClientRect().top ?? 0;
   const placeLoupe = (p) => {
     const size = loupe.offsetWidth || 132;
     const gap = 10;
@@ -1339,40 +845,20 @@ function targetInput(session, enter, slots, { clearable = false, clearLabel = 'C
       slots,
       h('div', { class: 'target-stage' }, btn, multi ? zoomOutBtn : null, loupe),
     ),
-    h(
-      'div',
-      { class: 'quick-keys', role: 'group', 'aria-label': 'Quick score without position' },
-      ['X', 10, 9, 8, 7, 6, 'M'].map((k) =>
-        h(
-          'button',
-          {
-            type: 'button',
-            class: `quick-key z-${zoneOf(k)}`,
-            'aria-label': `Score ${k === 'M' ? 'miss' : k}`,
-            // the selected arrow's score is shown pressed; the other keys dim (like the grade rows)
-            'aria-pressed': String(selectedValue === k),
-            dataset: { fk: `quick-${k}` },
-            onClick: () => enter(k, null, null),
-          },
-          String(k),
-        ),
-      ),
+    APL.ScoreKeypad({
+      label: 'Quick score without position',
+      keys: ['X', 10, 9, 8, 7, 6, 'M'].map((k) => ({
+        value: k,
+        zone: zoneOf(k),
+        ariaLabel: `Score ${k === 'M' ? 'miss' : k}`,
+      })),
+      // the selected arrow's score is shown pressed; the other keys dim (like the grade rows)
+      value: selectedValue,
+      onKey: (k) => enter(k, null, null),
       // at the thumb's end of the row; its place is kept (invisible) when no arrow is picked
-      h(
-        'button',
-        {
-          type: 'button',
-          class: ['quick-key', 'clear-key', !clearable && 'is-off'],
-          'aria-label': clearLabel,
-          'aria-hidden': clearable ? null : 'true',
-          tabindex: clearable ? null : '-1',
-          disabled: !clearable,
-          dataset: { fk: 'clear-arrow' },
-          onClick: () => onClear?.(),
-        },
-        icons.erase(),
-      ),
-    ),
+      clear: { enabled: clearable, label: clearLabel, onClick: () => onClear?.() },
+      fk: 'quick',
+    }),
   );
 }
 
@@ -1383,24 +869,13 @@ function targetInput(session, enter, slots, { clearable = false, clearLabel = 'C
 function gradePanel(session, { onGrade }) {
   const a = L.shownEnd(session).arrows[session.cursor];
   const row = (kind, label, full) =>
-    h(
-      'div',
-      { class: 'grade-line', role: 'group', 'aria-label': `${full} for arrow ${session.cursor + 1}` },
-      h('span', { class: 'grade-line-label', 'aria-hidden': 'true' }, label),
-      [1, 2, 3, 4, 5].map((g) =>
-        h(
-          'button',
-          {
-            type: 'button',
-            class: `grade-key g${g}`,
-            'aria-pressed': String(a[kind] === g),
-            'aria-label': `${full} ${g}`,
-            dataset: { fk: `grade-${kind}-${g}` },
-            onClick: () => onGrade(kind, g),
-          },
-          String(g),
-        ),
-      ),
-    );
+    APL.GradeKeys({
+      label: `${full} for arrow ${session.cursor + 1}`,
+      rowLabel: label,
+      value: a[kind],
+      keyLabel: (g) => `${full} ${g}`,
+      onChange: (g) => onGrade(kind, g),
+      fk: `grade-${kind}`,
+    });
   return h('div', { class: 'grade-panel' }, row('m', 'M', T.mentalProgram), row('s', 'S', T.shootingCycle));
 }

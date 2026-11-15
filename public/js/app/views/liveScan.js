@@ -5,6 +5,7 @@
 // Nothing is recorded or stored: frames are analysed in memory and dropped.
 import { h } from '../../core/dom.js';
 import { icons } from '../icons.js';
+import * as APL from '../../ui/apl/index.js';
 import { detectArrows } from '../photoDetect.js';
 import { spotCentres } from '../scoring.js';
 import { resultOffCrop, arrowMarkLayout } from '../scanGeometry.js';
@@ -109,18 +110,14 @@ export function liveScan({ face, maxArrows, spotHint = 0 }) {
         if (file) finish({ file });
       },
     });
-    const takeBtn = h(
-      'button',
-      { type: 'button', class: 'btn btn-primary live-take', disabled: true, dataset: { fk: 'live-take' }, onClick: () => take() },
-      'Take now',
-    );
+    const takeBtn = APL.Button({ children: 'Take now', disabled: true, onClick: () => take(), fk: 'live-take' });
     const dialog = h(
       'dialog',
       { class: 'live-scan', 'aria-label': 'Scan the target with the camera' },
       h(
         'div',
         { class: 'live-top' },
-        h('button', { type: 'button', class: 'icon-btn', 'aria-label': 'Close the camera', dataset: { fk: 'live-close' }, onClick: () => finish(null) }, icons.close()),
+        APL.IconButton({ icon: 'close', label: 'Close the camera', onClick: () => finish(null), fk: 'live-close' }),
       ),
       stage,
       progress,
@@ -128,7 +125,13 @@ export function liveScan({ face, maxArrows, spotHint = 0 }) {
       h(
         'div',
         { class: 'live-actions' },
-        h('button', { type: 'button', class: 'btn btn-outline', dataset: { fk: 'live-photo' }, onClick: () => fileInput.click() }, icons.camera(), 'Photo'),
+        APL.Button({
+          children: 'Photo',
+          variant: 'secondary',
+          leadingIcon: icons.camera(),
+          onClick: () => fileInput.click(),
+          fk: 'live-photo',
+        }),
         takeBtn,
       ),
       fileInput,

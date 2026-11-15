@@ -39,9 +39,6 @@ export const icons = {
   back: () => icon(20, p('m15 18-6-6 6-6')),
   forward: () => icon(20, p('m9 18 6-6-6-6')),
   calendar: () => icon(18, s('rect', { x: 3, y: 5, width: 18, height: 16, rx: 2 }), p('M3 10h18'), p('M8 3v4M16 3v4')),
-  sun: () => icon(18, c(12, 12, 4), p('M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4')),
-  moon: () => icon(18, p('M20 14.5A8 8 0 1 1 9.5 4a6.5 6.5 0 0 0 10.5 10.5z')),
-  device: () => icon(18, s('rect', { x: 3, y: 4, width: 18, height: 12, rx: 2 }), p('M8 20h8M12 16v4')),
   erase: () => icon(22, p('M21 5H9l-6 7 6 7h12a1 1 0 0 0 1-1V6a1 1 0 0 0-1-1z'), p('M17 9l-5 6M12 9l5 6')),
   camera: () => icon(20, p('M4 8h3l2-3h6l2 3h3a1 1 0 0 1 1 1v9a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V9a1 1 0 0 1 1-1z'), c(12, 13, 3.5)),
   plus: () => icon(20, p('M12 5v14M5 12h14')),
@@ -56,14 +53,4 @@ export const icons = {
   gear: () =>
     icon(22, p('M4 6h10M18 6h2M4 12h4M12 12h8M4 18h12'), c(16, 6, 2), c(10, 12, 2), c(18, 18, 2)),
   sights: () => icon(22, c(12, 12, 7), p('M12 2v5M12 17v5M2 12h5M17 12h5')),
-  logo: () =>
-    s(
-      'svg',
-      { width: 28, height: 28, viewBox: '-100 -100 200 200', 'aria-hidden': 'true', focusable: 'false' },
-      s('circle', { r: 96, fill: '#FFFFFF' }),
-      s('circle', { r: 76, fill: '#1A1A1A' }),
-      s('circle', { r: 58, fill: '#00A2E8' }),
-      s('circle', { r: 40, fill: '#D22B2B' }),
-      s('circle', { r: 20, fill: '#FFE11A' }),
-    ),
 };
