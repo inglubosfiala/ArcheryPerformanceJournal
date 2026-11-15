@@ -21,6 +21,11 @@ export default [
     languageOptions: { ecmaVersion: 2023, sourceType: 'module', globals: { ...globals.node } },
   },
   {
+    // DOM component tests run under the happy-dom environment.
+    files: ['tests/apl*.test.js'],
+    languageOptions: { globals: { ...globals.browser } },
+  },
+  {
     rules: {
       'no-unused-vars': ['error', { argsIgnorePattern: '^_', varsIgnorePattern: '^_' }],
     },
