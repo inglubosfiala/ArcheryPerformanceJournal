@@ -2006,7 +2006,7 @@ button.arrow-count:hover {
   font: var(--type-body-strong);
 }
 
-/* bottom bar: Undo, Previous / Next end, and Scan (the most used: accent outline) */
+/* bottom bar: Previous / Next end, and Scan (the most used: accent outline) */
 .score-actions {
   display: flex;
   gap: 8px;
@@ -2035,7 +2035,6 @@ button.arrow-count:hover {
   height: 18px;
 }
 
-.score-undo,
 .score-scan {
   flex: none;
   height: var(--tap-primary);
@@ -2045,12 +2044,6 @@ button.arrow-count:hover {
   justify-content: center;
   color: var(--ink);
   font: var(--type-button-lg);
-}
-
-.score-undo {
-  width: var(--tap-primary);
-  border: 1px solid var(--border);
-  background: var(--surface);
 }
 
 .score-scan {
@@ -2064,7 +2057,6 @@ button.arrow-count:hover {
   color: var(--accent-bright);
 }
 
-.score-undo:disabled,
 .score-end-btn:disabled,
 .score-scan:disabled {
   opacity: 0.45;

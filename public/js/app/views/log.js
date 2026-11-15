@@ -261,7 +261,7 @@ function renderActive(ctx, session) {
       : null,
   );
 
-  // --- bottom bar, in thumb reach: Undo, Previous / Next end, and Scan (the most used) at the end.
+  // --- bottom bar, in thumb reach: Previous / Next end, and Scan (the most used) at the end.
   // There is no Save end step (every change is saved as it is made): Next opens the next end, and
   // from the end being shot it needs at least one arrow, so empty ends do not pile up.
   const endBtn = (label, ariaLabel, { icon, trailing, enabled, onClick, fk }) =>
@@ -284,18 +284,6 @@ function renderActive(ctx, session) {
     onClick: () => update(ctx, L.nextEnd),
     fk: 'end-next',
   });
-  const undoBtn = h(
-    'button',
-    {
-      type: 'button',
-      class: 'score-undo',
-      'aria-label': T.undo,
-      disabled: !current.arrows.some((a) => a.v != null),
-      onClick: () => update(ctx, L.undo),
-      dataset: { fk: 'undo' },
-    },
-    icons.undo(),
-  );
 
   // --- end details, below the end (reached by scrolling)
   const stepper = (key, label) =>
@@ -406,7 +394,7 @@ function renderActive(ctx, session) {
         gearCard(ctx, session),
         h('button', { type: 'button', class: 'btn btn-text danger apl-discard', onClick: discard }, T.discardSession),
       ),
-      APL.BottomBar({ children: h('div', { class: 'score-actions' }, undoBtn, prevBtn, nextBtn, photoButton(ctx, session)) }),
+      APL.BottomBar({ children: h('div', { class: 'score-actions' }, prevBtn, nextBtn, photoButton(ctx, session)) }),
     ),
   };
 }
