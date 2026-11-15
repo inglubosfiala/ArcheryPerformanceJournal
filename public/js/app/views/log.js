@@ -127,9 +127,9 @@ function announceArrow(ctx) {
   if (a?.v != null) announce(T.arrowScored(s.cursor + 1, a.v));
 }
 
-// the bottom bar's primary button for each L.primaryAction ('grade' has none): its label, and what it does
+// the bottom bar's primary button for each L.primaryAction ('place' and 'grade' have none): its label,
+// and what it does
 const PRIMARY = {
-  place: { label: (pa) => T.placeArrow(pa.slot) },
   next: { label: () => T.nextArrow, run: L.nextArrow },
   save: { label: (pa) => T.saveEnd(pa.end), run: L.nextEnd },
   back: { label: (pa) => T.backToEnd(pa.end), run: (c) => L.goToEnd(c, null) },
@@ -272,11 +272,11 @@ function renderActive(ctx, session) {
         );
 
   // --- bottom bar, in thumb reach: Undo, the primary action, and Scan (the most used) at the end.
-  // While the selected arrow still needs its grades there is no primary button (the M / S rows are
-  // the next step); its place stays empty, so Scan does not move.
+  // While the selected arrow still needs a score or its grades there is no primary button (the face,
+  // keypad or M / S rows are the next step); its place stays empty, so Scan does not move.
   const pa = L.primaryAction(session, { askGrades });
   const primary =
-    pa.action === 'grade'
+    !PRIMARY[pa.action]
       ? h('span', { class: 'score-actions-gap', 'aria-hidden': 'true' })
       : APL.Button({
           children: PRIMARY[pa.action].label(pa),
