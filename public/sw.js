@@ -41,6 +41,7 @@ const SHELL = [
   './js/app/photoDetect.js',
   './js/app/photoWorker.js',
   './js/app/views/liveScan.js',
+  './js/app/runningSession.js',
   './js/app/sessionLogic.js',
   './js/app/stats.js',
   './js/app/strings.js',

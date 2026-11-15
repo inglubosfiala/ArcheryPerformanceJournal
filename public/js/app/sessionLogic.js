@@ -124,6 +124,13 @@ export function nextEmpty(arrows) {
 
 const hasArrows = (end) => end.arrows.some((a) => a.v != null);
 
+/**
+ * An arrow's position (face units, spot radius 1) is stored only this close to the spot's centre:
+ * on the face, or just off its edge. Further out the arrow keeps its score but has no position.
+ */
+export const ON_FACE = 1.05;
+const round3 = (n) => Math.round(n * 1000) / 1000;
+
 /** Index of the shown end among all ends (saved ends first, then the current one). */
 export function viewIndex(session) {
   return session.view == null ? session.ends.length : session.view;
@@ -152,8 +159,12 @@ function withShown(session, fn) {
  * - While an arrow is selected for editing, the score and position replace that arrow (grades kept).
  * - Otherwise it fills the selected empty slot, or the first empty one. A full end ignores input.
  * The arrow that received the score stays selected so it can be graded right away.
+ * A position is only kept when it lies on the face (see ON_FACE); otherwise just the score is stored.
  */
-export function enterScore(session, v, x = null, y = null, spot = null) {
+export function enterScore(session, v, px = null, py = null, spot = null) {
+  const onFace = px != null && py != null && Math.hypot(px, py) < ON_FACE;
+  const x = onFace ? round3(px) : null;
+  const y = onFace ? round3(py) : null;
   const arrows = shownEnd(session).arrows;
   let cur = session.cursor;
   if (!session.pinned && arrows[cur].v != null) {
@@ -163,7 +174,7 @@ export function enterScore(session, v, x = null, y = null, spot = null) {
   return withShown(session, (end, s) => {
     const { spot: _old, ...rest } = end.arrows[cur];
     // `spot` (which spot of a three-spot sheet) is only stored when known
-    end.arrows[cur] = { ...rest, v, x: x ?? null, y: y ?? null, ...(spot != null && x != null ? { spot } : {}) };
+    end.arrows[cur] = { ...rest, v, x, y, ...(spot != null && x != null ? { spot } : {}) };
     s.cursor = cur;
     s.pinned = false;
   });
@@ -218,6 +229,15 @@ export function doneEditing(session) {
 export function clearArrow(session) {
   return withShown(session, (end, s) => {
     end.arrows[s.cursor] = emptyArrow();
+    s.pinned = false;
+  });
+}
+
+/** Empty the shown end's arrows (scores, positions and grades), ready to be entered again. */
+export function clearEndArrows(session) {
+  return withShown(session, (end, s) => {
+    end.arrows = end.arrows.map(() => emptyArrow());
+    s.cursor = 0;
     s.pinned = false;
   });
 }

@@ -351,3 +351,17 @@ describe('session logged afterwards', () => {
     expect(L.isPastStart('2026-11-11', '18:00', now)).toBe(true);
   });
 });
+
+describe('arrow positions', () => {
+  it('keeps a position on the face, rounded to three places', () => {
+    const a = L.enterScore(start(), 9, 0.123456, -0.2).current.arrows[0];
+    expect([a.x, a.y]).toEqual([0.123, -0.2]);
+  });
+
+  it('keeps only the score of an arrow placed or moved off the face', () => {
+    const a = L.enterScore(start(), 6, 1.2, 0.3, 1).current.arrows[0];
+    expect(a).toEqual({ v: 6, m: null, s: null, x: null, y: null });
+    const moved = L.moveArrow(L.enterScore(start(), 9, 0.2, 0.1), 0, 'M', 0, -1.5).current.arrows[0];
+    expect([moved.v, moved.x, moved.y]).toEqual(['M', null, null]);
+  });
+});

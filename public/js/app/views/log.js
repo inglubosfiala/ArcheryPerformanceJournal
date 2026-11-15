@@ -29,8 +29,28 @@ import { emptyForm, formSections } from './sessionForms.js';
 import { detectArrows } from '../photoDetect.js';
 import { arrowMarkLayout, drawArrowMarks, liveScan } from './liveScan.js';
 
-export function findActive(repo) {
-  return repo.list('sessions', { filter: (x) => x.status === 'active' })[0] || null;
+/**
+ * The running session's questions to the archer, as dialogs (the `confirm` adapter of
+ * runningSession.js).
+ */
+export function askAboutRunningSession(q) {
+  if (q.kind === 'replace') {
+    return confirmDialog({
+      title: 'A session is in progress',
+      message: q.willFinish ? T.confirmReplaceFinish : T.confirmReplaceDiscard,
+      confirmLabel: q.willFinish ? 'Finish & start' : 'Discard & start',
+      danger: !q.willFinish,
+    });
+  }
+  if (q.kind === 'finish') {
+    return confirmDialog({
+      title: 'Finish session?',
+      message: `${TYPE_LABELS[sessionType(q.session)]} · ${q.ends} ${q.ends === 1 ? 'end' : 'ends'}. The session opens in History.`,
+      confirmLabel: 'OK',
+      icon: 'check',
+    });
+  }
+  return confirmDialog({ title: 'Discard session?', message: T.confirmDiscard, confirmLabel: 'Discard', danger: true });
 }
 
 /**
@@ -46,15 +66,14 @@ export function openFormSessions(settings, now = new Date()) {
   }));
 }
 
-export function logSubtitle(repo) {
-  const a = findActive(repo);
+export function logSubtitle(a) {
   return a
     ? `${a.type === 'competition' ? 'Competition · ' : ''}${a.distance} m · ${faceLabel(a.face)} · ${a.arrowsPerEnd} arrows/end`
     : T.sub.logIdle;
 }
 
 export function renderLog(ctx) {
-  const active = findActive(ctx.repo);
+  const active = ctx.running.get();
   // no session running (e.g. it was just finished or discarded): choose a type for a new one
   return active ? renderActive(ctx, active) : renderTypeChoice(ctx);
 }
@@ -63,7 +82,7 @@ export function renderLog(ctx) {
 /** New session: step 1 picks the type (#/new), step 2 asks that type's details (#/new/<type>). */
 export function renderNewSession(ctx, params = []) {
   const type = params[0];
-  if (SESSION_TYPES.includes(type)) return renderSetup(ctx, type, findActive(ctx.repo));
+  if (SESSION_TYPES.includes(type)) return renderSetup(ctx, type, ctx.running.get());
   return renderTypeChoice(ctx);
 }
 
@@ -115,13 +134,9 @@ function renderTypeChoice(ctx) {
   };
 }
 
-/** Apply a session transition to the stored active session and persist it. */
+/** Apply a session transition to the running session; the page is drawn again when it changed. */
 function update(ctx, fn, { rerender = true } = {}) {
-  const cur = findActive(ctx.repo);
-  if (!cur) return;
-  const next = fn(cur);
-  if (next === cur) return;
-  if (ctx.save('sessions', next) && rerender) ctx.rerender();
+  if (ctx.running.apply(fn) && rerender) ctx.rerender();
 }
 
 // ---------------------------------------------------------------- new session
@@ -230,25 +245,9 @@ function renderSetup(ctx, type, active = null) {
         );
 
   const start = async () => {
-    // Only one session runs at a time: an in-progress session is finished (saved ends kept) or,
-    // if it has no saved ends, discarded.
-    const running = findActive(ctx.repo);
-    if (running) {
-      const finish = L.canFinish(running);
-      const ok = await confirmDialog({
-        title: 'A session is in progress',
-        message: finish ? T.confirmReplaceFinish : T.confirmReplaceDiscard,
-        confirmLabel: finish ? 'Finish & start' : 'Discard & start',
-        danger: !finish,
-      });
-      if (!ok) return;
-      if (L.canFinish(running)) {
-        if (!ctx.save('sessions', L.finishSession(running))) return;
-      } else if (!ctx.remove('sessions', running.id)) return;
-    }
+    // only one session runs at a time: the running-session module asks about the one in progress
     const { distance, face, arrowsPerEnd } = setup;
-    ctx.repo.saveSettings({ lastSetup: { distance, face, arrowsPerEnd } });
-    const session = L.createSession({
+    const res = await ctx.running.start({
       date: whenDate,
       time: whenTime,
       pastMinutes: past ? (setup.pastMinutes ?? 0) : null,
@@ -259,8 +258,9 @@ function renderSetup(ctx, type, active = null) {
       competition: type === 'competition' ? { ...setup.competition, placement: '' } : null,
       ...chosenGear(),
     });
+    if (res.status === 'cancelled') return;
     ctx.ui.quietSet({ setup: null });
-    if (ctx.save('sessions', session)) ctx.navigate('log', { replace: true });
+    if (res.status === 'started') ctx.navigate('log', { replace: true });
   };
 
   const compField = (key, label, placeholder) =>
@@ -708,35 +708,12 @@ function renderActive(ctx, session) {
   const canFinish = L.canFinish(session);
   // Finish asks OK / Cancel first; the timer is paused meanwhile and runs on if it is cancelled
   const finish = async () => {
-    const before = findActive(ctx.repo);
-    if (!before || !L.canFinish(before)) return;
-    const wasRunning = !!before.timer?.running;
-    if (wasRunning) update(ctx, (c) => L.pauseTimer(c));
-    // the end being shot is saved too when it has arrows (finishSession keeps it)
-    const n = before.ends.length + (L.hasUnsavedArrows(before) ? 1 : 0);
-    const ok = await confirmDialog({
-      title: 'Finish session?',
-      message: `${TYPE_LABELS[sessionType(before)]} · ${n} ${n === 1 ? 'end' : 'ends'}. The session opens in History.`,
-      confirmLabel: 'OK',
-      icon: 'check',
-    });
-    const cur = findActive(ctx.repo);
-    if (!ok) {
-      if (wasRunning && cur && !cur.timer?.running) update(ctx, (c) => L.resumeTimer(c));
-      return;
-    }
-    if (!cur || !L.canFinish(cur)) return;
-    const done = L.finishSession(cur);
-    if (ctx.save('sessions', done)) {
-      ctx.sync?.now(); // put the finished session in Drive right away (no-op when sync is off)
-      ctx.navigate(`history/${done.id}`, { replace: true });
-    }
+    const res = await ctx.running.finish();
+    if (res.status === 'finished') ctx.navigate(`history/${res.session.id}`, { replace: true });
   };
   const discard = async () => {
-    const ok = await confirmDialog({ title: 'Discard session?', message: T.confirmDiscard, confirmLabel: 'Discard', danger: true });
-    if (!ok) return;
-    ctx.remove('sessions', session.id);
-    ctx.navigate('home', { replace: true });
+    const res = await ctx.running.discard();
+    if (res.status === 'discarded') ctx.navigate('home', { replace: true });
   };
 
   const details = card(
@@ -878,21 +855,9 @@ function photoButton(ctx, session) {
   );
 }
 
-/** What a scan needs from the running session, or null (with a message) when the end is full. */
+/** What a scan needs from the running session (it reads the whole end anew), or null without one. */
 function scanContext(ctx) {
-  const session = findActive(ctx.repo);
-  if (!session) return null;
-  const face = session.face;
-  const empty = L.shownEnd(session).arrows.filter((a) => a.v == null).length;
-  if (!empty) {
-    ctx.toast('This end is full. Clear an arrow or go to the next end first.');
-    return null;
-  }
-  // A picture of a three-spot sheet may show only one spot (a close-up): its arrows then go on the
-  // first spot of the sheet that has no arrow yet in this end.
-  const used = new Set(L.shownEnd(session).arrows.filter((a) => a.v != null && a.spot != null).map((a) => a.spot));
-  const spotHint = Math.max(0, spotCentres(face).findIndex((_, k) => !used.has(k)));
-  return { face, empty, spotHint };
+  return ctx.running.scanRoom();
 }
 
 /** Live camera: the result locks by itself (or Take now); Cancel in the preview goes back to the camera. */
@@ -1136,12 +1101,7 @@ async function previewAndApply(ctx, canvas, res, { face }, { cancelLabel = 'Canc
   );
   if (!ok) return false;
   if (!n) return true;
-  update(ctx, (cur) =>
-    arrows.reduce((s, a, i) => {
-      const inside = Math.hypot(a.x, a.y) < 1.05;
-      return L.enterScore(s, values[i], inside ? round3(a.x) : null, inside ? round3(a.y) : null, a.spot);
-    }, { ...cur, pinned: false }),
-  );
+  if (ctx.running.applyScan(arrows.map((a, i) => ({ v: values[i], x: a.x, y: a.y, spot: a.spot })))) ctx.rerender();
   return true;
 }
 
@@ -1408,8 +1368,8 @@ function targetInput(session, enter, slots, { clearable = false, clearLabel = 'C
     }
     if (multi) zoomOutFrom = zoomed;
     const hit = locateOnSheet(p.x, p.y, session.face);
-    const keep = Math.hypot(hit.x, hit.y) < 1.05;
-    const args = [scoreFromPoint(hit.x, hit.y, session.face), keep ? round3(hit.x) : null, keep ? round3(hit.y) : null, hit.spot];
+    // a touch off the face keeps its score but no position (sessionLogic's ON_FACE rule)
+    const args = [scoreFromPoint(hit.x, hit.y, session.face), hit.x, hit.y, hit.spot];
     // a placed arrow that was dragged moves; otherwise the touch enters a score
     if (mode === 'move') onMove(idx, ...args);
     else enter(...args);
@@ -1519,7 +1479,6 @@ function targetInput(session, enter, slots, { clearable = false, clearLabel = 'C
   );
 }
 
-const round3 = (n) => Math.round(n * 1000) / 1000;
 
 // ---------------------------------------------------------------- inline grades
 

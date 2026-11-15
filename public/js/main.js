@@ -28,7 +28,8 @@ import { icons } from './app/icons.js';
 import * as L from './app/sessionLogic.js';
 import { TYPE_LABELS, sessionType } from './app/sessionTypes.js';
 import { guideSheet } from './app/views/common.js';
-import { renderLog, renderNewSession, logSubtitle, findActive, openFormSessions, startTimerTicker } from './app/views/log.js';
+import { renderLog, renderNewSession, logSubtitle, askAboutRunningSession, openFormSessions, startTimerTicker } from './app/views/log.js';
+import { createRunningSession } from './app/runningSession.js';
 import { renderDashboard } from './app/views/dashboard.js';
 import { renderInsights } from './app/views/insights.js';
 import { renderHistory } from './app/views/history.js';
@@ -135,7 +136,7 @@ function renderNow({ scrollTop = false } = {}) {
   }
 
   // header + tabs
-  const subs = { home: T.sub.home, insights: T.sub.insights, log: logSubtitle(repo), new: T.sub.new, history: T.sub.history, gear: T.sub.gear, sights: T.sub.sights, settings: T.sub.settings };
+  const subs = { home: T.sub.home, insights: T.sub.insights, log: logSubtitle(ctx.running.get()), new: T.sub.new, history: T.sub.history, gear: T.sub.gear, sights: T.sub.sights, settings: T.sub.settings };
   shell.sub.textContent = subs[route.name] || '';
   // The top bar (title, Grades, Settings) is shown only on the Dashboard tab, to save space elsewhere.
   shell.header.hidden = route.name !== 'home';
@@ -208,7 +209,7 @@ function renderRunning() {
       h('span', { class: 'running-go' }, 'Continue', icons.forward()),
     );
   };
-  const active = findActive(repo);
+  const active = ctx.running.get();
   if (active && route.name !== 'log') {
     items.push(
       bar({
@@ -301,6 +302,16 @@ const ctx = {
     now: () => sync.request(),
   },
 };
+// the running (scored) session: found, started, finished and discarded in one place
+ctx.running = createRunningSession({
+  repo,
+  save: ctx.save,
+  remove: ctx.remove,
+  saveSettings: ctx.saveSettings,
+  confirm: askAboutRunningSession,
+  requestSync: () => ctx.sync.now(), // a finished session goes to Drive right away (no-op when sync is off)
+  onChange: () => ctx.rerender(),
+});
 
 const router = createRouter((r) => {
   const changed = r.name !== route.name || r.params.join('/') !== route.params.join('/');
