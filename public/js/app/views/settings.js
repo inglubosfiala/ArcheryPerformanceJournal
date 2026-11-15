@@ -3,7 +3,7 @@ import { h } from '../../core/dom.js';
 import { confirmDialog } from './confirm.js';
 import { APP_VERSION } from '../../config.js';
 import { exportBackup, parseBackup } from '../../backup/backup.js';
-import { storageInfo } from '../../pwa/updates.js';
+import { checkForUpdate, storageInfo } from '../../pwa/updates.js';
 import { ACCENTS, INK_ACCENT } from '../collections.js';
 import { card } from './common.js';
 import { icons } from '../icons.js';
@@ -189,6 +189,35 @@ export function renderSettings(ctx) {
         h('h2', { class: 'card-title', id: 'set-about' }, 'Storage & app'),
         storageLine,
         h('p', { class: 'muted small' }, `Version ${APP_VERSION === '__APP_VERSION__' ? 'dev' : APP_VERSION} · ${ctx.env} environment`),
+        h(
+          'button',
+          {
+            type: 'button',
+            class: 'btn btn-outline',
+            dataset: { fk: 'check-update' },
+            onClick: async (e) => {
+              const btn = e.currentTarget;
+              btn.disabled = true;
+              btn.textContent = 'Checking…';
+              const result = await checkForUpdate().catch(() => 'offline');
+              if (result === 'updating') {
+                // the page reloads by itself as soon as the new version has taken over
+                btn.textContent = 'New version found. Reloading…';
+                return;
+              }
+              btn.disabled = false;
+              btn.textContent = 'Check for new version';
+              ctx.toast(
+                result === 'current'
+                  ? 'You have the latest version.'
+                  : result === 'offline'
+                    ? 'Could not check for a new version. Are you online?'
+                    : 'Updates are not available in this browser.',
+              );
+            },
+          },
+          'Check for new version',
+        ),
       ),
     ),
   };

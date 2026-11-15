@@ -5,7 +5,7 @@
 import { h } from '../../core/dom.js';
 import { icons } from '../icons.js';
 import { detectArrows, consensus } from '../photoDetect.js';
-import { scoreFromPoint } from '../scoring.js';
+import { scoreFromPoint, spotCentres } from '../scoring.js';
 
 const FRAME_MAX = 560;
 const VIEW_MAX = 1280; // the overlay and the kept picture: the whole frame, up to this size // frames are scaled to this many pixels on their long side for detection
@@ -146,6 +146,17 @@ export function liveScan({ face, maxArrows, spotHint = 0 }) {
 
     function draw(res, hollow = false) {
       octx.clearRect(0, 0, overlay.width, overlay.height);
+      // the scan frame: what is outside it is dimmed (and not looked at)
+      if (frame) {
+        octx.fillStyle = 'rgba(0, 0, 0, 0.55)';
+        octx.fillRect(0, 0, overlay.width, frame.y);
+        octx.fillRect(0, frame.y + frame.h, overlay.width, overlay.height - frame.y - frame.h);
+        octx.fillRect(0, frame.y, frame.x, frame.h);
+        octx.fillRect(frame.x + frame.w, frame.y, overlay.width - frame.x - frame.w, frame.h);
+        octx.lineWidth = Math.max(2, overlay.width / 240);
+        octx.strokeStyle = 'rgba(255, 255, 255, 0.9)';
+        octx.strokeRect(frame.x, frame.y, frame.w, frame.h);
+      }
       if (!res || res.error) return;
       const line = Math.max(2, overlay.width / 200);
       octx.lineWidth = line;
@@ -196,7 +207,7 @@ export function liveScan({ face, maxArrows, spotHint = 0 }) {
         recent = [];
         takeBtn.disabled = true;
         bar.style.width = '0%';
-        status.textContent = 'Point the camera at the target.';
+        status.textContent = 'Fit the target in the frame.';
         return;
       }
       // keep the analysed moment (the whole frame) for the preview
@@ -247,6 +258,14 @@ export function liveScan({ face, maxArrows, spotHint = 0 }) {
     // spots are found, just the sheet around them, so the same number of analysed pixels covers the
     // target in much more detail (shafts a few pixels wide instead of one).
     let region = null;
+    // The scan frame: a box in the shape of the selected sheet (one face: square; a triple: tall),
+    // centred in the picture. Only what is inside it is analysed, so a second target hanging next
+    // to this one is not read as well. In video pixels (`guide`) and overlay pixels (`frame`).
+    const centres = spotCentres(face);
+    const span = (k) => Math.max(...centres.map((c) => c[k])) - Math.min(...centres.map((c) => c[k])) + 230; // spot Ø 200 + margin
+    const shape = span(0) / span(1); // width / height
+    let guide = null;
+    let frame = null;
 
     async function tick() {
       if (closed) return;
@@ -264,8 +283,13 @@ export function liveScan({ face, maxArrows, spotHint = 0 }) {
           full.width = ow;
           full.height = oh;
           stage.style.aspectRatio = `${ow} / ${oh}`;
+          const gw = Math.min(0.96 * vw, 0.96 * vh * shape);
+          guide = { x: Math.round((vw - gw) / 2), y: Math.round((vh - gw / shape) / 2), w: Math.round(gw), h: Math.round(gw / shape) };
+          frame = { x: guide.x * ko, y: guide.y * ko, w: guide.w * ko, h: guide.h * ko };
+          region = null;
+          if (!last) draw(null);
         }
-        const r = region || { x: 0, y: 0, w: vw, h: vh };
+        const r = region || guide;
         const k = Math.min(1, FRAME_MAX / Math.max(r.w, r.h));
         const w = Math.max(8, Math.round(r.w * k));
         const hgt = Math.max(8, Math.round(r.h * k));
@@ -304,14 +328,14 @@ export function liveScan({ face, maxArrows, spotHint = 0 }) {
               x1 = Math.max(x1, s.outer.cx / ko + rad);
               y1 = Math.max(y1, s.outer.cy / ko + rad);
             }
-            x0 = Math.max(0, Math.floor(x0));
-            y0 = Math.max(0, Math.floor(y0));
-            x1 = Math.min(vw, Math.ceil(x1));
-            y1 = Math.min(vh, Math.ceil(y1));
+            x0 = Math.max(guide.x, Math.floor(x0));
+            y0 = Math.max(guide.y, Math.floor(y0));
+            x1 = Math.min(guide.x + guide.w, Math.ceil(x1));
+            y1 = Math.min(guide.y + guide.h, Math.ceil(y1));
             const box = { x: x0, y: y0, w: x1 - x0, h: y1 - y0 };
             // …but only once every spot of the sheet is seen. While only some are (the camera came
             // in on one spot first), keep looking at the whole frame, or the others are never found.
-            region = !res.partial && box.w > 16 && box.h > 16 && box.w * box.h < 0.8 * vw * vh ? box : null;
+            region = !res.partial && box.w > 16 && box.h > 16 && box.w * box.h < 0.8 * guide.w * guide.h ? box : null;
             onResult({ ...res, spots, arrows });
           }
         } catch (err) {
@@ -340,7 +364,7 @@ export function liveScan({ face, maxArrows, spotHint = 0 }) {
         stream = s;
         video.srcObject = s;
         video.play().catch(() => {});
-        status.textContent = 'Point the camera at the target.';
+        status.textContent = 'Fit the target in the frame.';
         tick();
       })
       .catch(() => {

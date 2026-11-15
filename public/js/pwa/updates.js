@@ -24,6 +24,40 @@ export function registerServiceWorker(onUpdateReady) {
     .catch((e) => console.warn('Service worker registration failed', e));
 }
 
+/**
+ * Ask the server for a newer version now (Settings → "Check for new version"). When there is one it
+ * is downloaded and switched on at once, and the page reloads by itself (the controllerchange
+ * listener above). Resolves with 'updating', 'current', 'offline' or 'unsupported'.
+ */
+export async function checkForUpdate() {
+  if (!('serviceWorker' in navigator)) return 'unsupported';
+  const reg = await navigator.serviceWorker.getRegistration();
+  if (!reg) return 'unsupported';
+  const activate = (worker) => {
+    worker.postMessage({ type: 'SKIP_WAITING' });
+    return 'updating';
+  };
+  if (reg.waiting) return activate(reg.waiting);
+  try {
+    await reg.update();
+  } catch {
+    return 'offline';
+  }
+  if (reg.waiting) return activate(reg.waiting);
+  const worker = reg.installing;
+  if (!worker) return 'current';
+  // the new version is downloading: wait until it is ready
+  return new Promise((resolve) => {
+    const done = () => {
+      if (worker.state === 'installed') resolve(activate(worker));
+      else if (worker.state === 'redundant') resolve('offline');
+      else if (worker.state === 'activating' || worker.state === 'activated') resolve('updating');
+    };
+    worker.addEventListener('statechange', done);
+    done();
+  });
+}
+
 export async function requestPersistence() {
   try {
     if (navigator.storage?.persisted && (await navigator.storage.persisted())) return true;
