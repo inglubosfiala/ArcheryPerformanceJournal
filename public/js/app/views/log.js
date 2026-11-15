@@ -455,7 +455,9 @@ function renderSetup(ctx, type, active = null) {
     content: h(
       'div',
       { class: 'stack' },
-      isScored(type) ? null : backBar('#/new', 'Back to session type'),
+      // no back button on the scored setups (they have Cancel) and on a running SPT session (Save
+      // or Discard end it; the tab bar leaves it running)
+      isScored(type) || (type === 'strength' && timed && !past) ? null : backBar('#/new', 'Back to session type'),
       // no title on the scored setups and the SPT page: the room goes to the form
       isScored(type) || type === 'strength' ? null : h('h1', { class: 'page-title sm' }, `${TYPE_LABELS[type]} session`),
       active && isScored(type)

@@ -328,11 +328,12 @@ export function formSections(type, value, change, { live = false, timer = null }
           ),
         ),
       ),
-      // while the session runs the timer is the duration (as on the blank bale page); it can be
-      // changed on the saved session
+      // While the session runs the page is just the timer and the drills (as on the blank bale
+      // page): the timer is the duration, and the duration, effort and note are filled in on the
+      // saved session.
       live ? null : numberField('Duration', 'minutes', 'minutes', { suffix: 'min' }),
-      scale(`Effort (1–${EFFORT_MAX})`, 'effort', EFFORT_MAX, 'effort'),
-      noteField('…'),
+      live ? null : scale(`Effort (1–${EFFORT_MAX})`, 'effort', EFFORT_MAX, 'effort'),
+      live ? null : noteField('…'),
     ];
   }
 
