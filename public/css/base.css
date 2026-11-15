@@ -221,7 +221,7 @@ p {
 .z-gold {
   --z-bg: var(--target-gold);
   --z-fg: var(--target-black);
-  --z-bd: var(--target-gold);
+  --z-bd: var(--data-edge);
 }
 .z-red {
   --z-bg: var(--target-red);
@@ -241,12 +241,12 @@ p {
 .z-white {
   --z-bg: var(--target-white);
   --z-fg: var(--target-black);
-  --z-bd: var(--target-white);
+  --z-bd: var(--data-edge);
 }
 .z-miss {
   --z-bg: var(--score-miss);
   --z-fg: var(--target-black);
-  --z-bd: var(--score-miss);
+  --z-bd: var(--data-edge);
 }
 .z-empty {
   --z-bg: var(--surface);

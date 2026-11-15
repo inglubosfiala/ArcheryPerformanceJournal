@@ -13,6 +13,7 @@ const state = {
   score: 9,
   gradeM: 2,
   techniques: ['Breathing'],
+  theme: 'system',
 };
 const KINDS = {
   40: ['full', 'six', 'triple', 'vegas'],
@@ -32,6 +33,23 @@ function render() {
   const focusKey = document.activeElement?.dataset?.fk;
   root.replaceChildren(
     APL.ScreenHeader({ title: 'APL components', onBack: () => history.back() }),
+    story(
+      'Theme',
+      APL.SegmentedControl({
+        label: 'Theme',
+        options: ['system', 'light', 'dark'].map((v) => ({
+          value: v,
+          label: v[0].toUpperCase() + v.slice(1),
+        })),
+        value: state.theme,
+        onChange: (theme) => {
+          if (theme === 'system') delete document.documentElement.dataset.theme;
+          else document.documentElement.dataset.theme = theme;
+          set({ theme });
+        },
+        fk: 'theme',
+      }),
+    ),
     story(
       'Icon',
       h(

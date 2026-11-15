@@ -1,4 +1,4 @@
-// Settings: sync, backup / restore and storage diagnostics (ARCHITECTURE §6.6, §8), drawn with the
+// Settings: theme, sync, backup / restore and storage diagnostics (ARCHITECTURE §6.6, §8), drawn with the
 // APL components. The page has no bottom bar, so no primary button: every action is a secondary one.
 import { h } from '../../core/dom.js';
 import * as APL from '../../ui/apl/index.js';
@@ -8,10 +8,22 @@ import { exportBackup, parseBackup } from '../../backup/backup.js';
 import { checkForUpdate, storageInfo } from '../../pwa/updates.js';
 import { card } from './common.js';
 
-const COLLECTION_LABELS = { sessions: 'Sessions', gearSnapshots: 'Gear snapshots', sightMarks: 'Sight marks', competitions: 'Competitions' };
+// the APL themes; 'system' follows the device (this device only, not synced)
+const THEMES = [
+  { value: 'system', label: 'System' },
+  { value: 'light', label: 'Light' },
+  { value: 'dark', label: 'Dark' },
+];
+const COLLECTION_LABELS = {
+  sessions: 'Sessions',
+  gearSnapshots: 'Gear snapshots',
+  sightMarks: 'Sight marks',
+  competitions: 'Competitions',
+};
 
 /** A card holding one APL section. */
-const sectionCard = (id, label, children) => card({ class: 'apl-card' }, APL.Section({ label, id, children }));
+const sectionCard = (id, label, children) =>
+  card({ class: 'apl-card' }, APL.Section({ label, id, children }));
 const caption = (text) => h('p', { class: 'apl-cap13' }, text);
 
 export function renderSettings(ctx) {
@@ -52,7 +64,8 @@ export function renderSettings(ctx) {
       mode === 'replace' &&
       !(await confirmDialog({
         title: 'Replace all data?',
-        message: 'All data on this device is replaced with the backup. A safety copy is kept so you can undo.',
+        message:
+          'All data on this device is replaced with the backup. A safety copy is kept so you can undo.',
         confirmLabel: 'Replace',
         danger: true,
       }))
@@ -115,21 +128,39 @@ export function renderSettings(ctx) {
         h(
           'ul',
           { class: 'plain-list apl-cap13' },
-          Object.entries(pending.summary.counts).map(([k, n]) => h('li', null, `${COLLECTION_LABELS[k] || k}: ${n}`)),
+          Object.entries(pending.summary.counts).map(([k, n]) =>
+            h('li', null, `${COLLECTION_LABELS[k] || k}: ${n}`),
+          ),
           h(
             'li',
             null,
             `Newest record: ${pending.summary.newest ? new Date(pending.summary.newest).toLocaleString('en-GB') : '—'}`,
           ),
         ),
-        caption('Merge keeps records from both sides (newer edit wins). Replace overwrites everything on this device.'),
+        caption(
+          'Merge keeps records from both sides (newer edit wins). Replace overwrites everything on this device.',
+        ),
         h(
           'div',
           { class: 'apl-grid-2' },
-          APL.Button({ children: 'Merge', variant: 'secondary', onClick: () => applyImport('merge'), fk: 'import-merge' }),
-          APL.Button({ children: 'Replace', variant: 'secondary', onClick: () => applyImport('replace'), fk: 'import-replace' }),
+          APL.Button({
+            children: 'Merge',
+            variant: 'secondary',
+            onClick: () => applyImport('merge'),
+            fk: 'import-merge',
+          }),
+          APL.Button({
+            children: 'Replace',
+            variant: 'secondary',
+            onClick: () => applyImport('replace'),
+            fk: 'import-replace',
+          }),
         ),
-        h('button', { type: 'button', class: 'btn btn-text', onClick: () => ctx.ui.set({ importPreview: null }) }, 'Cancel'),
+        h(
+          'button',
+          { type: 'button', class: 'btn btn-text', onClick: () => ctx.ui.set({ importPreview: null }) },
+          'Cancel',
+        ),
       )
     : null;
 
@@ -141,6 +172,16 @@ export function renderSettings(ctx) {
       h(
         'div',
         { class: 'apl-screen-body history-body' },
+        sectionCard('set-theme', 'Appearance', [
+          APL.SegmentedControl({
+            label: 'Theme',
+            options: THEMES,
+            value: ctx.repo.getSettings().theme || 'system',
+            onChange: (theme) => ctx.saveSettings({ theme }) && ctx.rerender(),
+            fk: 'theme',
+          }),
+          caption('Light reads better outdoors in daylight. System follows the setting of this device.'),
+        ]),
         syncCard(ctx),
         sectionCard('set-backup', 'Backup', [
           caption(
@@ -152,13 +193,22 @@ export function renderSettings(ctx) {
             'p',
             { class: 'apl-cap13' },
             'Last backup: ',
-            h('strong', { class: 'apl-ink' }, meta.lastBackupAt ? new Date(meta.lastBackupAt).toLocaleString('en-GB') : 'never'),
+            h(
+              'strong',
+              { class: 'apl-ink' },
+              meta.lastBackupAt ? new Date(meta.lastBackupAt).toLocaleString('en-GB') : 'never',
+            ),
           ),
           h(
             'div',
             { class: 'apl-grid-2' },
             APL.Button({ children: 'Export backup', variant: 'secondary', onClick: doExport, fk: 'export' }),
-            APL.Button({ children: 'Import…', variant: 'secondary', onClick: () => fileInput.click(), fk: 'import' }),
+            APL.Button({
+              children: 'Import…',
+              variant: 'secondary',
+              onClick: () => fileInput.click(),
+              fk: 'import',
+            }),
           ),
           fileInput,
           importPreview,
@@ -169,8 +219,15 @@ export function renderSettings(ctx) {
         ]),
         sectionCard('set-about', 'Storage and app', [
           storageLine,
-          caption(`Version ${APP_VERSION === '__APP_VERSION__' ? 'dev' : APP_VERSION} · ${ctx.env} environment`),
-          APL.Button({ children: 'Check for new version', variant: 'secondary', onClick: checkUpdate, fk: 'check-update' }),
+          caption(
+            `Version ${APP_VERSION === '__APP_VERSION__' ? 'dev' : APP_VERSION} · ${ctx.env} environment`,
+          ),
+          APL.Button({
+            children: 'Check for new version',
+            variant: 'secondary',
+            onClick: checkUpdate,
+            fk: 'check-update',
+          }),
         ]),
       ),
     ),
@@ -197,7 +254,11 @@ function syncCard(ctx) {
   const s = ctx.sync;
   const title = 'Sync with Google Drive';
   if (!s || !s.configured) {
-    return sectionCard('set-sync', title, caption('Not set up in this build (no Google client ID configured).'));
+    return sectionCard(
+      'set-sync',
+      title,
+      caption('Not set up in this build (no Google client ID configured).'),
+    );
   }
   const signInError = ctx.ui.get().signInError;
   if (!s.signedIn()) {
@@ -206,9 +267,18 @@ function syncCard(ctx) {
         'Keep a copy of the journal in your own Google Drive (a hidden app-only folder) and use it on more than one device. The app works offline as before; it syncs when online.',
       ),
       signInError
-        ? h('p', { class: 'apl-cap13 error', role: 'alert' }, `Google sign-in did not complete (${signInError}).`)
+        ? h(
+            'p',
+            { class: 'apl-cap13 error', role: 'alert' },
+            `Google sign-in did not complete (${signInError}).`,
+          )
         : null,
-      APL.Button({ children: 'Continue with Google', variant: 'secondary', onClick: () => s.signIn(), fk: 'sign-in' }),
+      APL.Button({
+        children: 'Continue with Google',
+        variant: 'secondary',
+        onClick: () => s.signIn(),
+        fk: 'sign-in',
+      }),
       h('p', { class: 'apl-cap' }, 'Tip: export a backup below before the first sync.'),
     ]);
   }
@@ -226,7 +296,12 @@ function syncCard(ctx) {
     ctx.rerender();
   };
   return sectionCard('set-sync', title, [
-    h('p', { class: 'apl-cap13' }, 'Connected', s.email() ? [' as ', h('strong', { class: 'apl-ink' }, s.email())] : null),
+    h(
+      'p',
+      { class: 'apl-cap13' },
+      'Connected',
+      s.email() ? [' as ', h('strong', { class: 'apl-ink' }, s.email())] : null,
+    ),
     h(
       'p',
       { class: ['apl-cap13', shown.state === 'error' && 'error'], role: 'status' },
@@ -237,7 +312,12 @@ function syncCard(ctx) {
       'div',
       { class: 'apl-grid-2' },
       st.state === 'error' && st.error === 'auth'
-        ? APL.Button({ children: 'Reconnect Google', variant: 'secondary', onClick: () => s.signIn(), fk: 'reconnect' })
+        ? APL.Button({
+            children: 'Reconnect Google',
+            variant: 'secondary',
+            onClick: () => s.signIn(),
+            fk: 'reconnect',
+          })
         : APL.Button({
             children: 'Sync now',
             variant: 'secondary',

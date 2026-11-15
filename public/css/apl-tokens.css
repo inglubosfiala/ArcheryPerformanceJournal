@@ -73,7 +73,7 @@
 }
 
 :root {
-  /* colour */
+  /* colour (dark, the default theme) */
   --ground: #0b0e10;
   --surface: #161b1f;
   --surface-sunken: #0f1316;
@@ -100,6 +100,7 @@
   --danger: #ff8a80;
   --on-danger: #0b0e10;
   --score-miss: #d7d9db;
+  --data-edge: transparent;
   --grade-1: #0b6e4f;
   --grade-2: #7cc29a;
   --grade-3: #f2d65c;
@@ -141,4 +142,56 @@
   --radius-xl: 16px;
   --radius-pill: 999px;
   color-scheme: dark;
+}
+
+/* light theme: chosen in Settings (data-theme='light' on <html>) */
+:root[data-theme='light'] {
+  --ground: #f3f4f2;
+  --surface: #ffffff;
+  --surface-sunken: #eceeec;
+  --surface-bar: #ffffff;
+  --border: #808a91;
+  --border-soft: #e1e5e7;
+  --border-dashed: #7d878e;
+  --ink: #14181b;
+  --ink-soft: #3b444b;
+  --muted: #58626a;
+  --on-accent: #ffffff;
+  --accent: #0b7a55;
+  --accent-bright: #086646;
+  --accent-tint: #e7f4ee;
+  --accent-tint-border: #9ccdb7;
+  --accent-icon-bg: #cfeadd;
+  --radio-off: #7d878e;
+  --danger: #c62828;
+  --on-danger: #ffffff;
+  --data-edge: #808a91;
+  color-scheme: light;
+}
+
+/* …or the device is set to light and Settings says System (no data-theme) */
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme]) {
+    --ground: #f3f4f2;
+    --surface: #ffffff;
+    --surface-sunken: #eceeec;
+    --surface-bar: #ffffff;
+    --border: #808a91;
+    --border-soft: #e1e5e7;
+    --border-dashed: #7d878e;
+    --ink: #14181b;
+    --ink-soft: #3b444b;
+    --muted: #58626a;
+    --on-accent: #ffffff;
+    --accent: #0b7a55;
+    --accent-bright: #086646;
+    --accent-tint: #e7f4ee;
+    --accent-tint-border: #9ccdb7;
+    --accent-icon-bg: #cfeadd;
+    --radio-off: #7d878e;
+    --danger: #c62828;
+    --on-danger: #ffffff;
+    --data-edge: #808a91;
+    color-scheme: light;
+  }
 }
