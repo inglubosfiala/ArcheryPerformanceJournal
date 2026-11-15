@@ -280,7 +280,19 @@ export function detectArrows(img, face, maxArrows, { debug = false, spotHint = 0
         ...candidates.filter((c, i) => candidates.findIndex((o) => o.at.k === c.at.k) !== i),
       ]
     : candidates;
+  // A gate for sheets with several spots: the arrows asked for are spread over the spots (three
+  // arrows on a three-spot sheet: one per spot), so one spot never takes them all. A close-up of a
+  // single spot gives that spot's share only.
+  const perSpot = isMultiSpot(face) ? Math.max(1, Math.ceil(Math.max(0, maxArrows) / wantSpots)) : Infinity;
+  const taken = new Map();
   const arrows = ordered
+    .filter((c) => {
+      const key = partial ? 0 : c.at.k;
+      const n = taken.get(key) ?? 0;
+      if (n >= perSpot) return false;
+      taken.set(key, n + 1);
+      return true;
+    })
     .slice(0, Math.max(0, maxArrows))
     .map((c) => ({
       x: c.at.p.x,
@@ -467,11 +479,65 @@ function findShafts({ width, height, data, nearest, spotPx, face, rejects = null
     }
     if (cur && (!run || cur.u1 - cur.u0 > run.u1 - run.u0)) run = cur;
     if (!run) return null;
-    return {
-      a: { x: px + run.u0 * dx, y: py + run.u0 * dy },
-      b: { x: px + run.u1 * dx, y: py + run.u1 * dy },
-      length: run.u1 - run.u0,
+    return seg(px, py, dx, dy, run.u0, run.u1);
+  };
+  const seg = (px, py, dx, dy, u0, u1) => ({
+    px,
+    py,
+    dx,
+    dy,
+    u0,
+    u1,
+    a: { x: px + u0 * dx, y: py + u0 * dy },
+    b: { x: px + u1 * dx, y: py + u1 * dy },
+    length: u1 - u0,
+  });
+  /**
+   * Old holes in line with the shaft, just past its point, are short dark bits behind a small
+   * break; the shaft itself is one solid line. So short bits at the point end of the run (each
+   * shorter than a hole and a little more), cut off from the rest by a break, are dropped.
+   * Only for a line fitted to the shaft: a line a few degrees off leaves the shaft by itself.
+   */
+  const trimPoint = ({ px, py, dx, dy, u0, u1 }) => {
+    const at = (u, side) => {
+      const xi = Math.round(px + u * dx - side * dy);
+      const yi = Math.round(py + u * dy + side * dx);
+      return xi >= 0 && yi >= 0 && xi < width && yi < height && dark[yi * width + xi] === 1;
     };
+    // on the line or one pixel to either side of it
+    const solid = (u) => at(u, 0) || at(u, 1) || at(u, -1);
+    const bit = Math.max(6, Math.round(0.2 * spotPx));
+    const dAt = (u) => nearest(px + u * dx, py + u * dy).d;
+    const dir = dAt(u0) <= dAt(u1) ? 1 : -1; // from the point (the end nearer a spot's middle) inwards
+    const end = dir > 0 ? u1 : u0;
+    let tip = dir > 0 ? u0 : u1;
+    for (;;) {
+      let u = tip;
+      while (u !== end && !solid(u)) u += dir; // the run's end has a pixel of slack
+      const first = u;
+      while (u !== end && u - first !== dir * (bit + 1) && solid(u)) u += dir;
+      if (u === end || Math.abs(u - first) > bit) {
+        tip = first;
+        break;
+      }
+      let gap = 0;
+      while (u !== end && !solid(u)) {
+        u += dir;
+        gap++;
+      }
+      if (u === end) break;
+      if (gap < 2) {
+        // a one-pixel nick: not a break. Look on from here, keeping the point where it was.
+        let v = u;
+        while (v !== end && Math.abs(v - first) <= bit && solid(v)) v += dir;
+        if (v === end || Math.abs(v - first) > bit) {
+          tip = first;
+          break;
+        }
+      }
+      tip = u; // drop the bit and the break behind it
+    }
+    return dir > 0 ? seg(px, py, dx, dy, tip, u1) : seg(px, py, dx, dy, u0, tip);
   };
   /** Least-squares line through the dark pixels within a few px of the segment a-b. */
   const fitLine = (a, b) => {
@@ -529,21 +595,27 @@ function findShafts({ width, height, data, nearest, spotPx, face, rejects = null
     // walk along the line and take its longest dark run (gaps of a few px allowed)
     const c = cosT[t];
     const sn = sinT[t];
-    let seg = longestRun(rho * c, rho * sn, -sn, c);
+    let line0 = longestRun(rho * c, rho * sn, -sn, c);
     // The 1° / 1 px grid line drifts off a long shaft and then ends short of its point: fit a line
     // to the shaft's own pixels and walk again, so the run follows the shaft to its end.
-    for (let pass = 0; pass < 2 && seg; pass++) {
-      const fit = fitLine(seg.a, seg.b);
+    for (let pass = 0; pass < 2 && line0; pass++) {
+      const fit = fitLine(line0.a, line0.b);
       const again = fit && longestRun(fit.x, fit.y, fit.dx, fit.dy);
-      if (!again || again.length <= seg.length) break;
-      seg = again;
+      if (!again || again.length <= line0.length) break;
+      line0 = again;
+      if (pass === 1 || !fit) break;
     }
-    if (!seg || seg.length < minRun) {
-      rejects?.push({ why: 'short', votes: bestV, t, rho, run: seg ? seg.length : 0 });
+    const fitted = line0 && fitLine(line0.a, line0.b);
+    const onShaft = fitted && longestRun(fitted.x, fitted.y, fitted.dx, fitted.dy);
+    // the point is trimmed on a line that lies on the shaft (fitted to it), not on the grid line
+    const isFitted = !!onShaft && onShaft.length >= 0.9 * line0.length;
+    const shaftSeg = isFitted ? trimPoint(onShaft) : line0;
+    if (!shaftSeg || shaftSeg.length < minRun) {
+      rejects?.push({ why: 'short', votes: bestV, t, rho, run: shaftSeg ? shaftSeg.length : 0 });
       continue;
     }
-    const { a, b } = seg;
-    const run = { u0: 0, u1: seg.length };
+    const { a, b } = shaftSeg;
+    const run = { u0: 0, u1: shaftSeg.length };
     const atA = nearest(a.x, a.y);
     const atB = nearest(b.x, b.y);
     // the entry point is the end inside a face; the other end leans out (towards the camera)
@@ -556,7 +628,7 @@ function findShafts({ width, height, data, nearest, spotPx, face, rejects = null
     // point, anywhere along it: of the lines along one shaft the longest is the shaft itself. (Not
     // the one ending nearest the middle of the spot: a shaft can cross the middle and enter on the
     // far side.)
-    const line = { a, b, length: run.u1 - run.u0, tip, tipAt, t };
+    const line = { a, b, length: run.u1 - run.u0, tip, tipAt, t, fitted: isFitted };
     const near = 0.15 * spotPx;
     const same = found.findIndex((f) => {
       const da = Math.min(Math.abs(f.t - t), T - Math.abs(f.t - t));
@@ -568,7 +640,9 @@ function findShafts({ width, height, data, nearest, spotPx, face, rejects = null
       return on(a, f) || on(b, f) || on(f.a, line) || on(f.b, line);
     });
     if (same >= 0) {
-      if (line.length > found[same].length) found[same] = line;
+      // a line fitted to the shaft (its point trimmed) beats a grid line; otherwise the longer one
+      const f = found[same];
+      if (line.fitted !== f.fitted ? line.fitted : line.length > f.length) found[same] = line;
       continue;
     }
     found.push(line);

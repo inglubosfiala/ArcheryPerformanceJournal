@@ -214,6 +214,16 @@ export function liveScan({ face, maxArrows, spotHint = 0 }) {
         status.textContent = 'Target found. Looking for arrows…';
         return;
       }
+      // A gate: with several arrows to place on a sheet of several spots, all its spots must be in
+      // the picture. A view of one spot alone never locks by itself ("Take now" still takes it).
+      if (res.partial && maxArrows > 1) {
+        hold = null;
+        recent = [];
+        draw(res, true);
+        bar.style.width = '0%';
+        status.textContent = 'Show all the spots of the sheet (or Take now for this spot only).';
+        return;
+      }
       // The last few readings, and what most of them agree on. A frame that reads something else
       // now and then (blur, a reflection) changes nothing: the markers show the agreed arrows, and
       // the result locks once enough of the recent frames agree for long enough.

@@ -117,6 +117,24 @@ describe('photo arrow detection', () => {
     }
   });
 
+  it('takes one arrow per spot when three arrows are asked for on a three-spot sheet', () => {
+    // three things on the top spot, nothing on the others: only the best one counts
+    const arrows = [
+      { spot: 0, x: 0.05, y: 0.1 },
+      { spot: 0, x: -0.5, y: 0.2 },
+      { spot: 0, x: 0.3, y: -0.6 },
+      { spot: 2, x: 0.2, y: 0.2 },
+    ];
+    const img = photo('40t', arrows, { scale: 40, width: 300, height: 560, rot: 0.1 });
+    const res = detectArrows(img, '40t', 3);
+    expect(res.arrows.map((a) => a.spot).sort()).toEqual([0, 2]);
+    // six arrows on the sheet: two per spot
+    expect(detectArrows(img, '40t', 6).arrows.filter((a) => a.spot === 0)).toHaveLength(2);
+    // a close-up of one spot: that spot's one arrow
+    const close = photo('40s', [{ x: 0.2, y: -0.1 }, { x: -0.4, y: 0.3 }], { scale: 150 });
+    expect(detectArrows(close, '40t', 3, { spotHint: 1 }).arrows).toHaveLength(1);
+  });
+
   it('returns at most as many arrows as asked for, and none on a clean face', () => {
     const img = photo('122', [
       { x: 0.1, y: 0.1 },
@@ -171,6 +189,17 @@ describe('photo arrow detection', () => {
     const res = detectArrows(img, '122', 1);
     expect(res.arrows).toHaveLength(1);
     expect(Math.hypot(res.arrows[0].x - shaft.x, res.arrows[0].y - shaft.y)).toBeLessThan(0.08);
+  });
+
+  it('does not run on over old holes lying close past the point', () => {
+    for (const face of ['40s', '122']) {
+      const shaft = { x: 0.15, y: 0.1, dx: -1.3, dy: -0.9 }; // crosses the gold, enters at (0.15, 0.1)
+      // two holes in line with it, 0.07 and 0.15 of the radius past the point
+      const holes = [0.07, 0.15].map((k) => ({ x: shaft.x + 0.822 * k, y: shaft.y + 0.569 * k, dx: 0.03, dy: 0.02 }));
+      const res = detectArrows(photo(face, [], { shafts: [shaft, ...holes], squash: 0.95, scale: 110 }), face, 1);
+      expect(res.arrows, face).toHaveLength(1);
+      expect(Math.hypot(res.arrows[0].x - shaft.x, res.arrows[0].y - shaft.y), face).toBeLessThan(0.06);
+    }
   });
 
   it('uses a photo of one spot for a three-spot sheet, on the hinted spot', () => {
