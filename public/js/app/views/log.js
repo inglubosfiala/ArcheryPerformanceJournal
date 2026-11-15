@@ -710,10 +710,11 @@ function renderActive(ctx, session) {
     if (!before || !L.canFinish(before)) return;
     const wasRunning = !!before.timer?.running;
     if (wasRunning) update(ctx, (c) => L.pauseTimer(c));
-    const n = before.ends.length;
+    // the end being shot is saved too when it has arrows (finishSession keeps it)
+    const n = before.ends.length + (L.hasUnsavedArrows(before) ? 1 : 0);
     const ok = await confirmDialog({
       title: 'Finish session?',
-      message: `${TYPE_LABELS[sessionType(before)]} · ${n} ${n === 1 ? 'end' : 'ends'} saved${L.canSaveEnd(before) ? ' (the unsaved end is dropped)' : ''}. The session opens in History.`,
+      message: `${TYPE_LABELS[sessionType(before)]} · ${n} ${n === 1 ? 'end' : 'ends'}. The session opens in History.`,
       confirmLabel: 'OK',
       icon: 'check',
     });

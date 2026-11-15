@@ -23,7 +23,7 @@ export const T = {
   tabs: { log: 'Log', dashboard: 'Dashboard', history: 'History', insights: 'Insights', gear: 'Gear', sights: 'Sights', settings: 'Settings' },
   inProgress: (what, ends) => `Session in progress: ${what}, ${ends} ${ends === 1 ? 'end' : 'ends'} saved.`,
   continueSession: 'Continue',
-  confirmReplaceFinish: 'Finish the session in progress (saved ends are kept, the unsaved end is dropped) and start a new one?',
+  confirmReplaceFinish: 'Finish the session in progress (all its ends with arrows are saved) and start a new one?',
   confirmReplaceDiscard: 'The session in progress has no saved ends and will be discarded. Start a new one?',
   sub: {
     home: 'Dashboard',
