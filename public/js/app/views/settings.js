@@ -4,20 +4,11 @@ import { confirmDialog } from './confirm.js';
 import { APP_VERSION } from '../../config.js';
 import { exportBackup, parseBackup } from '../../backup/backup.js';
 import { checkForUpdate, storageInfo } from '../../pwa/updates.js';
-import { ACCENTS, INK_ACCENT } from '../collections.js';
 import { card } from './common.js';
-import { icons } from '../icons.js';
 
 const COLLECTION_LABELS = { sessions: 'Sessions', gearSnapshots: 'Gear snapshots', sightMarks: 'Sight marks', competitions: 'Competitions' };
-const THEMES = [
-  ['system', 'System', icons.device],
-  ['light', 'Light', icons.sun],
-  ['dark', 'Dark', icons.moon],
-];
-const ACCENT_NAMES = { '#0B6E4F': 'Green', '#14181C': 'Ink', '#1D4ED8': 'Blue', '#B45309': 'Amber' };
 
 export function renderSettings(ctx) {
-  const settings = ctx.repo.getSettings();
   const meta = ctx.repo.getMeta();
   const pending = ctx.ui.get().importPreview;
 
@@ -77,51 +68,6 @@ export function renderSettings(ctx) {
       'div',
       { class: 'stack' },
       h('h1', { class: 'page-title' }, 'Settings'),
-      card(
-        { 'aria-labelledby': 'set-log' },
-        h('h2', { class: 'card-title', id: 'set-log' }, 'Appearance'),
-        h('div', { class: 'field-label', id: 'lbl-theme' }, 'Theme'),
-        h(
-          'div',
-          { class: 'theme-switch', role: 'group', 'aria-labelledby': 'lbl-theme' },
-          THEMES.map(([id, label, icon]) =>
-            h(
-              'button',
-              {
-                type: 'button',
-                class: 'theme-opt',
-                'aria-pressed': String((settings.theme || 'system') === id),
-                dataset: { fk: `theme-${id}` },
-                onClick: () => {
-                  // a short cross-fade between the themes
-                  document.documentElement.classList.add('theme-switching');
-                  setTimeout(() => document.documentElement.classList.remove('theme-switching'), 250);
-                  if (ctx.saveSettings({ theme: id })) ctx.rerender();
-                },
-              },
-              icon(),
-              h('span', null, label),
-            ),
-          ),
-        ),
-        h('div', { class: 'field-label', id: 'lbl-accent' }, 'Accent colour'),
-        h(
-          'div',
-          { class: 'swatches', role: 'group', 'aria-labelledby': 'lbl-accent' },
-          ACCENTS.map((c) =>
-            h('button', {
-              type: 'button',
-              class: 'swatch',
-              // Ink is shown as it looks in the current theme (light in dark mode)
-              style: { '--swatch': c === INK_ACCENT ? 'var(--ink)' : c },
-              'aria-label': ACCENT_NAMES[c] || c,
-              'aria-pressed': String(settings.accent === c),
-              dataset: { fk: `accent-${c}` },
-              onClick: () => ctx.saveSettings({ accent: c }) && ctx.rerender(),
-            }),
-          ),
-        ),
-      ),
       syncCard(ctx),
       card(
         { 'aria-labelledby': 'set-backup' },

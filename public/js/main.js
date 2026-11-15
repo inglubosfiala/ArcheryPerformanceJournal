@@ -18,7 +18,7 @@ import { createRepository } from './storage/repository.js';
 import { createLocalStorageAdapter } from './storage/localStorageAdapter.js';
 import { migrations } from './storage/migrations.js';
 import { registerServiceWorker, requestPersistence } from './pwa/updates.js';
-import { collections, defaultSettings, DEFAULT_SIGHT_DISTANCES, SYNCED_SETTING_KEYS, INK_ACCENT } from './app/collections.js';
+import { collections, defaultSettings, DEFAULT_SIGHT_DISTANCES, SYNCED_SETTING_KEYS } from './app/collections.js';
 import { createGoogleAuth } from './sync/googleAuth.js';
 import { createDriveStore } from './sync/driveStore.js';
 import { createSyncService } from './sync/syncService.js';
@@ -340,34 +340,6 @@ const router = createRouter((r) => {
   if (changed && auth.configured && auth.isSignedIn() && !auth.getToken()) renewIfSafe();
 });
 
-// Light / dark: 'system' leaves <html> without data-theme, so the CSS follows the device setting.
-// The choice is mirrored to its own key, read by theme-boot.js before the first paint (no flash).
-const darkQuery = matchMedia('(prefers-color-scheme: dark)');
-function applyTheme() {
-  const { accent, theme = 'system' } = repo.getSettings();
-  const root = document.documentElement;
-  // Ink is the text colour: near-black in light mode, light in dark mode, so it stays visible.
-  // It is set by the CSS (data-accent), which picks the variant for the theme; the others are fixed.
-  if (accent === INK_ACCENT) {
-    root.dataset.accent = 'ink';
-    root.style.removeProperty('--accent');
-  } else {
-    delete root.dataset.accent;
-    root.style.setProperty('--accent', accent);
-  }
-  if (theme === 'light' || theme === 'dark') root.dataset.theme = theme;
-  else delete root.dataset.theme;
-  try {
-    localStorage.setItem(`${STORAGE_KEY}.theme`, theme);
-  } catch {
-    // storage blocked: the theme is still applied from the settings once the app has loaded
-  }
-  // the browser / status bar colour follows the page background
-  const ground = getComputedStyle(root).getPropertyValue('--ground').trim();
-  document.querySelector('meta[name="theme-color"]')?.setAttribute('content', ground || '#14181C');
-}
-darkQuery.addEventListener('change', applyTheme);
-
 function seed() {
   const s = repo.getSettings();
   if (!s.sightsSeeded) {
@@ -474,9 +446,7 @@ async function boot() {
     console.error(e);
   }
   shell = buildShell();
-  applyTheme();
   repo.subscribe((c) => {
-    if (c.type === 'settings' || c.type === 'import') applyTheme();
     if (c.type === 'import') renderNow();
     // local edits are pushed to Drive a little later (sync's own writes do not re-trigger it)
     if (['save', 'remove', 'settings', 'import'].includes(c.type)) sync.schedule();

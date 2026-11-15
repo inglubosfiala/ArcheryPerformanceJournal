@@ -1,72 +1,15 @@
-/* Archery Performance Journal — tokens, light/dark, mobile-first layout. No external fonts (offline + CSP). */
+/* Archery Performance Journal — layout and screen styles. The colours, type, spacing and radii are the
+   APL design tokens (apl-tokens.css, loaded first); the names below are older aliases still used here. */
 :root {
-  --ground: #f4f5f2;
-  --surface: #ffffff;
-  --ink: #14181c;
-  --ink-2: #3a4047;
-  --muted: #5b6168;
-  --border: #c9cdc6;
-  --divider: #dde0da;
-  --subtle: #edefea;
-  --accent: #0b6e4f;
-  --on-accent: #ffffff;
-  --focus: #2c6bed;
-  --danger: #b3261e;
-  --shadow: 0 1px 2px rgba(20, 24, 28, 0.06);
+  --ink-2: var(--ink-soft);
+  --divider: var(--border-soft);
+  --subtle: var(--surface-sunken);
+  --focus: var(--accent-bright);
+  --shadow: none;
   --header-h: 60px;
   --tabbar-h: 66px;
-  --font-display: 'Space Grotesk', 'Segoe UI', Roboto, system-ui, sans-serif;
-  --font-body: Inter, 'Segoe UI', Roboto, system-ui, -apple-system, sans-serif;
-  color-scheme: light;
-}
-
-/* Ink accent: the text colour, so it inverts with the theme (see applyTheme in main.js) */
-:root[data-accent='ink'] {
-  --accent: #14181c;
-  --on-accent: #ffffff;
-}
-
-@media (prefers-color-scheme: dark) {
-  :root[data-accent='ink']:not([data-theme='light']) {
-    --accent: #eef0ec;
-    --on-accent: #14181c;
-  }
-}
-
-:root[data-accent='ink'][data-theme='dark'] {
-  --accent: #eef0ec;
-  --on-accent: #14181c;
-}
-
-/* dark: the system setting, unless Settings picked light; or Settings picked dark */
-@media (prefers-color-scheme: dark) {
-  :root:not([data-theme='light']) {
-    --ground: #0f1215;
-    --surface: #1a1f24;
-    --ink: #eef0ec;
-    --ink-2: #d2d6d0;
-    --muted: #a6adb4;
-    --border: #3b434b;
-    --divider: #2c333a;
-    --subtle: #252b31;
-    --shadow: none;
-    --danger: #ff8a80;
-    color-scheme: dark;
-  }
-}
-
-:root[data-theme='dark'] {
-  --ground: #0f1215;
-  --surface: #1a1f24;
-  --ink: #eef0ec;
-  --ink-2: #d2d6d0;
-  --muted: #a6adb4;
-  --border: #3b434b;
-  --divider: #2c333a;
-  --subtle: #252b31;
-  --shadow: none;
-  --danger: #ff8a80;
-  color-scheme: dark;
+  --font-display: var(--font-sans);
+  --font-body: var(--font-sans);
 }
 
 *,
@@ -109,7 +52,7 @@ button:disabled {
 }
 
 a {
-  color: var(--accent);
+  color: var(--accent-bright);
 }
 
 :focus-visible {
@@ -1300,23 +1243,6 @@ textarea {
   transform: translateX(20px);
 }
 
-.swatches {
-  display: flex;
-  gap: 10px;
-}
-
-.swatch {
-  width: 48px;
-  height: 48px;
-  border-radius: 50%;
-  background: var(--swatch);
-  border: 3px solid var(--surface);
-  box-shadow: 0 0 0 1px var(--border);
-}
-
-.swatch[aria-pressed='true'] {
-  box-shadow: 0 0 0 3px var(--ink);
-}
 
 .import-preview {
   border: 1px solid var(--border);
@@ -2385,28 +2311,7 @@ body {
 
 /* ---------------------------------------------------------------- Insights */
 :root {
-  /* categorical series colors (validated: light surface #fff, dark surface #1a1f24) */
-  --series-1: #2a78d6;
-  --series-2: #eb6834;
-  --series-3: #1baf7a;
-  --series-4: #eda100;
-  --series-5: #e87ba4;
-  --series-6: #008300;
-}
-
-/* dark: the system setting, unless Settings picked light; or Settings picked dark */
-@media (prefers-color-scheme: dark) {
-  :root:not([data-theme='light']) {
-    --series-1: #3987e5;
-    --series-2: #d95926;
-    --series-3: #199e70;
-    --series-4: #c98500;
-    --series-5: #d55181;
-    --series-6: #008300;
-  }
-}
-
-:root[data-theme='dark'] {
+  /* categorical series colours: data only, never UI state */
   --series-1: #3987e5;
   --series-2: #d95926;
   --series-3: #199e70;
@@ -2414,6 +2319,7 @@ body {
   --series-5: #d55181;
   --series-6: #008300;
 }
+
 
 /* wide layout on a desktop browser */
 .app.app-wide {
@@ -3235,69 +3141,11 @@ body {
   transform-origin: top right;
 }
 
-/* Settings → Theme: System / Light / Dark */
-.theme-switch {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 4px;
-  padding: 4px;
-  border-radius: 14px;
-  background: var(--subtle);
-}
-
-.theme-opt {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-  min-height: 44px;
-  border: 0;
-  border-radius: 10px;
-  background: transparent;
-  color: var(--muted);
-  font: inherit;
-  font-size: 14px;
-  font-weight: 600;
-  transition: background 120ms, color 120ms;
-}
-
-.theme-opt[aria-pressed='true'] {
-  background: var(--surface);
-  color: var(--ink);
-  box-shadow: 0 1px 4px rgba(20, 24, 28, 0.15);
-}
-
-.theme-opt[aria-pressed='true'] svg {
-  color: var(--accent);
-}
-
-/* colours ease over when the theme is switched */
-html.theme-switching,
-html.theme-switching * {
-  transition: background-color 200ms, border-color 200ms, color 200ms !important;
-}
-
-@media (prefers-reduced-motion: reduce) {
-  html.theme-switching,
-  html.theme-switching * {
-    transition: none !important;
-  }
-}
 
 /* ---------------------------------------------------------------- confirmation dialog */
 .btn-danger {
   background: var(--danger);
-  color: #ffffff;
-}
-
-:root[data-theme='dark'] .btn-danger {
-  color: #14181c;
-}
-
-@media (prefers-color-scheme: dark) {
-  :root:not([data-theme='light']) .btn-danger {
-    color: #14181c;
-  }
+  color: var(--on-danger);
 }
 
 .confirm {
@@ -3629,15 +3477,8 @@ button.arrow-count:hover {
   padding: 0;
 }
 
-/* dark: the header is a panel like the tab bar (in light mode it stays the dark brand bar) */
-@media (prefers-color-scheme: dark) {
-  :root:not([data-theme='light']) .app-header {
-    background: var(--surface);
-    border-bottom: 1px solid var(--divider);
-  }
-}
-
-:root[data-theme='dark'] .app-header {
+/* the header is a panel like the tab bar */
+.app-header {
   background: var(--surface);
   border-bottom: 1px solid var(--divider);
 }
