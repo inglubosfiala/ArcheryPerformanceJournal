@@ -861,6 +861,10 @@ function scanContext(ctx) {
 
 /** Live camera: the result locks by itself (or Take now); Cancel in the preview goes back to the camera. */
 async function scoreLive(ctx) {
+  // Scan on a full end means "the next end": the full one is saved, a new end starts and the
+  // camera opens for it. On an end with room the scan reads that end anew (and replaces it).
+  const session = ctx.running.get();
+  if (session && session.view == null && L.shownEnd(session).arrows.every((a) => a.v != null)) update(ctx, L.nextEnd);
   for (;;) {
     const sc = scanContext(ctx);
     if (!sc) return;
