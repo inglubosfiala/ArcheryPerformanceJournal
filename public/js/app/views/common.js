@@ -67,8 +67,8 @@ export function whenCard(ctx, ss) {
   const redraw = ({ status }) => status === 'saved' && ctx.rerender();
   const change = (when) => redraw(ctx.finished.setWhen(ss.id, when));
   return card(
-    { 'aria-labelledby': 'when-title' },
-    h('h2', { class: 'card-title', id: 'when-title' }, 'When'),
+    // no heading: the date and the time speak for themselves
+    { 'aria-label': 'When' },
     h(
       'div',
       { class: 'grid-2' },

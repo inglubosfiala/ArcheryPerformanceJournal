@@ -187,15 +187,17 @@ function renderSetup(ctx, type, active = null) {
   const setWhen = (patch) => set({ when: { ...when, ...patch } });
   const whenSection = h(
     'section',
-    { class: 'setup-section', 'aria-labelledby': 'lbl-when' },
-    h(
-      'div',
-      { class: 'spread align-center' },
-      sectionLabel('When', 'lbl-when'),
-      when.date || when.time
-        ? h('button', { type: 'button', class: 'btn btn-text btn-sm', dataset: { fk: 'when-now' }, onClick: () => set({ when: null, pastMinutes: null }) }, 'Now')
-        : null,
-    ),
+    // no "When" label: the date and the time speak for themselves. "Now" (back to the present)
+    // shows only after one of them was changed.
+    { class: 'setup-section', 'aria-label': 'When' },
+    when.date || when.time
+      ? h(
+          'div',
+          { class: 'spread align-center when-now-row' },
+          h('span', null),
+          h('button', { type: 'button', class: 'btn btn-text btn-sm', dataset: { fk: 'when-now' }, onClick: () => set({ when: null, pastMinutes: null }) }, 'Now'),
+        )
+      : null,
     h(
       'div',
       { class: 'grid-2' },
@@ -451,15 +453,18 @@ function renderSetup(ctx, type, active = null) {
           : null,
       ];
 
+  // a timed form whose start is not in the past: its timer runs, it is a running session
+  const running = timed && !past;
   return {
     content: h(
       'div',
       { class: 'stack' },
-      // no back button on the scored setups (they have Cancel) and on a running SPT session (Save
-      // or Discard end it; the tab bar leaves it running)
-      isScored(type) || (type === 'strength' && timed && !past) ? null : backBar('#/new', 'Back to session type'),
-      // no title on the scored setups and the SPT page: the room goes to the form
-      isScored(type) || type === 'strength' ? null : h('h1', { class: 'page-title sm' }, `${TYPE_LABELS[type]} session`),
+      // no back button on the scored setups (they have Cancel) and on a running SPT or blank bale
+      // session (Save or Discard end it; the tab bar leaves it running)
+      isScored(type) || (running && (type === 'strength' || type === 'blank')) ? null : backBar('#/new', 'Back to session type'),
+      // no title on the scored setups, the SPT page and a running blank bale session: the room goes
+      // to the form
+      isScored(type) || type === 'strength' || (running && type === 'blank') ? null : h('h1', { class: 'page-title sm' }, `${TYPE_LABELS[type]} session`),
       active && isScored(type)
         ? h(
             'div',
