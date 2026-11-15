@@ -145,8 +145,6 @@ p {
   display: block;
 }
 
-.end-totals,
-.slot-grades,
 .saved-end {
   font-variant-numeric: tabular-nums;
 }
@@ -314,56 +312,21 @@ p {
   color: var(--on-grade-light);
 }
 
-.end-head {
-  display: flex;
-  justify-content: space-between;
-  align-items: baseline;
-  gap: 8px;
-}
 
-.end-title {
-  font: var(--type-screen-title);
-}
 
-.end-totals {
-  display: flex;
-  gap: 14px;
-  font-size: 13px;
-  color: var(--muted);
-}
 
-.end-totals strong {
-  color: var(--ink);
-  font-size: 18px;
-}
 
-.slots {
-  display: grid;
-  gap: 4px;
-}
 
-.slot {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 4px;
-  padding: 6px 0;
-  border: 0;
-  background: transparent;
-  border-radius: 12px;
-  min-height: 72px;
-  min-width: 0;
-}
 
-.slot.is-active {
-  box-shadow: inset 0 0 0 2px var(--accent);
-}
 
-.slot-grades {
-  font-size: 11px;
-  color: var(--muted);
-  white-space: nowrap;
-}
+
+
+
+
+
+
+
+
 
 .keypad {
   display: grid;
@@ -676,23 +639,14 @@ textarea {
   box-shadow: 0 0 0 2px var(--ground);
 }
 
-.slot.is-moving {
-  box-shadow: inset 0 0 0 2px var(--mark);
-}
 
-.slot.is-moving .score-chip {
-  outline: 2px dashed var(--mark);
-  outline-offset: 2px;
-}
 
-/* Undo sits in the end header now that the input-mode toggle is gone */
-.end-head {
-  align-items: center;
-}
 
-.end-totals {
-  align-items: center;
-}
+
+
+
+
+
 
 /* ---------------------------------------------------------------- inline M/S grades */
 .grade-panel {
@@ -708,11 +662,8 @@ textarea {
   width: min(100%, 340px, max(240px, calc(100dvh - 400px)));
 }
 
-/* compact the logging card so slots + target + quick keys + grades fit one screen */
-.slot {
-  min-height: 62px;
-  padding: 4px 0;
-}
+
+
 
 .grade-panel {
   gap: 4px;
@@ -726,54 +677,23 @@ textarea {
   width: min(100%, 340px, max(230px, calc(100dvh - 530px)));
 }
 
-/* ---------------------------------------------------------------- arrow slots as a column left of the target */
-.aim-row {
-  display: grid;
-  grid-template-columns: 52px minmax(0, 1fr);
-  gap: 8px;
-  align-items: center;
-  width: 100%;
-}
 
-.aim-row .slots {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  align-self: center;
-}
 
-.aim-row .slot {
-  min-height: 0;
-  padding: 3px 0;
-  gap: 1px;
-}
 
-.aim-row .slot .score-chip {
-  width: 36px;
-  height: 36px;
-  font-size: 15px;
-}
 
-.aim-row .slot-grades {
-  font-size: 10px;
-}
 
-.aim-row .target-stage {
-  justify-self: center;
-  width: min(100%, 340px, max(230px, calc(100dvh - 460px)));
-}
 
-/* ---------------------------------------------------------------- end navigation */
-.end-nav {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  min-width: 0;
-}
 
-.end-nav .end-title {
-  white-space: nowrap;
-}
+
+
+
+
+
+
+
+
+
+
 
 .end-of {
   font-size: 13px;
@@ -801,110 +721,45 @@ button.saved-end {
   background: var(--ground);
 }
 
-/* tighter arrow column so 6 arrows are about as tall as the target */
-.aim-row .slots {
-  gap: 0;
-}
 
-.aim-row .slot {
-  padding: 2px 0;
-}
 
-.aim-row .slot .score-chip {
-  width: 34px;
-  height: 34px;
-}
 
-/* selected arrow in the left column: evenly padded square around chip + grades, no dashed ring */
-.aim-row .slot {
-  width: 100%;
-  padding: 5px 0 4px;
-  border-radius: 12px;
-  align-items: center;
-  justify-content: center;
-}
 
-.slot.is-moving .score-chip {
-  outline: none;
-}
 
-.aim-row .slot {
-  padding: 4px 0 3px;
-}
 
-.aim-row .slot .score-chip {
-  width: 32px;
-  height: 32px;
-  font-size: 14px;
-}
 
-/* M / S grade badges under each arrow's score */
-.slot-grades {
-  display: flex;
-  gap: 2px;
-}
 
-.mini-grade {
-  min-width: 23px;
-  height: 18px;
-  padding: 0 2px;
-  border-radius: 5px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 10.5px;
-  font-weight: 700;
-  line-height: 1;
-  font-variant-numeric: tabular-nums;
-}
 
-.mini-grade.empty {
-  background: transparent;
-  color: var(--muted);
-  box-shadow: inset 0 0 0 1px var(--divider);
-  font-weight: 600;
-}
 
-.aim-row .slot {
-  gap: 3px;
-  padding: 3px 0 3px;
-}
 
-.aim-row .slot-grades {
-  font-size: inherit;
-}
 
-.aim-row .slot {
-  gap: 2px;
-  padding: 2px 0;
-}
 
-/* scoring card runs edge to edge like the header bar */
-.card-bleed {
-  margin-left: -16px;
-  margin-right: -16px;
-  max-width: none;
-  border-radius: 0;
-  padding: 12px;
-}
 
-@media (min-width: 600px) {
-  .card-bleed {
-    margin-left: -24px;
-    margin-right: -24px;
-    padding: 14px 24px;
-  }
-}
 
-/* with the extra width the target can grow; height still keeps the whole end on one screen */
-.aim-row .target-stage {
-  width: min(100%, 560px, max(230px, calc(100dvh - 530px)));
-}
 
-/* ungraded: show nothing (space is kept so the column doesn't jump when a grade is added) */
-.mini-grade.empty {
-  visibility: hidden;
-}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 /* ---------------------------------------------------------------- all cards edge to edge */
 .main .card {
@@ -925,63 +780,33 @@ button.saved-end {
   }
 }
 
-/* scoring card keeps its tighter side padding (more room for the target) */
-.main .card.card-bleed {
-  padding-left: 12px;
-  padding-right: 12px;
-}
 
-/* arrow column starts at the top of the target, not vertically centred */
-.aim-row {
-  align-items: start;
-}
 
-.aim-row .slots {
-  align-self: start;
-}
 
-.end-head .end-totals {
-  min-width: 0;
-  gap: 8px;
-}
 
-/* no top bar on the Log page: 60px more height for the target */
-.aim-row .target-stage {
-  width: min(100%, 560px, max(230px, calc(100dvh - 470px)));
-}
 
-/* no selection square around arrows in the left column */
-.slot.is-active,
-.slot.is-moving {
-  box-shadow: none;
-}
+
+
+
+
+
+
+
+
+
+
 
 /* ---------------------------------------------------------------- selected arrow (the one the M/S rows grade) */
-/* a ring around its score chip instead of a square around the slot */
-.aim-row .slot.is-active .score-chip {
-  box-shadow:
-    0 0 0 2px var(--surface),
-    0 0 0 4px var(--accent);
-}
 
-/* selected for re-scoring (next target touch / key replaces it) */
-.aim-row .slot.is-moving .score-chip {
-  box-shadow:
-    0 0 0 2px var(--surface),
-    0 0 0 4px var(--mark);
-}
 
-/* its missing grades show as outlined placeholders, so it is clear where M and S will go */
-.aim-row .slot.is-active .mini-grade.empty {
-  visibility: visible;
-  box-shadow: inset 0 0 0 1.5px var(--accent);
-  color: var(--accent);
-}
 
-.aim-row .slot.is-moving .mini-grade.empty {
-  box-shadow: inset 0 0 0 1.5px var(--mark);
-  color: var(--mark);
-}
+
+
+
+
+
+
+
 
 /* ---------------------------------------------------------------- session group on the detail page */
 .group-face {
@@ -1017,18 +842,10 @@ button.saved-end {
   border-top: 3px solid #b45309;
 }
 
-/* more than 6 arrows per end: arrow list in two columns so the target keeps its size */
-.aim-row.aim-row-wide {
-  grid-template-columns: 104px minmax(0, 1fr);
-}
 
-.aim-row .slots.slots-2col {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  grid-auto-flow: column;
-  grid-template-rows: repeat(6, auto);
-  column-gap: 0;
-}
+
+
+
 
 /* three-spot sheets (triple, Vegas): not round, and never taller than the screen */
 .target-btn.target-sheet {
@@ -1252,10 +1069,8 @@ body {
   }
 }
 
-/* session timer on the Log (tap to pause / resume) */
-.end-totals {
-  align-items: center;
-}
+
+
 
 /* blank bale arrow counter: big count label, big +1 / +3 / +6 buttons */
 .arrow-count-box {
@@ -1859,10 +1674,7 @@ button.arrow-count:hover {
   max-height: none;
 }
 
-.end-totals {
-  display: flex;
-  gap: 8px;
-}
+
 
 /* live camera scan: full-screen view with the detection drawn over the video */
 .live-scan {
@@ -2069,4 +1881,294 @@ button.arrow-count:hover {
 /* Settings: the support link looks like a secondary button */
 .support-link {
   text-decoration: none;
+}
+
+/* ---------------------------------------------------------------- scoring screen (running session) */
+/* The end on one phone screen: header, slot strip, face, keypad or grades; Undo, Scan and the
+   primary action in the bottom bar. Let-downs, the note and Finish follow by scrolling. */
+.score-screen {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.score-head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.score-head-text {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.score-title {
+  margin: 0;
+  font: var(--type-screen-title);
+}
+
+.score-sub {
+  margin: 0;
+  font: var(--type-caption);
+  color: var(--muted);
+}
+
+/* slot strip: one card per arrow, the current one outlined in accent */
+.slot-strip {
+  display: grid;
+  grid-template-columns: repeat(var(--slot-cols, 3), minmax(0, 1fr));
+  gap: var(--space-2);
+}
+
+.slot-card {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+  min-height: 52px;
+  padding: 0 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+  color: var(--ink);
+  font: inherit;
+  text-align: left;
+}
+
+.slot-card.is-active {
+  border-color: var(--accent-bright);
+  box-shadow: inset 0 0 0 1px var(--accent-bright);
+}
+
+.slot-card .score-chip {
+  flex: none;
+  width: 32px;
+  height: 32px;
+  font-size: 15px;
+}
+
+.slot-card .score-chip.z-empty {
+  background: var(--surface-sunken);
+  border-color: var(--radio-off);
+  color: var(--muted);
+}
+
+.slot-card-text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  line-height: 1.25;
+}
+
+.slot-card-name {
+  font: var(--type-caption);
+  color: var(--muted);
+}
+
+.slot-card-grades {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ink-soft);
+  white-space: nowrap;
+}
+
+/* more than six arrows: smaller cards, the chip over the grades */
+.slot-strip.is-compact .slot-card {
+  flex-direction: column;
+  justify-content: center;
+  gap: 2px;
+  min-height: 56px;
+  padding: 4px 0;
+}
+
+.slot-strip.is-compact .slot-card-text {
+  align-items: center;
+}
+
+.slot-strip.is-compact .slot-card-grades {
+  font-size: 11px;
+}
+
+/* Previous / Next end: small text links (used less than the bottom bar). The row keeps its height
+   when it has no link, so the face does not jump when "Save end now" appears after the first arrow. */
+.end-links {
+  display: flex;
+  justify-content: space-between;
+  min-height: var(--tap-min);
+}
+
+.end-link,
+.text-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  min-height: var(--tap-min);
+  padding: 0 6px;
+  border: 0;
+  background: transparent;
+  color: var(--accent-bright);
+  font: inherit;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.end-link svg {
+  width: 18px;
+  height: 18px;
+}
+
+/* the face: a row over a multi-spot sheet, then the stage (the loupe docks inside it) */
+.score-face {
+  align-items: stretch;
+  gap: var(--space-1);
+}
+
+.score-face .target-stage {
+  align-self: center;
+  width: min(100%, 560px, max(230px, calc(100dvh - 470px)));
+}
+
+.face-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: var(--tap-min);
+}
+
+.next-spot {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--accent-bright);
+}
+
+.spot-of {
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.next-spot[hidden],
+.spot-of[hidden] {
+  display: none;
+}
+
+.face-bar .zoom-out-btn {
+  position: static;
+  height: var(--tap-min);
+  padding: 0 12px 0 0;
+  background: transparent;
+  box-shadow: none;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+/* the spot suggested for the current arrow (a hint: any spot can be tapped) */
+.spot-hint {
+  fill: none;
+  stroke: var(--accent-bright);
+  stroke-width: 3px;
+  vector-effect: non-scaling-stroke;
+}
+
+.target-btn.is-zoomed .spot-hint {
+  display: none;
+}
+
+/* under the face, in one place: the score keypad or the M / S grades */
+.score-under {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.or-divider {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font: var(--type-caption);
+  color: var(--muted);
+}
+
+.or-divider::before,
+.or-divider::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: var(--border-soft);
+}
+
+.under-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.under-foot {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: -4px;
+}
+
+.score-under .apl-keypad .apl-key {
+  min-height: 48px;
+}
+
+.score-under .grade-panel {
+  border-top: 0;
+  padding-top: 0;
+  gap: var(--space-2);
+}
+
+/* the chosen grade: a 3px ring (the others dim) */
+.score-under .grade-panel .apl-key[aria-pressed='true'] {
+  box-shadow: 0 0 0 3px var(--ink);
+}
+
+/* bottom bar: Undo, Scan (the most used: accent outline), and the primary action */
+.score-actions {
+  display: flex;
+  gap: 10px;
+}
+
+.score-actions .apl-btn {
+  flex: 1;
+  min-width: 0;
+}
+
+.score-undo,
+.score-scan {
+  flex: none;
+  height: var(--tap-primary);
+  border-radius: var(--radius-xl);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--ink);
+  font: var(--type-button-lg);
+}
+
+.score-undo {
+  width: var(--tap-primary);
+  border: 1px solid var(--border);
+  background: var(--surface);
+}
+
+.score-scan {
+  gap: 8px;
+  padding: 0 16px;
+  border: 2px solid var(--accent-bright);
+  background: var(--accent-tint);
+}
+
+.score-scan svg {
+  color: var(--accent-bright);
+}
+
+.score-undo:disabled,
+.score-scan:disabled {
+  opacity: 0.45;
 }

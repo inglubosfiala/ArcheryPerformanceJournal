@@ -62,6 +62,21 @@ export function spotCentres(face) {
 }
 
 /**
+ * The spot suggested for the arrow in slot `cursor` of an end on a three-spot sheet (a hint only:
+ * any spot can be shot at). Slot n suggests spot n; when that spot is already used by another arrow
+ * of the end (or there is no spot n), the first spot not used yet; when all are used, they repeat.
+ * Null on a single face.
+ */
+export function suggestedSpot(face, arrows, cursor) {
+  if (!isMultiSpot(face)) return null;
+  const count = spotCentres(face).length;
+  const used = new Set(arrows.filter((a, i) => i !== cursor && a.spot != null).map((a) => a.spot));
+  if (cursor < count && !used.has(cursor)) return cursor;
+  const free = Array.from({ length: count }, (_, i) => i).find((i) => !used.has(i));
+  return free ?? cursor % count;
+}
+
+/**
  * Which spot a point on the sheet belongs to (the nearest centre). `sx`, `sy` are sheet coordinates
  * normalised to one spot's radius. Returns the position relative to that spot's centre, which is what
  * is stored and scored; `spot` is null on single faces.

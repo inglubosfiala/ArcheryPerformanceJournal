@@ -8,6 +8,8 @@ import {
   isMultiSpot,
   spotCentres,
   zoneOf,
+  faceLabel,
+  suggestedSpot,
 } from '../scoring.js';
 import { sumArrows, computeStats, fmt } from '../stats.js';
 import * as L from '../sessionLogic.js';
@@ -92,66 +94,73 @@ export function renderNewSession(ctx, params = []) {
   if (isScored(type)) return renderScoredSetup(ctx, type, ctx.running.get());
   return renderFormSetup(ctx, type);
 }
-
 /** Apply a session transition to the running session; the page is drawn again when it changed. */
 function update(ctx, fn, { rerender = true } = {}) {
-  if (ctx.running.apply(fn) && rerender) ctx.rerender();
+  const changed = ctx.running.apply(fn);
+  if (changed && rerender) ctx.rerender();
+  return changed;
 }
 
 // ---------------------------------------------------------------- active session
+
+// The arrow whose score is being changed with the keypad ("Change score"), as `<end index>:<slot>`.
+// Kept across re-renders of the page; any score entered, or another arrow selected, ends it.
+let rescoring = null;
+
+// One polite live region for the whole app (it outlives the page's re-renders, so screen readers
+// hear every announcement): "Arrow 2: 9" when an arrow is scored.
+let liveRegion = null;
+function announce(text) {
+  if (!liveRegion?.isConnected) {
+    liveRegion = h('div', { class: 'sr-only', role: 'status', 'aria-live': 'polite' });
+    document.body.append(liveRegion);
+  }
+  liveRegion.textContent = '';
+  setTimeout(() => {
+    liveRegion.textContent = text;
+  }, 50);
+}
+
+/** Announce the selected arrow's score (the arrow that just received one). */
+function announceArrow(ctx) {
+  const s = ctx.running.get();
+  const a = s && L.shownEnd(s).arrows[s.cursor];
+  if (a?.v != null) announce(`Arrow ${s.cursor + 1}: ${a.v}`);
+}
+
+const PRIMARY_LABELS = {
+  place: (pa) => `Place arrow ${pa.slot}`,
+  grade: () => 'Grade M and S',
+  next: () => 'Next arrow',
+  save: (pa) => `Save end ${pa.end}`,
+  back: (pa) => T.backToEnd(pa.end),
+};
+const PRIMARY_RUNS = {
+  next: L.nextArrow,
+  save: L.nextEnd,
+  back: (c) => L.goToEnd(c, null),
+};
 
 function renderActive(ctx, session) {
   const { cursor } = session;
   const current = L.shownEnd(session); // the end on screen (the current one or a saved one)
   const viewing = session.view != null;
   const editing = L.isEditing(session);
-  const enter = (v, x, y, spot) => update(ctx, (cur) => L.enterScore(cur, v, x, y, spot));
-
+  const askGrades = ctx.repo.getSettings().askGrades !== false;
   const endNo = L.viewIndex(session) + 1;
   const totalEnds = session.ends.length + 1;
   const sight = findSightMark(ctx.repo, session.distance);
+  const picked = current.arrows[cursor];
 
-  // --- slots
-  const slots = h(
-    'div',
-    {
-      class: ['slots', current.arrows.length > 6 && 'slots-2col'],
-      role: 'group',
-      'aria-label': 'Arrows in this end',
-    },
-    current.arrows.map((a, i) => {
-      const active = i === cursor;
-      return h(
-        'button',
-        {
-          type: 'button',
-          class: ['slot', active && 'is-active', active && editing && 'is-moving'],
-          'aria-label': `Arrow ${i + 1}${a.v == null ? ', empty' : `, ${a.v}`}${a.m ? `, M${a.m}` : ''}${a.s ? `, S${a.s}` : ''}${active ? ', selected' : ''}`,
-          dataset: { fk: `slot-${i}` },
-          'aria-pressed': String(active && editing),
-          onClick: () => update(ctx, (cur) => L.selectArrow(cur, i)),
-        },
-        h('span', { class: `score-chip z-${zoneOf(a.v)}` }, a.v == null ? String(i + 1) : String(a.v)),
-        // M and S as small badges in the grade colours — as visible as the score
-        h(
-          'span',
-          { class: 'slot-grades', 'aria-hidden': 'true' },
-          h('span', { class: `mini-grade ${a.m ? `g${a.m}` : 'empty'}` }, `M${a.m ?? ''}`),
-          h('span', { class: `mini-grade ${a.s ? `g${a.s}` : 'empty'}` }, `S${a.s ?? ''}`),
-        ),
-      );
-    }),
-  );
+  const slotKey = `${L.viewIndex(session)}:${cursor}`;
+  if (rescoring !== slotKey) rescoring = null;
+  const enter = (v, x, y, spot) => {
+    rescoring = null;
+    if (update(ctx, (cur) => L.enterScore(cur, v, x, y, spot))) announceArrow(ctx);
+  };
 
-  // Clear: shown when an arrow was tapped on the left and has a score or grades; empties that arrow
-  const picked = session.pinned ? L.shownEnd(session).arrows[session.cursor] : null;
-  const clearable = !!picked && (picked.v != null || picked.m != null || picked.s != null);
-  const input = targetInput(session, enter, slots, {
-    onMove: (i, v, x, y, spot) => update(ctx, (cur) => L.moveArrow(cur, i, v, x, y, spot)),
-    clearable,
-    clearLabel: `Clear arrow ${session.cursor + 1}`,
-    onClear: () => update(ctx, L.clearArrow),
-  });
+  const total =
+    session.ends.reduce((n, e) => n + sumArrows(e.arrows), 0) + (viewing ? 0 : sumArrows(current.arrows));
 
   // session timer: tap to pause / resume
   // sessions started before the timer existed show it stopped at 0:00; one tap starts it
@@ -159,61 +168,192 @@ function renderActive(ctx, session) {
     update(ctx, (c) => (c.timer?.running ? L.pauseTimer(c) : L.resumeTimer(c))),
   );
 
-  // Tapping an arrow on the left selects it: the next target touch / key replaces it, grades below apply to it;
-  // tapping it again deselects it.
-  const grades = gradePanel(session, { onGrade: (kind, g) => update(ctx, (c) => L.gradeArrow(c, kind, g)) });
-
-  const endCard = card(
-    { class: 'card-bleed', 'aria-label': `End ${endNo}` },
+  // --- top: the end, the session's total, distance and face, and the timer
+  const header = h(
+    'header',
+    { class: 'score-head' },
     h(
       'div',
-      { class: 'end-head' },
-      // only the end's name up here; Previous / Next end are under the grades
+      { class: 'score-head-text' },
       h(
-        'div',
-        { class: 'end-nav' },
-        h(
-          'h2',
-          { class: 'end-title' },
-          `${T.end} ${endNo}`,
-          h('span', { class: 'end-of muted' }, totalEnds > 1 ? ` / ${totalEnds}` : ''),
-        ),
+        'h2',
+        { class: 'score-title' },
+        `${T.end} ${endNo}`,
+        viewing ? h('span', { class: 'end-of muted' }, ` of ${totalEnds}`) : null,
       ),
-      h('div', { class: 'end-totals' }, timerBtn),
+      h('p', { class: 'score-sub' }, [`Total ${total}`, `${session.distance} m`, faceLabel(session.face)].join(' · ')),
     ),
-    input,
-    grades,
-    // Previous end (disabled on the first end) and the camera (score the end from the target, at the
-    // thumb). Next end is the screen's primary action, in the bottom bar.
-    h(
-      'div',
-      { class: 'apl-grid-2' },
-      APL.Button({
-        children: T.prevShort,
-        variant: 'secondary',
-        leadingIcon: 'back',
-        // the button itself says just "Previous", so it fits
-        label: T.prevEnd,
-        disabled: !L.canPrevEnd(session),
-        onClick: () => update(ctx, L.prevEnd),
-        fk: 'end-prev',
-      }),
-      photoButton(ctx, session),
-    ),
+    timerBtn,
   );
 
-  // Next end: on the newest end it saves it and starts a new one (it needs at least one arrow); on
-  // an earlier end it moves one end forward.
-  const nextBtn = APL.Button({
-    children: T.nextEnd,
-    trailingIcon: 'arrowRight',
-    label: viewing ? T.nextEnd : `${T.nextEnd} (saves end ${endNo})`,
-    disabled: !L.canNextEnd(session),
-    onClick: () => update(ctx, L.nextEnd),
-    fk: 'end-next',
+  // --- slot strip: one card per slot; tapping one makes it the current arrow
+  const compact = current.arrows.length > 6;
+  const cols = compact ? 4 : current.arrows.length === 4 ? 2 : Math.min(3, current.arrows.length);
+  const strip = h(
+    'div',
+    {
+      class: ['slot-strip', compact && 'is-compact'],
+      role: 'group',
+      'aria-label': 'Arrows in this end',
+      style: { '--slot-cols': String(cols) },
+    },
+    current.arrows.map((a, i) => {
+      const active = i === cursor;
+      const grades = `M${a.m ?? '–'} · S${a.s ?? '–'}`;
+      return h(
+        'button',
+        {
+          type: 'button',
+          class: ['slot-card', active && 'is-active', active && editing && 'is-moving'],
+          'aria-label': `Arrow ${i + 1}${a.v == null ? ', empty' : `, ${a.v}`}${a.m ? `, M${a.m}` : ''}${a.s ? `, S${a.s}` : ''}${active ? ', selected' : ''}`,
+          'aria-pressed': String(active),
+          dataset: { fk: `slot-${i}` },
+          onClick: () => update(ctx, (cur) => L.selectArrow(cur, i)),
+        },
+        h('span', { class: `score-chip z-${zoneOf(a.v)}`, 'aria-hidden': 'true' }, a.v == null ? (compact ? String(i + 1) : '') : String(a.v)),
+        h(
+          'span',
+          { class: 'slot-card-text', 'aria-hidden': 'true' },
+          compact ? null : h('span', { class: 'slot-card-name' }, `Arrow ${i + 1}`),
+          h('span', { class: 'slot-card-grades' }, grades),
+        ),
+      );
+    }),
+  );
+
+  // --- Previous / Next end: used less, so small text links under the strip
+  const endLink = (label, { icon, trailing, onClick, fk }) =>
+    h(
+      'button',
+      { type: 'button', class: 'end-link', onClick, dataset: { fk } },
+      icon ? icon() : null,
+      label,
+      trailing ? trailing() : null,
+    );
+  const emptyLeft = L.nextEmpty(current.arrows) >= 0;
+  const endLinks = h(
+    'nav',
+    { class: 'end-links', 'aria-label': 'Ends' },
+    L.canPrevEnd(session)
+      ? endLink(`End ${endNo - 1}`, { icon: icons.back, onClick: () => update(ctx, L.prevEnd), fk: 'end-prev' })
+      : h('span'),
+    viewing
+      ? endLink(`End ${endNo + 1}`, { trailing: icons.forward, onClick: () => update(ctx, L.nextEnd), fk: 'end-next' })
+      : // an end with arrows still empty can be saved early (the full end is saved by the primary button)
+        L.canNextEnd(session) && emptyLeft
+        ? endLink(`Save end ${endNo} now`, { trailing: icons.forward, onClick: () => update(ctx, L.nextEnd), fk: 'end-next' })
+        : h('span'),
+  );
+
+  // --- the face (multi-spot sheets: the spot suggested for an empty current slot is outlined)
+  const hintSpot = picked.v == null ? suggestedSpot(session.face, current.arrows, cursor) : null;
+  const input = targetInput(session, enter, {
+    hintSpot,
+    onMove: (i, v, x, y, spot) => {
+      if (update(ctx, (cur) => L.moveArrow(cur, i, v, x, y, spot))) announceArrow(ctx);
+    },
   });
 
-  // --- end details
+  // --- under the face, in one place: the score keypad while the current arrow has no score (or its
+  // score is being changed), else its M / S grades
+  const keypadMode = picked.v == null || rescoring === slotKey;
+  const under = keypadMode
+    ? h(
+        'div',
+        { class: 'score-under' },
+        picked.v == null
+          ? h('div', { class: 'or-divider' }, h('span', null, 'or enter the score only'))
+          : h(
+              'div',
+              { class: 'under-head' },
+              h('span', null, `Change the score of arrow ${cursor + 1}`),
+              h(
+                'button',
+                {
+                  type: 'button',
+                  class: 'text-link',
+                  onClick: () => {
+                    rescoring = null;
+                    if (!update(ctx, L.doneEditing)) ctx.rerender();
+                  },
+                },
+                'Keep score',
+              ),
+            ),
+        APL.ScoreKeypad({
+          label: 'Score without position',
+          keys: ['X', 10, 9, 8, 7, 6, 'M'].map((k) => ({
+            value: k,
+            zone: zoneOf(k),
+            ariaLabel: `Score ${k === 'M' ? 'miss' : k}`,
+          })),
+          value: picked.v,
+          onKey: (k) => enter(k, null, null),
+          // changing a score: Clear at the thumb's end of the row empties the arrow instead
+          clear:
+            picked.v == null
+              ? null
+              : {
+                  enabled: true,
+                  label: `Clear arrow ${cursor + 1}`,
+                  onClick: () => {
+                    rescoring = null;
+                    update(ctx, L.clearArrow);
+                  },
+                },
+          fk: 'quick',
+        }),
+      )
+    : h(
+        'div',
+        { class: 'score-under' },
+        gradePanel(session, { onGrade: (kind, g) => update(ctx, (c) => L.gradeArrow(c, kind, g)) }),
+        h(
+          'div',
+          { class: 'under-foot' },
+          h(
+            'button',
+            {
+              type: 'button',
+              class: 'text-link',
+              dataset: { fk: 'change-score' },
+              onClick: () => {
+                rescoring = slotKey;
+                // selected for editing: the next key or touch on the face replaces this arrow
+                if (!session.pinned) update(ctx, (c) => L.selectArrow(c, cursor));
+                else ctx.rerender();
+              },
+            },
+            `Change score of arrow ${cursor + 1}`,
+          ),
+        ),
+      );
+
+  // --- bottom bar, in thumb reach: Undo, Scan (the most used), and the primary action
+  const pa = L.primaryAction(session, { askGrades });
+  const primary = APL.Button({
+    children: PRIMARY_LABELS[pa.action](pa),
+    disabled: !pa.enabled,
+    onClick: () => update(ctx, PRIMARY_RUNS[pa.action]),
+    fk: 'primary',
+  });
+  const undoBtn = h(
+    'button',
+    {
+      type: 'button',
+      class: 'score-undo',
+      'aria-label': 'Undo last arrow',
+      disabled: !current.arrows.some((a) => a.v != null),
+      onClick: () => {
+        rescoring = null;
+        update(ctx, L.undo);
+      },
+      dataset: { fk: 'undo' },
+    },
+    icons.undo(),
+  );
+
+  // --- end details, below the end (reached by scrolling)
   const stepper = (key, label) =>
     APL.Section({
       label,
@@ -249,15 +389,6 @@ function renderActive(ctx, session) {
       fk: 'note',
       onInput: (e) => update(ctx, (c) => L.setNote(c, e.target.value), { rerender: false }),
     }),
-    // looking at an earlier end: jump straight back to the one being shot
-    viewing
-      ? APL.Button({
-          children: T.backToEnd(totalEnds),
-          variant: 'secondary',
-          onClick: () => update(ctx, (c) => L.goToEnd(c, null)),
-          fk: 'back-current',
-        })
-      : null,
     APL.Button({ children: T.finish, variant: 'secondary', disabled: !canFinish, onClick: finish, fk: 'finish' }),
   );
 
@@ -300,7 +431,7 @@ function renderActive(ctx, session) {
     );
   });
 
-  // Distance, face and arrows/end are already in the header subtitle; only the sight mark is shown here.
+  // the sight mark for this distance, when one is saved
   const pills =
     sight && (sight.elevation || sight.windage)
       ? h(
@@ -310,8 +441,6 @@ function renderActive(ctx, session) {
         )
       : null;
 
-  const total =
-    session.ends.reduce((n, e) => n + sumArrows(e.arrows), 0) + (viewing ? 0 : sumArrows(current.arrows));
   return {
     content: h(
       'div',
@@ -319,8 +448,8 @@ function renderActive(ctx, session) {
       h(
         'div',
         { class: 'apl-screen-body log-body' },
+        h('section', { class: 'score-screen', 'aria-label': `End ${endNo}` }, header, strip, endLinks, input, under),
         pills,
-        endCard,
         details,
         rows.length
           ? card(
@@ -331,10 +460,7 @@ function renderActive(ctx, session) {
         gearCard(ctx, session),
         h('button', { type: 'button', class: 'btn btn-text danger apl-discard', onClick: discard }, T.discardSession),
       ),
-      APL.BottomBar({
-        summary: `${T.end} ${endNo} · Total ${total}`,
-        children: nextBtn,
-      }),
+      APL.BottomBar({ children: h('div', { class: 'score-actions' }, undoBtn, photoButton(ctx, session), primary) }),
     ),
   };
 }
@@ -347,15 +473,20 @@ function renderActive(ctx, session) {
  * afterwards. Pictures are only used in memory and are never stored.
  */
 function photoButton(ctx, session) {
-  return APL.Button({
-    children: 'Scan',
-    variant: 'secondary',
-    leadingIcon: icons.camera(),
-    label: 'Score arrows with the camera',
-    disabled: !canScan(session),
-    onClick: () => scanTarget(ctx),
-    fk: 'photo',
-  });
+  // the scoring screen's most used button: outlined in accent, next to Undo in the bottom bar
+  return h(
+    'button',
+    {
+      type: 'button',
+      class: 'score-scan',
+      'aria-label': 'Score arrows with the camera',
+      disabled: !canScan(session),
+      onClick: () => scanTarget(ctx),
+      dataset: { fk: 'photo' },
+    },
+    icons.camera(),
+    'Scan',
+  );
 }
 
 /**
@@ -580,8 +711,7 @@ function arrowDots(session) {
  * A finger aims a little above itself (AIM_OFFSET_PX); the magnifier docks in a corner of the stage
  * away from the finger and the aimed point.
  */
-function targetInput(session, enter, slots, { clearable = false, clearLabel = 'Clear arrow', onClear, onMove } = {}) {
-  const selectedValue = L.shownEnd(session).arrows[session.cursor]?.v ?? null;
+function targetInput(session, enter, { hintSpot = null, onMove } = {}) {
   // magnifier: zoomed copy of the face centred on the aimed point, with a crosshair and the live score
   const marker = s(
     'g',
@@ -628,6 +758,15 @@ function targetInput(session, enter, slots, { clearable = false, clearLabel = 'C
     'svg',
     { viewBox: faceViewBox(session.face), 'aria-hidden': 'true', focusable: 'false' },
     faceSheet(session.face),
+    // the spot suggested for the current arrow: only a hint, any spot can be tapped
+    hintSpot != null
+      ? s('circle', {
+          class: 'spot-hint',
+          cx: spotCentres(session.face)[hintSpot][0],
+          cy: spotCentres(session.face)[hintSpot][1],
+          r: 100,
+        })
+      : null,
     arrowDots(session),
     moveGuide,
   );
@@ -666,12 +805,17 @@ function targetInput(session, enter, slots, { clearable = false, clearLabel = 'C
     };
     anim = requestAnimationFrame(step);
   };
+  // the row over a multi-spot sheet: "Next: spot n" on the whole sheet; "All spots" and
+  // "Spot n of 3" while zoomed into one
   const zoomOutBtn = h(
     'button',
     { type: 'button', class: 'zoom-out-btn', hidden: true, 'aria-label': 'Show all spots', onClick: () => zoomTo(null) },
     icons.back(),
     'All spots',
   );
+  const nextSpot = h('span', { class: 'next-spot', hidden: hintSpot == null }, hintSpot == null ? '' : `Next: spot ${hintSpot + 1}`);
+  const spotOf = h('span', { class: 'spot-of', hidden: true });
+  const faceBar = multi ? h('div', { class: 'face-bar' }, zoomOutBtn, nextSpot, spotOf) : null;
   if (multi && zoomOutFrom != null) {
     sheet.setAttribute('viewBox', spotBox(zoomOutFrom).join(' '));
     zoomOutFrom = null;
@@ -682,6 +826,9 @@ function targetInput(session, enter, slots, { clearable = false, clearLabel = 'C
     setBox(i == null ? fullBox : spotBox(i));
     btn.classList.toggle('is-zoomed', i != null);
     zoomOutBtn.hidden = i == null;
+    spotOf.hidden = i == null;
+    spotOf.textContent = i == null ? '' : `Spot ${i + 1} of ${spotCentres(session.face).length}`;
+    nextSpot.hidden = i != null || hintSpot == null;
   }
 
   // --- one gesture's geometry, read once when the pointer lands (no layout reads while it moves)
@@ -933,31 +1080,12 @@ function targetInput(session, enter, slots, { clearable = false, clearLabel = 'C
 
   return h(
     'div',
-    { class: 'target-wrap' },
-    // arrow slots in a column on the left, target face on the right
-    h(
-      'div',
-      { class: ['aim-row', session.arrowsPerEnd > 6 && 'aim-row-wide'] },
-      slots,
-      h('div', { class: 'target-stage' }, btn, multi ? zoomOutBtn : null, loupe),
-    ),
-    APL.ScoreKeypad({
-      label: 'Quick score without position',
-      keys: ['X', 10, 9, 8, 7, 6, 'M'].map((k) => ({
-        value: k,
-        zone: zoneOf(k),
-        ariaLabel: `Score ${k === 'M' ? 'miss' : k}`,
-      })),
-      // the selected arrow's score is shown pressed; the other keys dim (like the grade rows)
-      value: selectedValue,
-      onKey: (k) => enter(k, null, null),
-      // at the thumb's end of the row; its place is kept (invisible) when no arrow is picked
-      clear: { enabled: clearable, label: clearLabel, onClick: () => onClear?.() },
-      fk: 'quick',
-    }),
+    { class: 'target-wrap score-face' },
+    faceBar,
+    // the loupe docks inside the stage (loupePlacement.js)
+    h('div', { class: 'target-stage' }, btn, loupe),
   );
 }
-
 
 // ---------------------------------------------------------------- inline grades
 

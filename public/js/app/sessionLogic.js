@@ -235,6 +235,35 @@ export function moveArrow(session, i, v, x = null, y = null, spot = null) {
   return enterScore({ ...clone(session), cursor: i, pinned: true }, v, x, y, spot);
 }
 
+/** Select the next empty arrow of the shown end (after the selected one, wrapping round). */
+export function nextArrow(session) {
+  const arrows = shownEnd(session).arrows;
+  const n = arrows.length;
+  for (let k = 1; k <= n; k++) {
+    const i = (session.cursor + k) % n;
+    if (arrows[i].v == null) return { ...clone(session), cursor: i, pinned: false };
+  }
+  return session;
+}
+
+/**
+ * The scoring screen's primary action for the selected arrow: `place` it (nothing to do yet),
+ * `grade` it (M and S still missing while grades are asked for after each arrow), move to the
+ * `next` empty arrow, `save` the full end, or go `back` to the end being shot from an earlier one.
+ * `slot` and `end` are 1-based, for the button's label.
+ */
+export function primaryAction(session, { askGrades = true } = {}) {
+  const slot = session.cursor + 1;
+  if (session.view != null) return { action: 'back', slot, end: session.ends.length + 1, enabled: true };
+  const end = viewIndex(session) + 1;
+  const arrows = shownEnd(session).arrows;
+  const a = arrows[session.cursor];
+  if (a.v == null) return { action: 'place', slot, end, enabled: false };
+  if (askGrades && (a.m == null || a.s == null)) return { action: 'grade', slot, end, enabled: false };
+  if (nextEmpty(arrows) >= 0) return { action: 'next', slot, end, enabled: true };
+  return { action: 'save', slot, end, enabled: true };
+}
+
 /** Clear the last scored arrow in the shown end. */
 export function undo(session) {
   const arrows = shownEnd(session).arrows;
