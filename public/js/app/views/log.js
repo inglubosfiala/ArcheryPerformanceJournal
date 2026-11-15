@@ -23,6 +23,7 @@ import { detectArrows } from '../photoDetect.js';
 import { drawArrowMarks, liveScan } from './liveScan.js';
 import { PREVIEW_MARGIN, spotsBox, resultOnCrop } from '../scanGeometry.js';
 import { PHOTO_MAX, canScan, createScan } from '../scan.js';
+import { loupeCorner, loupeBox } from '../loupePlacement.js';
 
 /**
  * The running session's questions to the archer, as dialogs (the `confirm` adapter of
@@ -532,6 +533,7 @@ function findSightMark(repo, distance) {
 const LOUPE_SPAN = 24; // viewBox units shown in the magnifier (the face is 202 wide → ~3× zoom)
 // A finger aiming a new arrow aims this many screen pixels above itself, so it never hides the point.
 const AIM_OFFSET_PX = 64;
+const LOUPE_SIZE = 132; // the loupe's lens, in px (base.css .loupe-lens)
 // The spot an arrow was just placed on (multi-spot sheets): placing re-renders the page, and the new
 // target starts zoomed on this spot and animates out to the whole sheet (the reverse of the zoom in).
 let zoomOutFrom = null;
@@ -575,11 +577,12 @@ function arrowDots(session) {
  * moving the finger fine-tunes the position; releasing registers the arrow. Cancel = no arrow.
  * Multi-spot sheets (triple, Vegas): the first tap zooms into the spot tapped, so it fills the
  * target area; the arrow is then placed on it the same way, and the view zooms back out.
- * The magnifier's place is chosen when the finger lands and stays there until it lifts.
+ * A finger aims a little above itself (AIM_OFFSET_PX); the magnifier docks in a corner of the stage
+ * away from the finger and the aimed point.
  */
 function targetInput(session, enter, slots, { clearable = false, clearLabel = 'Clear arrow', onClear, onMove } = {}) {
   const selectedValue = L.shownEnd(session).arrows[session.cursor]?.v ?? null;
-  // magnifier: zoomed copy of the face centred on the finger, with a crosshair and the live score
+  // magnifier: zoomed copy of the face centred on the aimed point, with a crosshair and the live score
   const marker = s(
     'g',
     null,
@@ -601,7 +604,9 @@ function targetInput(session, enter, slots, { clearable = false, clearLabel = 'C
   const loupeScore = h('span', { class: 'score-chip loupe-score' });
   // shown while a placed arrow is dragged: which arrow moves, and the score it had
   const loupeTag = h('span', { class: 'loupe-tag', hidden: true });
-  const loupe = h('div', { class: 'loupe', 'aria-hidden': 'true', hidden: true }, loupeSvg, loupeTag, loupeScore);
+  // docked in a corner of the stage: the lens, and the live score under it
+  const loupeLens = h('div', { class: 'loupe-lens' }, loupeSvg, loupeTag);
+  const loupe = h('div', { class: 'loupe', 'aria-hidden': 'true', hidden: true }, loupeLens, loupeScore);
   // on the sheet, a move looks different from a new arrow: the arrow's own numbered dot travels with
   // the finger, tied to the place it came from by a dashed line
   const guideLine = s('line', { stroke: '#E5007E', 'stroke-width': 1.6, 'stroke-dasharray': '3.5 2.5', 'stroke-linecap': 'round' });
@@ -707,7 +712,12 @@ function targetInput(session, enter, slots, { clearable = false, clearLabel = 'C
     const aim = offset
       ? toSheet(clamp(ev.clientX, rect.left, rect.right), clamp(ev.clientY - AIM_OFFSET_PX, rect.top, rect.bottom))
       : finger;
-    return { x: aim.x, y: aim.y, fx: finger.x, fy: finger.y, px: ev.clientX - rect.left, py: ev.clientY - rect.top };
+    const px = ev.clientX - rect.left;
+    const py = ev.clientY - rect.top;
+    // the aimed point inside the stage, in pixels (for docking the loupe away from it)
+    const apx = offset ? clamp(px, 0, rect.width) : px;
+    const apy = offset ? clamp(py - AIM_OFFSET_PX, 0, rect.height) : py;
+    return { x: aim.x, y: aim.y, fx: finger.x, fy: finger.y, px, py, apx, apy };
   };
 
   // on the sheet while a finger aims: a crosshair at the aimed point, a faint ring where the finger
@@ -750,21 +760,17 @@ function targetInput(session, enter, slots, { clearable = false, clearLabel = 'C
     aimGuide.setAttribute('visibility', 'visible');
   };
 
-  // The loupe's place is chosen once, when the finger lands, and kept until it lifts (it never jumps).
-  // Above the target face when there is room; otherwise over the face, centred, on the half away
-  // from the finger (finger on the top half: loupe at the bottom, and the other way round).
-  const visibleTop = () => document.querySelector('.main')?.getBoundingClientRect().top ?? 0;
-  const placeLoupe = (p) => {
-    const size = loupe.offsetWidth || 132;
-    const gap = 10;
-    const stage = btn.getBoundingClientRect();
-    const left = stage.left + stage.width / 2 - size / 2;
-    let top = stage.top - size - gap;
-    if (top < visibleTop() + gap) {
-      top = p.py < stage.height / 2 ? stage.bottom - size - gap : Math.max(visibleTop() + gap, stage.top + gap);
-    }
-    loupe.style.top = `${Math.round(top)}px`;
-    loupe.style.left = `${Math.round(left)}px`;
+  // The loupe docks inside the stage, in a corner away from the finger and the aimed point
+  // (loupePlacement.js); it changes corner only past a band, so it does not flicker.
+  let corner = null;
+  const dockLoupe = (p) => {
+    const stage = { stageW: geo.rect.width, stageH: geo.rect.height, size: LOUPE_SIZE };
+    const next = loupeCorner({ fingerX: p.px, fingerY: p.py, aimX: p.apx, aimY: p.apy, ...stage, prevCorner: corner });
+    if (next === corner) return;
+    corner = next;
+    const box = loupeBox(corner, stage);
+    loupe.style.left = `${Math.round(box.x)}px`;
+    loupe.style.top = `${Math.round(box.y)}px`;
   };
 
   const show = (p) => {
@@ -779,6 +785,7 @@ function targetInput(session, enter, slots, { clearable = false, clearLabel = 'C
     const v = scoreFromPoint(hit.x, hit.y, session.face);
     loupeScore.textContent = String(v);
     loupeScore.className = `score-chip loupe-score z-${zoneOf(v)}`;
+    dockLoupe(p);
     loupe.hidden = false;
     if (active?.offset) drawAimGuide(p);
     if (active?.mode === 'move') {
@@ -794,7 +801,13 @@ function targetInput(session, enter, slots, { clearable = false, clearLabel = 'C
   };
 
   // the aimed point: the finger's, shifted by the grab offset (finger px / py stay the finger's)
-  const aimFrom = (f, off) => ({ ...f, x: f.x + off.x, y: f.y + off.y });
+  const aimFrom = (f, off) => ({
+    ...f,
+    x: f.x + off.x,
+    y: f.y + off.y,
+    apx: f.apx + (off.x * 100) / geo.unitsPerPx,
+    apy: f.apy + (off.y * 100) / geo.unitsPerPx,
+  });
   // the placed arrow of the shown end nearest the pointer, within `reachPx` on the screen
   const grabAt = (f, reachPx) => {
     const reach = (reachPx * geo.unitsPerPx) / 100;
@@ -906,8 +919,8 @@ function targetInput(session, enter, slots, { clearable = false, clearLabel = 'C
       if (navigator.vibrate) navigator.vibrate(15);
     }
     btn.classList.add('aiming');
+    corner = null;
     show(active.p);
-    placeLoupe(active.p);
   });
   btn.addEventListener('pointermove', (ev) => {
     if (!active || ev.pointerId !== active.id) return;
