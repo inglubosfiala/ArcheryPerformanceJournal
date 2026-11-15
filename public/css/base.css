@@ -3696,14 +3696,19 @@ button.arrow-count:hover {
 /* Previous end / Next end, right under the M / S grades */
 .end-step {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  /* Previous end, Next end and the camera: three buttons of the same width */
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 8px;
 }
 
 .btn.end-step-btn {
   min-height: 52px;
+  min-width: 0;
+  padding-left: 6px;
+  padding-right: 6px;
   gap: 4px;
-  font-size: 16px;
+  font-size: 15px;
+  line-height: 1.15;
 }
 
 .btn.end-step-btn svg {
@@ -3768,10 +3773,6 @@ button.arrow-count:hover {
 }
 
 /* scoring from a photo: the camera button next to the timer, and the preview in the dialog */
-.photo-btn-wrap {
-  display: inline-flex;
-}
-
 .photo-preview {
   display: block;
   width: 100%;

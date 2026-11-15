@@ -635,12 +635,13 @@ function renderActive(ctx, session) {
           h('span', { class: 'end-of muted' }, totalEnds > 1 ? ` / ${totalEnds}` : ''),
         ),
       ),
-      h('div', { class: 'end-totals' }, photoButton(ctx, session), timerBtn),
+      h('div', { class: 'end-totals' }, timerBtn),
     ),
     input,
     grades,
     // Previous end (disabled on the first end) and Next end: on the newest end Next saves it and
-    // starts a new one (it needs at least one arrow); on an earlier end it moves one end forward
+    // starts a new one (it needs at least one arrow); on an earlier end it moves one end forward.
+    // The camera (score the end from the target) is the third button of the row, at the thumb.
     h(
       'div',
       { class: 'end-step' },
@@ -669,6 +670,7 @@ function renderActive(ctx, session) {
         T.nextEnd,
         icons.forward(),
       ),
+      photoButton(ctx, session),
     ),
   );
 
@@ -838,20 +840,17 @@ const PHOTO_MAX = 640; // the photo is scaled down to this many pixels on its lo
  */
 function photoButton(ctx, session) {
   return h(
-    'span',
-    { class: 'photo-btn-wrap' },
-    h(
-      'button',
-      {
-        type: 'button',
-        class: 'icon-btn',
-        'aria-label': 'Score arrows with the camera',
-        dataset: { fk: 'photo' },
-        disabled: L.viewIndex(session) !== session.ends.length,
-        onClick: () => scoreLive(ctx),
-      },
-      icons.camera(),
-    ),
+    'button',
+    {
+      type: 'button',
+      class: 'btn btn-outline end-step-btn',
+      'aria-label': 'Score arrows with the camera',
+      dataset: { fk: 'photo' },
+      disabled: L.viewIndex(session) !== session.ends.length,
+      onClick: () => scoreLive(ctx),
+    },
+    icons.camera(),
+    'Scan',
   );
 }
 
