@@ -25,6 +25,7 @@ import {
   uniqueName,
 } from '../gearFields.js';
 import { T } from '../strings.js';
+import { fieldSheet, openFieldSheet } from './gearSheet.js';
 
 export function renderGear(ctx, params = []) {
   const [id, sub] = params;
@@ -133,6 +134,7 @@ function menuSheet(ctx, setup) {
     );
   return {
     onClose: close,
+    returnFk: 'setup-more',
     node: APL.Dialog({
       sheet: true,
       title: setup.name,
@@ -382,21 +384,13 @@ function renderSetup(ctx, setup) {
 /** The view's overlay: the ⋯ menu or the edit sheet. */
 function overlayFor(ctx, setup, ui) {
   if (ui.gearMenu === setup.id) return menuSheet(ctx, setup);
-  return null;
+  return fieldSheet(ctx, setup);
 }
 
-/** Edit one field (a plain text dialog for now; the edit sheet replaces it). */
-async function openField(ctx, setupId, key) {
+/** Open the edit sheet of one field. */
+function openField(ctx, setupId, key) {
   const setup = ctx.repo.get('setups', setupId);
-  if (!setup) return;
-  const label = GEAR_GROUPS.flatMap((g) => g.fields).find((f) => f[0] === key)[1];
-  const field = APL.TextField({ label, value: setup.fields?.[key] || '', fk: 'edit-value' });
-  if (!(await confirmDialog({ title: label, body: field, confirmLabel: T.save, icon: 'pencil' }))) return;
-  const value = field.querySelector('input').value.trim();
-  const fields = { ...setup.fields };
-  if (value) fields[key] = value;
-  else delete fields[key];
-  if (ctx.save('setups', { ...setup, fields })) ctx.rerender();
+  if (setup) openFieldSheet(ctx, setup, key);
 }
 
 // ---------------------------------------------------------------- sight marks (a page of the setup)

@@ -79,27 +79,54 @@ const CM_PER_IN = 2.54;
 
 /**
  * Numeric fields: the canonical unit the value is stored in (always a plain number as text), the −/+
- * step, the range, the decimals kept, and an optional second unit for display and typing (`alt`:
+ * step, the range, the decimals kept, where −/+ starts on an empty field, and an optional second unit for display and typing (`alt`:
  * its name, its size in canonical units, its own step and decimals). Fields not listed are text.
  */
 export const FIELD_META = {
-  limbsLbs: { unit: 'lb', step: 0.5, min: 5, max: 80, decimals: 1 },
-  drawWeight: { unit: 'lb', step: 0.5, min: 5, max: 80, decimals: 1 },
-  spine: { unit: '', step: 50, min: 100, max: 3000, decimals: 0 },
-  arrowLength: { unit: 'in', step: 0.25, min: 15, max: 40, decimals: 2, alt: { unit: 'cm', size: 1 / CM_PER_IN, step: 0.5, decimals: 1 } },
-  points: { unit: 'gr', step: 5, min: 20, max: 400, decimals: 0 },
-  strands: { unit: '', step: 1, min: 4, max: 40, decimals: 0 },
-  brace: { unit: 'in', step: 0.125, min: 5, max: 12, decimals: 3, alt: { unit: 'cm', size: 1 / CM_PER_IN, step: 0.1, decimals: 1 } },
-  nockPoint: { unit: 'mm', step: 1, min: -10, max: 30, decimals: 1 },
-  tillerTop: { unit: 'mm', step: 1, min: -20, max: 40, decimals: 1 },
-  tillerBottom: { unit: 'mm', step: 1, min: -20, max: 40, decimals: 1 },
-  stabLong: { unit: 'in', step: 1, min: 0, max: 40, decimals: 1 },
-  stabSides: { unit: 'in', step: 1, min: 0, max: 20, decimals: 1 },
-  vbar: { unit: '°', step: 1, min: 0, max: 90, decimals: 0 },
-  stabWeights: { unit: 'oz', step: 0.5, min: 0, max: 60, decimals: 1 },
+  limbsLbs: { start: 34, unit: 'lb', step: 0.5, min: 5, max: 80, decimals: 1 },
+  drawWeight: { start: 36, unit: 'lb', step: 0.5, min: 5, max: 80, decimals: 1 },
+  spine: { start: 600, unit: '', step: 50, min: 100, max: 3000, decimals: 0 },
+  arrowLength: { start: 28, unit: 'in', step: 0.25, min: 15, max: 40, decimals: 2, alt: { unit: 'cm', size: 1 / CM_PER_IN, step: 0.5, decimals: 1 } },
+  points: { start: 100, unit: 'gr', step: 5, min: 20, max: 400, decimals: 0 },
+  strands: { start: 16, unit: '', step: 1, min: 4, max: 40, decimals: 0 },
+  brace: { start: 8.5, unit: 'in', step: 0.125, min: 5, max: 12, decimals: 3, alt: { unit: 'cm', size: 1 / CM_PER_IN, step: 0.1, decimals: 1 } },
+  nockPoint: { start: 9, unit: 'mm', step: 1, min: -10, max: 30, decimals: 1 },
+  tillerTop: { start: 3, unit: 'mm', step: 1, min: -20, max: 40, decimals: 1 },
+  tillerBottom: { start: 3, unit: 'mm', step: 1, min: -20, max: 40, decimals: 1 },
+  stabLong: { start: 30, unit: 'in', step: 1, min: 0, max: 40, decimals: 1 },
+  stabSides: { start: 12, unit: 'in', step: 1, min: 0, max: 20, decimals: 1 },
+  vbar: { start: 35, unit: '°', step: 1, min: 0, max: 90, decimals: 0 },
+  stabWeights: { start: 6, unit: 'oz', step: 0.5, min: 0, max: 60, decimals: 1 },
 };
 
 export const isNumericField = (key) => key in FIELD_META;
+
+/** "1/8 in", "0.5 lb", "1 mm": the step of a numeric field in a unit (its canonical one by default). */
+export function stepLabel(key, unit = null) {
+  const meta = FIELD_META[key];
+  const alt = meta.alt && unit === meta.alt.unit ? meta.alt : null;
+  const step = alt ? alt.step : meta.step;
+  const u = alt ? alt.unit : meta.unit;
+  const text = step === 0.125 ? '1/8' : step === 0.25 ? '1/4' : formatNumber(step, 3);
+  return u ? `${text} ${u}` : text;
+}
+
+/** The canonical value one step up (dir 1) or down (dir -1) from `n`, stepping in `unit`; clamped. */
+export function stepValue(key, n, dir, unit = null) {
+  const meta = FIELD_META[key];
+  const alt = meta.alt && unit === meta.alt.unit ? meta.alt : null;
+  if (n == null) return meta.start;
+  let next;
+  if (alt) {
+    const shown = Math.round((n / alt.size) / alt.step) * alt.step;
+    next = (shown + dir * alt.step) * alt.size;
+  } else {
+    // snap onto the step grid first, so 8.6 + 1/8 → 8.625 rather than 8.725
+    const snapped = Math.round(n / meta.step) * meta.step;
+    next = Math.abs(snapped - n) > 1e-9 ? (dir > 0 ? Math.ceil(n / meta.step) : Math.floor(n / meta.step)) * meta.step : n + dir * meta.step;
+  }
+  return Math.min(meta.max, Math.max(meta.min, Number(next.toFixed(6))));
+}
 
 /** A number with at most `decimals` places and no trailing zeros ("8.750" → "8.75"). */
 export function formatNumber(n, decimals) {

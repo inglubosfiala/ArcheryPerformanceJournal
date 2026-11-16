@@ -24,6 +24,8 @@ import {
   uniqueName,
   sessionsUsing,
   copyFields,
+  stepValue,
+  stepLabel,
 } from '../public/js/app/gearFields.js';
 
 const setups = [
@@ -95,6 +97,24 @@ describe('numeric fields', () => {
     expect(parseFieldValue('drawWeight', '38 lbs')).toBe(38);
     expect(parseFieldValue('drawWeight', 'about 38')).toBeNull();
     expect(parseFieldValue('riser', '1')).toBeNull(); // a text field
+  });
+
+  it('steps in the field step, snapping onto it, in either unit, starting empty fields at a typical value', () => {
+    expect(stepValue('brace', 8.75, 1)).toBe(8.875);
+    expect(stepValue('brace', 8.6, 1)).toBe(8.625); // snaps instead of 8.725
+    expect(stepValue('brace', 8.6, -1)).toBe(8.5);
+    expect(stepValue('brace', 8.75, 1, 'cm')).toBeCloseTo(22.3 / 2.54, 6); // 22.2 cm + 1 mm
+    expect(stepValue('drawWeight', 38, -1)).toBe(37.5);
+    expect(stepValue('points', 110, 1)).toBe(115);
+    expect(stepValue('brace', null, 1)).toBe(8.5);
+    expect(stepValue('brace', 12, 1)).toBe(12);
+    expect([stepLabel('brace'), stepLabel('brace', 'cm'), stepLabel('arrowLength'), stepLabel('drawWeight'), stepLabel('strands')]).toEqual([
+      '1/8 in',
+      '0.1 cm',
+      '1/4 in',
+      '0.5 lb',
+      '1',
+    ]);
   });
 
   it('stores clamped canonical numbers and shows them in either unit', () => {

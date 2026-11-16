@@ -127,6 +127,8 @@ export const defaultSettings = {
   askGrades: true,
   // the gear setup new sessions use (a record of `setups`; see activeSetup in gearFields.js)
   activeSetupId: null,
+  // the unit a gear field is shown in where it has two (e.g. { brace: 'cm' }); this device only
+  gearUnits: {},
   lastSetup: { distance: 18, face: '40t', arrowsPerEnd: 3 },
 };
 
