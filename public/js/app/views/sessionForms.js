@@ -259,12 +259,11 @@ const toInt = (v) => {
  * change: `update(current) → patch` runs on the current fields (not the rendered ones), so typing that
  * was stored without re-rendering is never overwritten by a later tap. Typing does not re-render (the
  * field keeps focus); taps do.
- * `live`: the session is being shot now (New session page with a running timer) — a blank bale count
- * is then tapped up with big +1 / +3 / +6 buttons instead of typed. Editing a saved one keeps the field.
- * `timer`: the session timer, shown on the count's row (right of it).
+ * `live`: the session is being done now (an SPT session with a running timer): the fields filled in
+ * on the saved session are left out.
  * `pastSessions`: saved sessions, newest first: a new drill starts from the numbers last used.
  */
-export function formSections(type, value, change, { live = false, timer = null, pastSessions = [] } = {}) {
+export function formSections(type, value, change, { live = false, pastSessions = [] } = {}) {
   const numberField = (label, key, fk, { suffix = '' } = {}) =>
     APL.TextField({
       label,
@@ -306,8 +305,8 @@ export function formSections(type, value, change, { live = false, timer = null, 
     // The count is a big number, changed with −1 / +1 / +3 / +6; tapping the number lets you type it
     // (a total from memory, or a larger correction). Changes do not re-render the page: the number
     // is updated in place and pops, and a floating "+n" rises from it.
-    // Shot now (`live`): the timer sits beside the count; duration and note are asked on Save (log.js).
-    // Logged afterwards or edited in History: Duration and Note fields follow.
+    // Used when a blank bale is logged afterwards and when a saved one is edited in History (the
+    // running blank bale has its own page, blankBale.js). Duration and Note fields follow.
     const count = h(
       'button',
       {
@@ -411,9 +410,8 @@ export function formSections(type, value, change, { live = false, timer = null, 
     const counter = h(
       'section',
       { class: 'apl-section arrow-counter', 'aria-label': 'Arrows shot' },
-      timer
-        ? h('div', { class: 'arrow-count-row' }, countBox, timer)
-        : [h('h2', { class: 'apl-label' }, 'Arrows shot'), countBox],
+      h('h2', { class: 'apl-label' }, 'Arrows shot'),
+      countBox,
       h(
         'div',
         { class: 'arrow-add-row' },
@@ -433,9 +431,7 @@ export function formSections(type, value, change, { live = false, timer = null, 
         ),
       ),
     );
-    return live
-      ? [counter]
-      : [counter, numberField('Duration', 'minutes', 'minutes', { suffix: 'min' }), noteField('…')];
+    return [counter, numberField('Duration', 'minutes', 'minutes', { suffix: 'min' }), noteField('…')];
   }
 
   if (type === 'manual') {

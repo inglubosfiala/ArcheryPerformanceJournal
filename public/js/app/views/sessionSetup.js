@@ -118,6 +118,7 @@ export function equipmentSection(ctx, { settings, setup, set }, { kind = null, d
   });
   return {
     section,
+    choice: gearChoice,
     chosenGear: () => gearForChoice(gearChoice, { setups }) || { gear: null, gearSnapshotId: null },
     gearName: gearChoice === 'none' ? null : gearOpts.options.find((o) => o[0] === gearChoice)?.[1],
   };
@@ -125,7 +126,10 @@ export function equipmentSection(ctx, { settings, setup, set }, { kind = null, d
 
 // ---------------------------------------------------------------- form session
 
-/** The form of a blank bale, SPT, mental or manual session, saved straight to History. */
+/**
+ * The form of an SPT, mental or manual session, saved straight to History. SPT and mental are timed:
+ * opening the form starts their timer (a blank bale starts from the Shooting page instead).
+ */
 export function renderFormSetup(ctx, type) {
   const st = setupState(ctx);
   const { setup, set, quiet } = st;
@@ -180,11 +184,10 @@ export function renderFormSetup(ctx, type) {
 
   // a timed form whose start is not in the past: its timer runs, it is a running session
   const running = timed && !past;
-  // blank bale: the timer sits beside the arrow count (in the form); SPT: in the page header, next
-  // to the title; mental, manual: a "Timer" row
+  // SPT: the timer in the page header, next to the title; mental: a "Timer" row
   const sptRunning = running && type === 'strength';
   const timerRow =
-    running && type !== 'blank' && !sptRunning
+    running && !sptRunning
         ? h(
             'div',
             { class: 'apl-section-head' },
@@ -193,10 +196,9 @@ export function renderFormSetup(ctx, type) {
           )
         : null;
 
-  // no back button on a running SPT or blank bale session (Save or Discard end it; the tab bar
-  // leaves it running); no title on a running blank bale session: the room goes to the form
-  const back = !(running && (type === 'strength' || type === 'blank'));
-  const title = running && type === 'blank' ? '' : `${TYPE_LABELS[type]} session`;
+  // no back button on a running SPT session (Save or Discard end it; the tab bar leaves it running)
+  const back = !(running && type === 'strength');
+  const title = `${TYPE_LABELS[type]} session`;
   // a drill card's own green "Start timer" is the primary action while it shows: Save steps down
   const saveVariant = type === 'strength' && showsStartTimer(form.drills) ? 'secondary' : 'primary';
 
@@ -204,23 +206,19 @@ export function renderFormSetup(ctx, type) {
     content: h(
       'div',
       { class: 'apl-screen' },
-      back || title
-        ? APL.ScreenHeader({
-            title,
-            onBack: back ? () => ctx.navigate('new') : null,
-            backLabel: 'Back to session type',
-            trailing: sptRunning ? sessionTimer(formTimer, toggleFormTimer) : null,
-          })
-        : null,
+      APL.ScreenHeader({
+        title,
+        onBack: back ? () => ctx.navigate('new') : null,
+        backLabel: 'Back to session type',
+        trailing: sptRunning ? sessionTimer(formTimer, toggleFormTimer) : null,
+      }),
       h(
         'div',
-        { class: ['apl-screen-body', !back && !title && 'apl-screen-body--top'] },
+        { class: 'apl-screen-body' },
         when,
         timerRow,
         ...formSections(type, form, changeForm, {
           live: running,
-          timer:
-            type === 'blank' && running ? sessionTimer(formTimer, toggleFormTimer, { size: 'lg' }) : null,
           // SPT: a new drill starts from the numbers last used in a saved session
           pastSessions:
             type === 'strength'

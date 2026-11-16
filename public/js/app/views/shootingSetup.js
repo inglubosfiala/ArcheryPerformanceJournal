@@ -17,7 +17,7 @@ import {
   joinConditions,
 } from '../sessionTypes.js';
 import { setupState, whenSection, equipmentSection } from './sessionSetup.js';
-import { emptyForm } from './sessionForms.js';
+import { emptyForm, formSections } from './sessionForms.js';
 import { faceParts, faceId, FACE_SIZES, kindsForSize, faceForSize } from './setupFaces.js';
 
 const ARROW_PRESETS = [3, 6, 9, 12];
@@ -293,10 +293,20 @@ function scoredSections(fields, setKind) {
   ];
 }
 
-/** Blank bale: what it is, and an optional arrow goal. */
-function blankSections(fields, setKind) {
+/**
+ * Blank bale: what it is, and an optional arrow goal. Logged afterwards (a past start): the count,
+ * the duration and a note, typed in here (no running page).
+ */
+function blankSections(fields, setKind, { past, quietKind }) {
+  const form = fields.form || emptyForm('blank');
+  // typing stores without re-rendering; taps (+1, −1) re-render
+  const change = (update, { rerender = true } = {}) => {
+    const next = { ...form, ...update(form) };
+    if (rerender) setKind({ form: next });
+    else quietKind({ form: Object.assign(form, next) });
+  };
   return [
-    h(
+    past ? null : h(
       'div',
       { class: 'ns-info' },
       h('span', { class: 'ns-info-well', 'aria-hidden': 'true' }, APL.Icon({ name: 'plus', size: 20 })),
@@ -321,6 +331,7 @@ function blankSections(fields, setKind) {
         fk: 'goal',
       }),
     }),
+    ...(past ? formSections('blank', form, change) : []),
   ];
 }
 
@@ -362,11 +373,28 @@ export function renderShootingSetup(ctx, kind) {
     if (res.status === 'started') ctx.navigate('log', { replace: true });
   };
 
+  // Start: the blank bale's timer starts now (nothing ran while the setup was open); one already
+  // open goes on as it is
+  const blankOpen = blank && ctx.openForms.list().some((f) => f.type === 'blank');
   const startBlank = () => {
-    ctx.openForms.open('blank', null);
-    ctx.openForms.keepDraft('blank', { ...emptyForm('blank'), goal: fields.goal ?? null });
+    if (!blankOpen) ctx.openForms.start('blank', { goal: fields.goal ?? null, gear: equipment.choice });
     ctx.ui.quietSet({ setup: null });
     ctx.navigate('blank', { replace: true });
+  };
+  // a past start: saved straight to History (an open blank bale is left running)
+  const logBlank = async () => {
+    const form = fields.form || emptyForm('blank');
+    const res = await ctx.openForms.save('blank', {
+      fields: { ...form, ...(fields.goal ? { goal: fields.goal } : {}) },
+      date: whenDate,
+      time: whenTime,
+      past: true,
+      close: false,
+      gear: equipment.chosenGear(),
+    });
+    if (res.status !== 'saved') return;
+    ctx.ui.quietSet({ setup: null });
+    ctx.navigate(`history/${res.session.id}`, { replace: true });
   };
 
   const summary = blank
@@ -376,6 +404,9 @@ export function renderShootingSetup(ctx, kind) {
   const body = h(
     'div',
     { class: 'apl-screen-body', role: 'tabpanel', id: 'shooting-panel', 'aria-labelledby': `kind-${kind}` },
+    blankOpen
+      ? APL.Banner({ title: 'A blank bale session is running', action: { label: T.continueSession, href: '#/blank' } })
+      : null,
     active
       ? APL.Banner({
           title: T.inProgress(setupSummary(active), active.ends.length),
@@ -384,7 +415,7 @@ export function renderShootingSetup(ctx, kind) {
       : null,
     when,
     kind === 'competition' ? competitionSection(fields, { setKind, quietKind }) : null,
-    ...(blank ? blankSections(fields, setKind) : scoredSections(fields, setKind)),
+    ...(blank ? blankSections(fields, setKind, { past, quietKind }) : scoredSections(fields, setKind)),
     equipment.section,
   );
 
@@ -406,9 +437,9 @@ export function renderShootingSetup(ctx, kind) {
       APL.BottomBar({
         summary,
         children: APL.Button({
-          children: START_LABELS[kind],
-          trailingIcon: 'arrowRight',
-          onClick: blank ? startBlank : startScored,
+          children: blank && past ? 'Save blank bale' : blankOpen ? 'Continue blank bale' : START_LABELS[kind],
+          trailingIcon: blank && past ? null : 'arrowRight',
+          onClick: !blank ? startScored : past ? logBlank : startBlank,
           fk: 'setup-start',
         }),
       }),

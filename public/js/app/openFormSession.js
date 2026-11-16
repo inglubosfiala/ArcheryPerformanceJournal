@@ -1,12 +1,13 @@
-// Open form sessions: blank bale / strength / mental sessions that were opened and not yet saved or
-// discarded. Each has a session timer and a kept draft, both stored in this device's settings (not
-// synced), so they survive leaving the page or the app being closed. A manual session is typed in
-// afterwards: it has no timer and no kept draft, it is only saved through here.
+// Open form sessions: blank bale / strength / mental sessions that were opened (SPT, mental) or
+// started (blank bale, from the Shooting page's Start) and not yet saved or discarded. Each has a
+// session timer and a kept draft, both stored in this device's settings (not synced), so they survive
+// leaving the page or the app being closed. A manual session is typed in afterwards: it has no timer
+// and no kept draft, it is only saved through here.
 //
-// This module owns that whole life: opening (the timer starts, a kept draft is taken back), keeping
-// the draft, the timer button, saving, discarding and listing what is open. It asks the archer
-// through the `confirm` adapter and never touches the DOM, so the same code runs in the app and in
-// tests. The page keeps only its own state (the draft being typed) and where to go next.
+// This module owns that whole life: opening or starting (the timer starts, a kept draft is taken
+// back), keeping the draft, the timer button, saving, discarding and listing what is open. It asks
+// the archer through the `confirm` adapter and never touches the DOM, so the same code runs in the
+// app and in tests. The page keeps only its own state (the draft being typed) and where to go next.
 //
 // save / discard report what happened as `{ status }`:
 //   'saved' (with `session`) · 'discarded' · 'cancelled' (the archer said no)
@@ -14,6 +15,7 @@
 
 import { timerElapsed, pauseTimer, resumeTimer } from './sessionLogic.js';
 import { SESSION_TYPES, isScored } from './sessionTypes.js';
+import { rememberSetup } from './lastSetup.js';
 
 /** A form timer left behind (form opened but not saved) is dropped after this long without a touch. */
 export const FORM_TIMER_STALE_MS = 6 * 3600 * 1000;
@@ -86,6 +88,26 @@ export function createOpenFormSessions({
     return { timed: true, timer, draft };
   }
 
+  /**
+   * Start a blank bale session (the Shooting page's Start): its timer starts now and its draft holds
+   * the arrow goal and, in `meta` (not saved with the session), when it started and the equipment
+   * choice. Remembered as the last blank bale setup. A blank bale already open is not started again:
+   * it goes on as it is (`status: 'open'`).
+   */
+  function start(type, { goal = null, gear = null } = {}) {
+    const all = timers();
+    if (isFormTimerLive(all[type], now())) return { status: 'open', timer: all[type], draft: drafts()[type] || null };
+    const at = now().toISOString();
+    const timer = { running: true, startedAt: at, elapsedMs: 0, touchedAt: at };
+    const draft = { arrows: null, note: '', ...(goal ? { goal } : {}), meta: { startedAt: at, gear } };
+    repo.saveSettings({
+      formTimers: { ...all, [type]: timer },
+      formDrafts: { ...drafts(), [type]: draft },
+      ...rememberSetup(repo.getSettings(), type, { goal: goal || null, gear }),
+    });
+    return { status: 'started', timer, draft };
+  }
+
   /** Keep the draft of a timed form on the device (a manual session's draft lives on the page only). */
   function keepDraft(type, draft) {
     if (isTimed(type)) repo.saveSettings({ formDrafts: { ...drafts(), [type]: draft } });
@@ -108,9 +130,11 @@ export function createOpenFormSessions({
    * Save the form as a finished session after a yes. `past` marks a session logged afterwards.
    * The timer is paused while the question is open and runs on when the answer is no. Minutes typed
    * by hand win over the timer; the timer gives none for a session logged afterwards or a manual one.
-   * Nothing is closed when the save is refused.
+   * Nothing is closed when the save is refused. `close: false` leaves an open session of the type
+   * alone (a blank bale logged afterwards while another one runs). The draft's `meta` is not saved.
    */
-  async function save(type, { fields, date, time, past = false, gear = {} }) {
+  async function save(type, { fields: draft, date, time, past = false, gear = {}, close: closeOpen = true }) {
+    const { meta: _meta, ...fields } = draft;
     const timed = isTimed(type);
     const live = timed && !past;
     const running = () => !!timers()[type]?.running;
@@ -134,7 +158,7 @@ export function createOpenFormSessions({
     }
     const session = saveRecord('sessions', { type, status: 'finished', ...fields, date, time, minutes: minutes(), ...gear });
     if (!session) return { status: 'failed' };
-    if (timed) close(type);
+    if (timed && closeOpen) close(type);
     return { status: 'saved', session };
   }
 
@@ -145,5 +169,5 @@ export function createOpenFormSessions({
     return { status: 'discarded' };
   }
 
-  return { list, open, keepDraft, toggleTimer, save, discard };
+  return { list, open, start, keepDraft, toggleTimer, save, discard };
 }

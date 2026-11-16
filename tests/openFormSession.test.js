@@ -341,6 +341,64 @@ describe('saving', () => {
   });
 });
 
+describe('starting a blank bale session', () => {
+  it('starts nothing until start() is called (opening the setup page creates no timer)', () => {
+    make();
+    expect(timer('blank')).toBeUndefined();
+    expect(make().list()).toEqual([]);
+  });
+
+  it('starts the timer now and keeps a draft with the goal and, apart, when it started and the equipment', () => {
+    const forms = make();
+    const res = forms.start('blank', { goal: 60, gear: 'indoor' });
+    expect(res.status).toBe('started');
+    expect(timer('blank')).toEqual({ running: true, startedAt: iso(START), elapsedMs: 0, touchedAt: iso(START) });
+    expect(keptDraft('blank')).toEqual({ arrows: null, note: '', goal: 60, meta: { startedAt: iso(START), gear: 'indoor' } });
+    expect(forms.list().map((f) => f.type)).toEqual(['blank']);
+  });
+
+  it('remembers the goal and the equipment as the last blank bale setup', () => {
+    make().start('blank', { goal: 90, gear: 'none' });
+    expect(repo.getSettings().lastSetup.blank).toEqual({ goal: 90, gear: 'none' });
+    make().start('strength');
+    expect(repo.getSettings().lastSetup.blank).toEqual({ goal: 90, gear: 'none' });
+  });
+
+  it('keeps no goal when none was picked', () => {
+    make().start('blank', { goal: null });
+    expect(keptDraft('blank')).not.toHaveProperty('goal');
+  });
+
+  it('goes on with a blank bale already open instead of starting it again', () => {
+    const forms = make();
+    forms.start('blank', { goal: 30 });
+    forms.keepDraft('blank', { ...keptDraft('blank'), arrows: 12 });
+    clock += 5 * MIN;
+    const res = forms.start('blank', { goal: 120 });
+    expect(res.status).toBe('open');
+    expect(keptDraft('blank').arrows).toBe(12);
+    expect(timer('blank').startedAt).toBe(iso(START));
+  });
+
+  it('saves the goal with the session but not the draft meta', async () => {
+    const forms = make();
+    forms.start('blank', { goal: 60, gear: 'indoor' });
+    clock += 20 * MIN;
+    const res = await forms.save('blank', { fields: { ...keptDraft('blank'), arrows: 64 }, ...WHEN });
+    expect(res.status).toBe('saved');
+    expect(res.session).toMatchObject({ type: 'blank', arrows: 64, goal: 60, minutes: 20 });
+    expect(res.session).not.toHaveProperty('meta');
+    expect(forms.list()).toEqual([]);
+  });
+
+  it('leaves an open blank bale alone when another one is logged afterwards with close: false', async () => {
+    const forms = make();
+    forms.start('blank');
+    await forms.save('blank', { fields: BLANK, ...WHEN, past: true, close: false });
+    expect(forms.list().map((f) => f.type)).toEqual(['blank']);
+  });
+});
+
 describe('discarding', () => {
   it('asks first; after a yes the timer and the kept draft are gone', async () => {
     const forms = make();

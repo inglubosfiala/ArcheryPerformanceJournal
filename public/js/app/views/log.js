@@ -19,6 +19,7 @@ import { faceSheet, faceViewBox, VB } from './face.js';
 import { SESSION_TYPES, TYPE_LABELS, sessionType } from '../sessionTypes.js';
 import { renderFormSetup } from './sessionSetup.js';
 import { renderTypeChoice, renderShootingSetup } from './shootingSetup.js';
+import { renderBlankRunning } from './blankBale.js';
 import { SHOOTING_KINDS } from '../lastSetup.js';
 import { sessionTimer } from './timer.js';
 import * as APL from '../../ui/apl/index.js';
@@ -106,11 +107,10 @@ export function renderNewSession(ctx, params = []) {
 
 /** The running blank bale session (#/blank); none open: its setup on the Shooting page. */
 export function renderBlankBale(ctx) {
-  if (!ctx.openForms.list().some((f) => f.type === 'blank')) {
-    queueMicrotask(() => ctx.navigate('new/shooting/blank', { replace: true }));
-    return renderShootingSetup(ctx, 'blank');
-  }
-  return renderFormSetup(ctx, 'blank');
+  const open = ctx.openForms.list().find((f) => f.type === 'blank');
+  if (open) return renderBlankRunning(ctx, open);
+  queueMicrotask(() => ctx.navigate('new/shooting/blank', { replace: true }));
+  return renderShootingSetup(ctx, 'blank');
 }
 /** Apply a session transition to the running session; the page is drawn again when it changed. */
 function update(ctx, fn, { rerender = true } = {}) {

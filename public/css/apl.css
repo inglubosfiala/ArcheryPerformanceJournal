@@ -2021,3 +2021,110 @@ a.apl-sessionrow:hover {
   justify-content: center;
   flex-shrink: 0;
 }
+
+/* ---------------------------------------------------------------- Running blank bale (#/blank) */
+.bb-header {
+  padding-right: 12px;
+}
+.bb-title {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-width: 0;
+}
+.bb-title h1 {
+  margin: 0;
+  font-size: 20px;
+  line-height: 26px;
+  font-weight: 700;
+}
+.bb-body {
+  gap: 18px;
+}
+.bb-count {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  padding: 22px var(--space-4) 18px;
+  border-radius: 20px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+}
+.bb-count-value {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+.bb-count-n {
+  font-size: 88px;
+  line-height: 1;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.03em;
+  color: var(--ink);
+}
+.bb-count-unit {
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--muted);
+}
+.bb-goal {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.bb-goal-track {
+  height: 8px;
+  border-radius: 4px;
+  background: var(--surface-sunken);
+  overflow: hidden;
+}
+.bb-goal-fill {
+  height: 8px;
+  background: var(--accent-bright);
+  transition: width 300ms;
+}
+.bb-goal-line {
+  display: flex;
+  justify-content: space-between;
+  font-size: 13px;
+  color: var(--muted);
+}
+.bb-adds {
+  display: grid;
+  grid-template-columns: 1fr 1.3fr 1.3fr 1.3fr;
+  gap: 8px;
+}
+.bb-add {
+  height: 80px;
+  border-radius: var(--radius-xl);
+  border: 2px solid var(--ink);
+  background: var(--surface);
+  color: var(--ink);
+  font: inherit;
+  font-size: 28px;
+  font-weight: 800;
+  touch-action: manipulation;
+}
+.bb-add:active {
+  background: var(--accent-tint);
+}
+.bb-add--minus {
+  align-self: center;
+  height: 64px;
+  border: 1px solid var(--border);
+  background: var(--surface-sunken);
+  font-size: 22px;
+  font-weight: 700;
+}
+.bb-add:disabled {
+  color: var(--muted);
+  opacity: 0.5;
+}
+@media (prefers-reduced-motion: reduce) {
+  .bb-goal-fill {
+    transition: none;
+  }
+}
