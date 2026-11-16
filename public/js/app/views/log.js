@@ -12,7 +12,7 @@ import {
   faceLabel,
 } from '../scoring.js';
 import { fmt } from '../stats.js';
-import { endSum, endRows, sessionCounts, sessionTotal, scoringHint } from '../endSummary.js';
+import { endSum, endRows, sessionCounts, sessionTotal, scoringHint, isEndComplete } from '../endSummary.js';
 import * as L from '../sessionLogic.js';
 import { T } from '../strings.js';
 import { icons } from '../icons.js';
@@ -313,29 +313,37 @@ function renderActive(ctx, session) {
     h('span', { class: 'score-hint' }, scoringHint(session)),
   );
 
-  // --- bottom bar, in thumb reach: Previous / Next end, and Scan (the most used) at the end.
-  // There is no Save end step (every change is saved as it is made): Next opens the next end, and
-  // from the end being shot it needs at least one arrow, so empty ends do not pile up.
-  const endBtn = (label, ariaLabel, { icon, trailing, enabled, onClick, fk }) =>
-    h(
-      'button',
-      { type: 'button', class: 'score-end-btn', 'aria-label': ariaLabel, disabled: !enabled, onClick, dataset: { fk } },
-      icon ? icon() : null,
-      label,
-      trailing ? trailing() : null,
-    );
-  const prevBtn = endBtn(T.prevShort, T.prevEnd, {
-    icon: icons.back,
-    enabled: L.canPrevEnd(session),
-    onClick: () => update(ctx, L.prevEnd),
-    fk: 'end-prev',
-  });
-  const nextBtn = endBtn(T.nextShort, T.nextEnd, {
-    trailing: icons.forward,
-    enabled: L.canNextEnd(session),
-    onClick: () => update(ctx, L.nextEnd),
-    fk: 'end-next',
-  });
+  // --- bottom bar, in thumb reach: ‹ previous end, Next end, and Scan (the most used, the largest)
+  // at the right. There is no Save end step (every change is saved as it is made): Next opens the
+  // next end, and from the end being shot it needs at least one arrow, so empty ends do not pile
+  // up. It turns accent once every slot of the end has a score.
+  const prevBtn = h(
+    'button',
+    {
+      type: 'button',
+      class: 'score-prev',
+      'aria-label': T.prevEnd,
+      disabled: !L.canPrevEnd(session),
+      onClick: () => update(ctx, L.prevEnd),
+      dataset: { fk: 'end-prev' },
+    },
+    icons.back(),
+  );
+  const nextEnd = () => {
+    const saving = session.view == null;
+    if (update(ctx, L.nextEnd) && saving) announce(T.endSaved(endNo, sessionTotal(ctx.running.get())));
+  };
+  const nextBtn = h(
+    'button',
+    {
+      type: 'button',
+      class: ['score-next', isEndComplete(current) && 'is-ready'],
+      disabled: !L.canNextEnd(session),
+      onClick: nextEnd,
+      dataset: { fk: 'end-next' },
+    },
+    T.nextEnd,
+  );
 
   // --- the End n details sheet: let-downs, correct let-downs and the note (same handlers as before)
   const stepper = (key, label) =>

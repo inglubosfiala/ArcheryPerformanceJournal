@@ -2633,58 +2633,74 @@ button.arrow-count:hover {
   box-shadow: 0 0 0 3px var(--ink);
 }
 
-/* bottom bar: Previous / Next end, and Scan (the most used: accent outline) */
+/* bottom bar: ‹ previous end (icon), Next end (accent once the end is complete), and Scan, the
+   largest, at the right under the thumb */
 .score-actions {
   display: flex;
   gap: 8px;
 }
 
-.score-end-btn {
-  flex: 1;
-  min-width: 0;
+.score-prev,
+.score-next {
+  flex: none;
   height: var(--tap-primary);
-  padding: 0 4px;
   border: 1px solid var(--border);
-  border-radius: var(--radius-xl);
+  border-radius: var(--radius-lg);
   background: var(--surface);
   color: var(--ink);
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 2px;
   font: var(--type-body-strong);
   white-space: nowrap;
 }
 
-.score-end-btn svg {
-  flex: none;
-  width: 18px;
-  height: 18px;
+.score-prev {
+  width: var(--tap-primary);
+  padding: 0;
+}
+
+.score-prev svg {
+  width: 20px;
+  height: 20px;
+}
+
+.score-next {
+  min-width: 110px;
+  padding: 0 14px;
+}
+
+.score-next.is-ready:not(:disabled) {
+  border-color: var(--accent);
+  background: var(--accent);
+  color: var(--on-accent);
 }
 
 .score-scan {
-  flex: none;
+  flex: 1 1 auto;
+  min-width: 0;
   height: var(--tap-primary);
-  border-radius: var(--radius-xl);
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  color: var(--ink);
-  font: var(--type-button-lg);
-}
-
-.score-scan {
-  gap: 6px;
+  gap: 10px;
   padding: 0 12px;
   border: 2px solid var(--accent-bright);
+  border-radius: var(--radius-xl);
   background: var(--accent-tint);
+  color: var(--ink);
+  font-size: 18px;
+  font-weight: 800;
 }
 
 .score-scan svg {
+  width: 24px;
+  height: 24px;
   color: var(--accent-bright);
 }
 
-.score-end-btn:disabled,
+.score-prev:disabled,
+.score-next:disabled,
 .score-scan:disabled {
   opacity: 0.45;
 }
