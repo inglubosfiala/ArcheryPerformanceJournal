@@ -74,6 +74,8 @@ const SHELL = [
   './js/ui/apl/index.js',
   './js/app/views/history.js',
   './js/app/views/gear.js',
+  './js/app/views/gearSheet.js',
+  './js/app/views/gearSights.js',
   './js/app/views/competitionLog.js',
   './js/app/views/dashboard.js',
   './js/app/views/sessionForms.js',

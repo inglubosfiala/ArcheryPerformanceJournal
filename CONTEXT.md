@@ -57,12 +57,18 @@ A shot drawn and not released; a correct let-down is one that was the right deci
 
 ### Equipment
 
-**Gear setup**:
-The archer's equipment as configured: bow, arrows, string, tuning and accessories, together with its sight marks. The current setup is edited on the Gear tab; named copies of it are saved setups.
-_Avoid_: Snapshot (in conversation; the code calls a saved setup a gear snapshot)
+**Setup**:
+One named configuration of the archer's equipment: bow, arrows, string, tuning and accessories, together with its sight marks. The archer keeps several (indoor, outdoor, a borrowed bow); every change is saved to the setup at once. A session keeps its own copy of the setup it was shot with, so later changes never alter it.
+_Avoid_: Snapshot, saved setup, working copy, current setup (the old Gear tab had a working copy and snapshots of it; since schema 7 there are only setups. The code still names a session's link to its setup `gearSnapshotId`)
+
+**Active setup**:
+The one setup new sessions take a copy of by default. Exactly one is active while any exist; it is chosen on the Gear tab and shared between devices.
+
+**Tuning history**:
+The changes made to one setup's values, newest first, each with its date and an optional reason (the last 50 per setup).
 
 **Sight mark**:
-The sight setting (elevation, windage) for one distance. Sight marks belong to one gear setup: changing the bow changes the marks, so every setup has its own.
+The sight setting (elevation, windage) for one distance. Sight marks belong to one setup: changing the bow changes the marks, so every setup has its own.
 
 ### Target
 

@@ -93,6 +93,7 @@ const VIEWS = { home: renderDashboard, insights: renderInsights, log: renderLog,
 let route = { name: 'home', params: [] };
 let shell;
 let overlayClose = null;
+let lastReturnFk = null;
 let lastOverlayKey = null;
 
 function buildShell() {
@@ -153,7 +154,9 @@ function renderNow({ scrollTop = false } = {}) {
 function renderOverlay(overlay) {
   const opened = overlay && lastOverlayKey !== overlay.key;
   const returnFocus = !overlay && lastOverlayKey;
+  const returnFk = lastReturnFk;
   lastOverlayKey = overlay ? overlay.key : null;
+  lastReturnFk = overlay ? overlay.returnFk || null : null;
   overlayClose = overlay ? overlay.onClose : null;
   for (const el of [shell.main, shell.nav, shell.banner, shell.running]) el.inert = !!overlay;
   if (!overlay) {
@@ -161,7 +164,9 @@ function renderOverlay(overlay) {
     shell.overlay.className = 'overlay-root';
     if (returnFocus && !document.activeElement?.closest?.('.main')) {
       // keep the user's place: focus returns to the active slot or the main area
-      const target = shell.main.querySelector('.slot.is-active') || shell.main;
+      // (or to the control that opened the overlay, when it names one: `returnFk`)
+      const opener = returnFk && shell.main.querySelector(`[data-fk="${CSS.escape(returnFk)}"]`);
+      const target = opener || shell.main.querySelector('.slot.is-active') || shell.main;
       target.focus({ preventScroll: true });
     }
     return;
@@ -316,7 +321,7 @@ const router = createRouter((r) => {
   }
   const changed = r.name !== route.name || r.params.join('/') !== route.params.join('/');
   route = r;
-  if (changed) ui.quietSet({ newSightIds: [], importPreview: null });
+  if (changed) ui.quietSet({ importPreview: null, gearMenu: null, gearEdit: null, sightMenu: null, sightEdit: null });
   renderNow({ scrollTop: changed });
   if (changed && auth.configured && auth.isSignedIn() && !auth.getToken()) renewIfSafe();
 });

@@ -167,12 +167,10 @@ function whenSection(ctx, { setup, set, quiet }, { duration = false } = {}) {
   return { section, whenDate, whenTime, past };
 }
 
-/** Equipment: the Gear tab's setup by default, or any saved setup, as radio cards. */
+/** Equipment: the active setup by default, or any other setup, as cards. */
 function equipmentSection(ctx, { settings, setup, set }) {
-  const snapshots = ctx.repo.list('gearSnapshots', {
-    sort: (a, b) => b.createdAt.localeCompare(a.createdAt),
-  });
-  const gearOpts = gearChoices({ settings, snapshots });
+  const setups = ctx.repo.list('setups');
+  const gearOpts = gearChoices({ settings, setups });
   const gearChoice = gearOpts.options.some((o) => o[0] === setup.gear) ? setup.gear : gearOpts.value;
   const section = APL.Section({
     label: 'Equipment',
@@ -181,13 +179,14 @@ function equipmentSection(ctx, { settings, setup, set }) {
       ...gearOpts,
       value: gearChoice,
       onChange: (id) => set({ gear: id }),
-      snapshots,
+      setups,
+      distance: setup.distance ?? null,
     }),
   });
   return {
     section,
     chosenGear: () =>
-      gearForChoice(gearChoice, { settings, snapshots }) || { gear: null, gearSnapshotId: null },
+      gearForChoice(gearChoice, { setups }) || { gear: null, gearSnapshotId: null },
     gearName: gearChoice === 'none' ? null : gearOpts.options.find((o) => o[0] === gearChoice)?.[1],
   };
 }

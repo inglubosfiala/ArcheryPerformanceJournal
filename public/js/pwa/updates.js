@@ -35,6 +35,7 @@ export async function checkForUpdate() {
   if (!reg) return 'unsupported';
   const activate = (worker) => {
     worker.postMessage({ type: 'SKIP_WAITING' });
+    reloadOnceActive(worker);
     return 'updating';
   };
   if (reg.waiting) return activate(reg.waiting);
@@ -56,6 +57,22 @@ export async function checkForUpdate() {
     worker.addEventListener('statechange', done);
     done();
   });
+}
+
+/**
+ * The page normally reloads on `controllerchange` when the new version takes over. Chrome does not
+ * always send it (a page opened with a hard reload has no controller to change; another open tab of
+ * the app can delay it), which left "New version found. Reloading…" on screen for good. So reload
+ * shortly after the new worker is active, and in any case after a while.
+ */
+const RELOAD_AFTER_ACTIVE_MS = 1000;
+const RELOAD_ANYWAY_MS = 10000;
+
+function reloadOnceActive(worker) {
+  const reload = () => location.reload();
+  const whenActive = () => worker.state === 'activated' && setTimeout(reload, RELOAD_AFTER_ACTIVE_MS);
+  if (!whenActive()) worker.addEventListener('statechange', whenActive);
+  setTimeout(reload, RELOAD_ANYWAY_MS);
 }
 
 export async function requestPersistence() {

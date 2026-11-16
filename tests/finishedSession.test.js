@@ -185,21 +185,28 @@ describe('when', () => {
 });
 
 describe('gear', () => {
-  it('copies the current setup into the session', () => {
-    repo.saveSettings({ gear: { bow: 'Hoyt' }, activeSnapshotId: null });
-    const ss = scored();
-    expect(make().setGear(ss.id, 'current')).toEqual({ status: 'saved' });
-    expect(stored(ss.id)).toMatchObject({ gear: { bow: 'Hoyt' }, gearSnapshotId: null });
-  });
-
-  it('copies a saved setup, and keeps what was recorded when that is picked', () => {
-    const sn = repo.save('gearSnapshots', { name: 'Outdoor', date: '2026-10-01', fields: { bow: 'W&W' } });
+  it('copies a setup into the session, and keeps what was recorded when that is picked', () => {
+    const setup = repo.save('setups', { name: 'Outdoor', fields: { riser: 'W&W' } });
     const ss = scored();
     const f = make();
-    f.setGear(ss.id, sn.id);
-    expect(stored(ss.id)).toMatchObject({ gear: { bow: 'W&W' }, gearSnapshotId: sn.id });
+    expect(f.setGear(ss.id, setup.id)).toEqual({ status: 'saved' });
+    expect(stored(ss.id)).toMatchObject({ gear: { riser: 'W&W' }, gearSnapshotId: setup.id });
     expect(f.setGear(ss.id, 'recorded')).toEqual({ status: 'none' });
-    expect(stored(ss.id).gearSnapshotId).toBe(sn.id);
+    expect(stored(ss.id).gearSnapshotId).toBe(setup.id);
+  });
+
+  it('a later edit of the setup leaves the session as it was', () => {
+    const setup = repo.save('setups', { name: 'Indoor', fields: { brace: '8.75' } });
+    const ss = scored();
+    make().setGear(ss.id, setup.id);
+    repo.save('setups', { ...repo.get('setups', setup.id), fields: { brace: '9' } });
+    expect(stored(ss.id).gear).toEqual({ brace: '8.75' });
+  });
+
+  it('stores no equipment for "none"', () => {
+    const ss = scored();
+    make().setGear(ss.id, 'none');
+    expect(stored(ss.id)).toMatchObject({ gear: null, gearSnapshotId: null });
   });
 });
 
