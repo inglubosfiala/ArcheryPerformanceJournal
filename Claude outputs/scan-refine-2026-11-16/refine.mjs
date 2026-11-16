@@ -185,9 +185,130 @@ function localEdge(at, outer, f, shaft, s) {
   return { e, local, n: found.length };
 }
 
+/**
+ * L: the printed ring line beside the arrow, fitted as a short arc.
+ * The ring line nearest the point is either a thin black line between rings of one colour (10/9 in the gold,
+ * 8/7 in the red) or a colour step (9/8 gold → red, 7/6 red → blue, the spot's edge blue → white). Strips across
+ * the line are read at arc positions of LIN.minMm…LIN.maxMm mm on both sides of the arrow, off the shaft and its
+ * hole. In each strip the line is found to 0.1 mm: the deepest thin dip (black line) or the 50 % crossing between
+ * the two ring colours (step). A robust straight fit r(a) through those points (a = arc mm) gives the line's
+ * radius where the arrow is. Returns { e, local, n, pts } (pts in full px, for the crops) or null.
+ */
+const LIN = { minMm: 3, maxMm: 20, stepMm: 1, span: 0.04, minPts: 5, ...JSON.parse(process.env.LIN || '{}') };
+const KIND = { 0.2: 'line', 0.4: 'step', 0.6: 'line', 0.8: 'step', 1: 'step' };
+function localRing(at, outer, f, shaft, s) {
+  const d = Math.hypot(f.x, f.y);
+  const e = EDGES.reduce((p, q) => (Math.abs(q - d) < Math.abs(p - d) ? q : p));
+  if (Math.abs(d - e) > TUNE.near) return null;
+  const kind = KIND[e];
+  const th = Math.atan2(f.y, f.x);
+  const dr = 0.001; // 0.1 mm
+  const ref = 0.02; // colour reference: 2 mm just outside the search window
+  const keep = shaft.half + 1.5 * s; // stay this far off the shaft and its hole (full px)
+  const offShaft = (p) => {
+    const vx = p.x - shaft.tip.x, vy = p.y - shaft.tip.y;
+    const along = vx * shaft.lean.x + vy * shaft.lean.y;
+    const across = Math.abs(-vx * shaft.lean.y + vy * shaft.lean.x);
+    return !((along > -keep && across < keep) || Math.hypot(vx, vy) < keep + shaft.half);
+  };
+  const pts = [];
+  for (let side = -1; side <= 1; side += 2)
+    for (let mm = LIN.minMm; mm <= LIN.maxMm; mm += LIN.stepMm) {
+      const arc = side * mm;
+      const phi = th + arc / (e * MM);
+      const rs = [], cols = [];
+      let ok = true;
+      for (let r = e - LIN.span - ref; r <= e + LIN.span + ref + 1e-9; r += dr) {
+        const p = pictureFromFace(outer, { x: r * Math.cos(phi), y: r * Math.sin(phi) });
+        const c = offShaft(p) ? at(p.x, p.y) : null;
+        if (!c) { ok = false; break; }
+        rs.push(r); cols.push(c);
+      }
+      if (!ok) continue;
+      const r0 = kind === 'line' ? findDip(rs, cols, e) : findStep(rs, cols, e, ref);
+      if (r0 == null) continue;
+      pts.push({ arc, r: r0, p: pictureFromFace(outer, { x: r0 * Math.cos(phi), y: r0 * Math.sin(phi) }) });
+    }
+  if (pts.length < LIN.minPts) return null;
+  // robust straight fit r = c0 + c1·arc: fit, drop points far off, fit again
+  const fit = (q) => {
+    const ma = q.reduce((x, p) => x + p.arc, 0) / q.length, mr = q.reduce((x, p) => x + p.r, 0) / q.length;
+    let sxy = 0, sxx = 0;
+    for (const p of q) { sxy += (p.arc - ma) * (p.r - mr); sxx += (p.arc - ma) ** 2; }
+    const c1 = sxx ? sxy / sxx : 0;
+    return { c0: mr - c1 * ma, c1 };
+  };
+  let q = pts, m = fit(q);
+  for (let it = 0; it < 3; it++) {
+    const res = q.map((p) => Math.abs(p.r - (m.c0 + m.c1 * p.arc)));
+    const mad = median(res);
+    const lim = Math.max(0.003, 3 * mad); // never tighter than 0.3 mm
+    const nq = q.filter((_, i) => res[i] <= lim);
+    if (nq.length === q.length || nq.length < LIN.minPts) break;
+    q = nq; m = fit(q);
+  }
+  if (q.length < LIN.minPts) return null;
+  if (Math.abs(m.c0 - e) > LIN.span) return null;
+  return { e, local: m.c0, n: q.length, pts: q.map((p) => p.p) };
+}
+
+/** A thin black line: the deepest narrow dip in brightness within ±span of e (sub-sample by a parabola). */
+function findDip(rs, cols, e) {
+  const b = cols.map(bright);
+  const sm = b.map((_, i) => (b[Math.max(0, i - 1)] + b[i] + b[Math.min(b.length - 1, i + 1)]) / 3);
+  const side = 15; // 1.5 mm each side for the paper's own brightness
+  let best = null;
+  for (let i = side; i < sm.length - side; i++) {
+    if (Math.abs(rs[i] - e) > LIN.span) continue;
+    if (!(sm[i] <= sm[i - 1] && sm[i] <= sm[i + 1])) continue;
+    const lo = Math.max(...sm.slice(i - side, i - 5)), hi = Math.max(...sm.slice(i + 6, i + side + 1));
+    const depth = Math.min(lo, hi) - sm[i];
+    if (depth < 25) continue;
+    // thin: back to half depth within 1.2 mm on both sides (an old hole is wider)
+    const halfLvl = sm[i] + depth / 2;
+    let a = i, z = i;
+    while (a > i - 12 && sm[a] < halfLvl) a--;
+    while (z < i + 12 && sm[z] < halfLvl) z++;
+    if (sm[a] < halfLvl || sm[z] < halfLvl) continue;
+    if (!best || depth > best.depth) best = { i, depth };
+  }
+  if (!best) return null;
+  const { i } = best;
+  const y0 = sm[i - 1], y1 = sm[i], y2 = sm[i + 1];
+  const den = y0 - 2 * y1 + y2;
+  const off = den > 0 ? Math.max(-0.5, Math.min(0.5, (0.5 * (y0 - y2)) / den)) : 0;
+  return rs[i] + off * (rs[1] - rs[0]);
+}
+
+/** A colour step: where the colour is half way from the inner ring's to the outer ring's, nearest e. */
+function findStep(rs, cols, e, ref) {
+  const mean = (sel) => { const m = [0, 0, 0]; let n = 0; rs.forEach((r, i) => { if (sel(r)) { for (let c = 0; c < 3; c++) m[c] += cols[i][c]; n++; } }); return m.map((v) => v / n); };
+  const inC = mean((r) => r < e - LIN.span);
+  const outC = mean((r) => r > e + LIN.span);
+  const dv = [outC[0] - inC[0], outC[1] - inC[1], outC[2] - inC[2]];
+  const len2 = dv[0] ** 2 + dv[1] ** 2 + dv[2] ** 2;
+  if (len2 < 40 ** 2) return null;
+  const q = cols.map((c) => ((c[0] - inC[0]) * dv[0] + (c[1] - inC[1]) * dv[1] + (c[2] - inC[2]) * dv[2]) / len2);
+  const sm = q.map((_, i) => (q[Math.max(0, i - 1)] + q[i] + q[Math.min(q.length - 1, i + 1)]) / 3);
+  // a hole or a black line in the way: much darker than both colours
+  const dark = Math.min(bright(inC), bright(outC)) * 0.55;
+  if (cols.some((c, i) => Math.abs(rs[i] - e) <= LIN.span && bright(c) < dark)) return null;
+  let best = null;
+  for (let i = 2; i < sm.length - 2; i++) {
+    if (Math.abs(rs[i] - e) > LIN.span) continue;
+    if (!((sm[i] - 0.5) * (sm[i + 1] - 0.5) <= 0)) continue;
+    const slope = sm[Math.min(sm.length - 1, i + 3)] - sm[Math.max(0, i - 2)];
+    if (slope < 0.3) continue; // must rise from inner to outer colour
+    const t = sm[i + 1] !== sm[i] ? (0.5 - sm[i]) / (sm[i + 1] - sm[i]) : 0;
+    const r = rs[i] + t * (rs[1] - rs[0]);
+    if (!best || slope > best.slope) best = { r, slope };
+  }
+  return best ? best.r : null;
+}
+
 const val = (v) => (v === 'X' ? 10 : v === 'M' ? 0 : v);
 const meta = JSON.parse(fs.readFileSync(path.join(rawDir, 'meta.json'), 'utf8'));
-const VARIANTS = ['base', 'A', 'A+cut', 'A+ctr', 'A+ctr+cut', 'B', 'A+B', 'A+B+cut'];
+const VARIANTS = (process.env.VARIANTS || 'base,A+ctr,L,L+cut,A+L,A+L+cut,A+ctr+L,A+ctr+L+cut').split(',');
 const tally = Object.fromEntries(VARIANTS.map((v) => [v, 0]));
 const rows = [];
 for (const [name, m] of Object.entries(meta)) {
@@ -236,8 +357,19 @@ for (const [name, m] of Object.entries(meta)) {
     };
     const bB = withB(fBase), bAB = withB(fA);
     const fC = A && a.lean ? faceFromPicture(outer, { x: A.tip.x + A.half * a.lean.x, y: A.tip.y + A.half * a.lean.y }) : fBase;
-    const pts = { 'A+ctr': fC, 'A+ctr+cut': cut(fC, halfFace), base: fBase, A: fA, 'A+cut': cut(fA, halfFace), B: bB.f, 'A+B': bAB.f, 'A+B+cut': cut(bAB.f, halfFace) };
-    const row = { photo: name, spot: a.spot, truth: t, kind: a.lean ? 'shaft' : 'blob', refined: !!A, tipMovedMm: A ? +(A.moved / s).toFixed(1) : null, halfMm: A ? +(A.half / s).toFixed(2) : null, edgeMm: bAB.edge ? +((bAB.edge.local - bAB.edge.e) * MM).toFixed(1) : null, d: {}, read: {}, tipFull: A ? A.tip : tipFull, outer };
+    const half = A ? A.half : 2.7 * s;
+    const ringFor = (f) => {
+      if (!a.lean) return { f, ring: null };
+      const ring = localRing(at, outer, f, { tip: A ? A.tip : tipFull, lean: a.lean, half }, s);
+      if (!ring) return { f, ring: null };
+      const d = Math.hypot(f.x, f.y);
+      const k = d ? (d - (ring.local - ring.e)) / d : 1;
+      return { f: { x: f.x * k, y: f.y * k }, ring };
+    };
+    const hf = (+(process.env.CUTK ?? 1)) * half / (s * MM);
+    const lB = ringFor(fBase), lC = ringFor(fC), lA = ringFor(fA);
+    const pts = { 'A+L': lA.f, 'A+L+cut': cut(lA.f, hf), L: lB.f, 'L+cut': cut(lB.f, hf), 'A+ctr+L': lC.f, 'A+ctr+L+cut': cut(lC.f, hf), 'A+ctr': fC, 'A+ctr+cut': cut(fC, halfFace), base: fBase, A: fA, 'A+cut': cut(fA, halfFace), B: bB.f, 'A+B': bAB.f, 'A+B+cut': cut(bAB.f, halfFace) };
+    const row = { photo: name, spot: a.spot, truth: t, kind: a.lean ? 'shaft' : 'blob', refined: !!A, tipMovedMm: A ? +(A.moved / s).toFixed(1) : null, halfMm: A ? +(A.half / s).toFixed(2) : null, edgeMm: lB.ring ? +((lB.ring.local - lB.ring.e) * MM).toFixed(1) : null, ringN: lB.ring ? lB.ring.n : null, ringPts: lB.ring ? lB.ring.pts : [], baseFull: tipFull, d: {}, read: {}, tipFull: A ? A.tip : tipFull, outer };
     for (const v of VARIANTS) {
       const sc = scoreFromPoint(pts[v].x, pts[v].y, FACE);
       row.read[v] = sc;
@@ -259,5 +391,5 @@ for (const r of rows) {
 }
 console.log('');
 for (const v of VARIANTS) console.log(`${v.padEnd(8)} ${tally[v]}/${rows.length}`);
-console.log(`refined tips: ${rows.filter((r) => r.refined).length}/${rows.length}, local edges used (A+B): ${rows.filter((r) => r.edgeMm != null).length}`);
+console.log(`refined tips: ${rows.filter((r) => r.refined).length}/${rows.length}, local rings fitted (L): ${rows.filter((r) => r.edgeMm != null).length}`);
 if (outFile) fs.writeFileSync(outFile, JSON.stringify({ TUNE, tally, rows }, null, 1));

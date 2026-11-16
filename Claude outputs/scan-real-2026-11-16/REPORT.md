@@ -185,3 +185,27 @@ out of git, or shrunk to the close-up crops.
 - `sweep.mjs`: detector options over the close-ups saved by `eval.mjs` (fast, no resampling)
 - `zoom.py`: zoomed views of each arrow: the picture as analysed, the dark mask, the shafts and the point
 - `zoom/`, `zoom-tip/`: the misses before and after the tip change; `results-tip.json`: the final run
+
+## Sharper preview, and the size of the analysed picture
+
+The preview after a scan used to show the very picture that was analysed: at most 640 px on its long side,
+blown up 2–3× on a phone screen. Now the kept look is drawn a second time, up to 2048 px (never larger than
+the photo), and the found rings and arrows are scaled to it (`scan.js` `sharper`, `PREVIEW_MAX`). The
+detector still analyses the 640 px picture. Checked in the app: the AE preview is 838 × 2048 instead of
+about 262 × 640. The live camera asks for 1920 × 1080 now (was 1280 × 720), and its preview crop is no
+longer scaled down to 640.
+
+Would analysing more pixels help? Not as the detector is tuned now:
+
+| Analysed long side | Node eval (area average) | In the browser (canvas resampling) | Time per photo |
+|---|---|---|---|
+| 640 (now) | 41 / 48 | 39 / 48 | ~0.5 s |
+| 960 | 37 / 48 | 38 / 48 | ~0.9 s |
+| 1280 | 36 / 48 | (did not finish) | ~1.5 s+ |
+
+Several of the detector's limits are in pixels and were tuned at 640 (gaps bridged along a shaft, the 3 × 3
+darkness test, the glare bridge). At a larger size they no longer fit. More pixels might help after those
+are made relative to the spot's size, but that's a separate piece of work, and on a phone it costs time.
+
+The browser run at 640 used the original AA and AJ (AJ still mixes the two sheets), and the browser's
+resampling. The browser read AE's middle arrow as 9 where the Node eval read it as 10.
