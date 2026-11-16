@@ -64,6 +64,7 @@ const SHELL = [
   './js/app/finishedSession.js',
   './js/app/sessionLogic.js',
   './js/app/stats.js',
+  './js/app/endSummary.js',
   './js/app/strings.js',
   './js/app/views/common.js',
   './js/app/views/confirm.js',
