@@ -33,7 +33,9 @@ import {
   GROUP_FILTERS,
   FILTER_LABELS,
 } from '../sessionInsights.js';
-import { isMultiSpot } from '../scoring.js';
+import { isMultiSpot, keypadValues, zoneOf } from '../scoring.js';
+import { sumArrows } from '../stats.js';
+import { rescoreArrow } from '../sessionLogic.js';
 import { faceRings } from './face.js';
 import { whenCard, gearCard } from './common.js';
 
@@ -353,6 +355,206 @@ export function groupSection(ss, { filter = 'all', onFilter }) {
   );
 }
 
+// ---------------------------------------------------------------- B5 ends, B6 the Edit end sheet
+
+const ENDS_SHOWN = 5;
+const gradesText = (a) => [a.m != null && `M${a.m}`, a.s != null && `S${a.s}`].filter(Boolean).join(' ');
+const chip = (v, cls = '') =>
+  h('span', { class: `score-chip z-${zoneOf(v)} ${cls}`, 'aria-hidden': 'true' }, v == null ? '–' : String(v));
+
+/** One row per end: its score chips with the grades under each, and its total. Tap = Edit end. */
+export function endsSection(ss, { all = false, onShowAll, onEdit }) {
+  const ends = all ? ss.ends : ss.ends.slice(0, ENDS_SHOWN);
+  const said = (a) => (a.v == null ? 'empty' : [a.v, gradesText(a)].filter(Boolean).join(' '));
+  return h(
+    'section',
+    { class: 'ov-card ov-list', 'aria-labelledby': 'ov-ends' },
+    h(
+      'div',
+      { class: 'ov-card-head ov-list-head' },
+      h('h2', { class: 'apl-label', id: 'ov-ends' }, T.ends),
+      h('span', { class: 'apl-cap' }, 'Tap an end to edit'),
+    ),
+    ends.map((e, i) =>
+      h(
+        'button',
+        {
+          type: 'button',
+          class: 'ov-end',
+          'aria-haspopup': 'dialog',
+          'aria-label': `End ${i + 1}: ${e.arrows.map(said).join(', ')}. Total ${sumArrows(e.arrows)}. Edit`,
+          onClick: () => onEdit(i),
+          dataset: { fk: `end-${i}` },
+        },
+        h('span', { class: 'ov-end-no' }, String(i + 1)),
+        h(
+          'span',
+          { class: 'ov-end-arrows' },
+          e.arrows.map((a) => h('span', { class: 'ov-end-arrow' }, chip(a.v), h('span', { class: 'ov-end-grades' }, gradesText(a) || ' '))),
+        ),
+        h('span', { class: 'ov-end-sum' }, String(sumArrows(e.arrows))),
+        h('span', { class: 'ov-row-go', 'aria-hidden': 'true' }, icons.chevron()),
+      ),
+    ),
+    !all && ss.ends.length > ENDS_SHOWN
+      ? h('button', { type: 'button', class: 'ov-more', onClick: onShowAll, dataset: { fk: 'ends-all' } }, `Show all ${ss.ends.length} ends`)
+      : null,
+  );
+}
+
+/** The keys of a face in rows of at most 7 (a full face's 12 keys as two rows of 6): every key ≥44px. */
+function keyRows(face) {
+  const keys = keypadValues(face);
+  const per = keys.length > 7 ? Math.ceil(keys.length / 2) : keys.length;
+  return Array.from({ length: Math.ceil(keys.length / per) }, (_, r) => keys.slice(r * per, r * per + per));
+}
+
+/**
+ * The Edit end sheet: the end's arrows as tiles (pick one, then change its score with the keypad and
+ * its grades with the M / S rows), the let-downs, Delete end, Cancel / Save end. The draft lives in
+ * the page state until Save; a position that no longer matches its new score is dropped on Save.
+ */
+function endSheet(ctx, ss, { ov, set }) {
+  const index = ov.end;
+  const saved = ss.ends[index];
+  if (!saved) return null;
+  const draft = ov.endDraft || structuredClone(saved);
+  const sel = Math.min(ov.endSel ?? 0, draft.arrows.length - 1);
+  const cur = draft.arrows[sel];
+  const close = () => set({ sheet: null, end: null, endDraft: null, endSel: null });
+  const update = (fn) => {
+    const next = structuredClone(draft);
+    fn(next);
+    set({ endDraft: next });
+  };
+  const setScore = (v) =>
+    update((d) => {
+      d.arrows[sel].v = v;
+    });
+  const setGrade = (kind, g) =>
+    update((d) => {
+      d.arrows[sel][kind] = d.arrows[sel][kind] === g ? null : g;
+    });
+  // correct let-downs never exceed let-downs (as on the scoring screen)
+  const bump = (key, delta) =>
+    update((d) => {
+      d[key] = Math.max(0, (d[key] || 0) + delta);
+      if (key === 'ld' && d.cld > d.ld) d.cld = d.ld;
+      if (key === 'cld' && d.cld > d.ld) d.ld = d.cld;
+    });
+
+  const save = () => {
+    const dropped = [];
+    const arrows = draft.arrows.map((a, i) => {
+      const was = saved.arrows[i];
+      if (a.v == null || a.v === was.v) return a;
+      // the saved position decides, the draft's grades stay
+      const { spot: _spot, ...graded } = a;
+      const res = rescoreArrow({ ...graded, v: was.v, x: was.x, y: was.y, ...(was.spot != null ? { spot: was.spot } : {}) }, a.v, ss.face);
+      if (res.dropped) dropped.push(i + 1);
+      return res.arrow;
+    });
+    if (ctx.finished.setEnd(ss.id, index, { ...draft, arrows }).status === 'failed') return;
+    close();
+    const n = dropped.length;
+    ctx.toast(
+      n
+        ? `End saved. ${n === 1 ? `Arrow ${dropped[0]} is` : `Arrows ${dropped.join(', ')} are`} off the group plot: the new score is in another ring.`
+        : 'End saved.',
+    );
+  };
+  const del = async () => {
+    if ((await ctx.finished.deleteEnd(ss.id, index)).status !== 'deleted') return;
+    close();
+    ctx.toast(`End ${index + 1} deleted.`);
+  };
+
+  const stepper = (key, label) =>
+    h(
+      'div',
+      { class: 'ov-ld' },
+      h('span', { class: 'ov-ld-label' }, label),
+      APL.Stepper({
+        label: label.toLowerCase(),
+        value: draft[key] || 0,
+        min: 0,
+        onChange: (v) => bump(key, v - (draft[key] || 0)),
+        fk: `end-${key}`,
+      }),
+    );
+
+  return {
+    onClose: close,
+    returnFk: `end-${index}`,
+    node: APL.Dialog({
+      sheet: true,
+      title: `End ${index + 1} · ${sumArrows(draft.arrows)}`,
+      idPrefix: 'ov-end',
+      onClose: close,
+      closeLabel: 'Cancel and close',
+      children: h(
+        'div',
+        { class: 'ov-sheet ov-endsheet' },
+        h('p', { class: 'apl-cap13 ov-endsheet-hint' }, 'Tap an arrow, then change its score or grades'),
+        h(
+          'div',
+          { class: 'ov-tiles', role: 'group', 'aria-label': 'Arrows', style: { '--cols': String(Math.min(draft.arrows.length, 3)) } },
+          draft.arrows.map((a, i) =>
+            h(
+              'button',
+              {
+                type: 'button',
+                class: 'ov-tile',
+                'aria-pressed': String(i === sel),
+                'aria-label': `Arrow ${i + 1}: ${a.v ?? 'empty'}${a.m ? `, M${a.m}` : ''}${a.s ? `, S${a.s}` : ''}`,
+                onClick: () => set({ endSel: i, endDraft: draft }),
+                dataset: { fk: `tile-${i}` },
+              },
+              chip(a.v, 'ov-tile-chip'),
+              h('span', { class: 'ov-tile-grades', 'aria-hidden': 'true' }, h('span', null, `M${a.m ?? '–'}`), h('span', null, `S${a.s ?? '–'}`)),
+            ),
+          ),
+        ),
+        keyRows(ss.face).map((row, r) =>
+          APL.ScoreKeypad({
+            label: r ? `Score of arrow ${sel + 1}, lower rings` : `Score of arrow ${sel + 1}`,
+            keys: row.map((k) => ({ value: k, zone: zoneOf(k), ariaLabel: `Score ${k === 'M' ? 'miss' : k}` })),
+            value: cur.v,
+            onKey: setScore,
+            fk: `endkey${r}`,
+          }),
+        ),
+        APL.GradeKeys({
+          label: `Mental program for arrow ${sel + 1}`,
+          rowLabel: 'M',
+          value: cur.m,
+          keyLabel: (g) => `Mental grade ${g}`,
+          onChange: (g) => setGrade('m', g),
+          fk: 'end-grade-m',
+        }),
+        APL.GradeKeys({
+          label: `Shooting cycle for arrow ${sel + 1}`,
+          rowLabel: 'S',
+          value: cur.s,
+          keyLabel: (g) => `Shooting-cycle grade ${g}`,
+          onChange: (g) => setGrade('s', g),
+          fk: 'end-grade-s',
+        }),
+        h('div', { class: 'ov-lds' }, stepper('ld', T.letDowns), stepper('cld', 'Correct')),
+        ss.ends.length > 1
+          ? h('button', { type: 'button', class: 'btn btn-text danger ov-delete-end', onClick: del, dataset: { fk: 'end-delete' } }, 'Delete end')
+          : h('p', { class: 'apl-cap ov-delete-end' }, 'The only end of a session cannot be deleted.'),
+        h(
+          'div',
+          { class: 'ov-actions ov-actions--even' },
+          APL.Button({ children: 'Cancel', variant: 'secondary', onClick: close, fk: 'end-cancel' }),
+          APL.Button({ children: 'Save end', onClick: save, fk: 'end-save' }),
+        ),
+      ),
+    }),
+  };
+}
+
 // ---------------------------------------------------------------- B7 details and their sheets
 
 /** Competition details as chips and fields, saved as they change (placement too). */
@@ -444,6 +646,7 @@ function overlayFor(ctx, ss, { ov, set }) {
     returnFk,
     node: APL.Dialog({ sheet: true, title, idPrefix: 'ov-sheet', onClose: close, closeLabel: 'Close', children: h('div', { class: 'ov-sheet' }, children) }),
   });
+  if (ov.sheet === 'end') return endSheet(ctx, ss, { ov, set });
   if (ov.sheet === 'menu') {
     const del = async () => {
       ctx.ui.quietSet({ ov: { ...ov, sheet: null } });
@@ -535,6 +738,11 @@ export function renderOverview(ctx, ss, { mode = 'history', sections = [] } = {}
     gradesCard(ss),
     reviewSection(ctx, ss, { editing: editingReview, onToggle: finished ? null : () => set({ review: !ov.review }) }),
     groupSection(ss, { filter: ov.filter || 'all', onFilter: (f) => set({ filter: f }) }),
+    endsSection(ss, {
+      all: !!ov.allEnds,
+      onShowAll: () => set({ allEnds: true }),
+      onEdit: (i) => set({ sheet: 'end', end: i, endDraft: null, endSel: 0 }),
+    }),
     ...sections,
     finished ? null : detailsCard(ctx, ss, st, setupName, set),
   );
@@ -563,6 +771,7 @@ export function renderOverview(ctx, ss, { mode = 'history', sections = [] } = {}
           })
         : null,
     ),
-    overlay: finished ? null : overlayFor(ctx, ss, state),
+    // right after Finish only an end can be opened (the details and the menu are History's)
+    overlay: finished && ov.sheet !== 'end' ? null : overlayFor(ctx, ss, state),
   };
 }

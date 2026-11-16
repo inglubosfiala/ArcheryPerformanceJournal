@@ -1,7 +1,8 @@
 // Finished sessions: the sessions that are complete and appear in History.
 //
 // This module owns what can still happen to a finished session: changing its review, competition
-// details, when it took place (date, start time), duration, equipment and form fields; moving it to
+// details, when it took place (date, start time), duration, equipment, form fields and ends (an end
+// changed or deleted: totals and statistics follow, as they are worked out from the ends); moving it to
 // Recently deleted, restoring it and deleting it for good; and the lists of finished and deleted
 // sessions. Every change reads the stored session again (a page may have been open for a while, or
 // the session changed on another device), merges the change and saves it through the guarded save.
@@ -9,7 +10,7 @@
 // in the app and in tests.
 //
 // Every command reports what happened as `{ status }`:
-//   'saved' · 'deleted' (moved to Recently deleted) · 'restored' · 'purged' (deleted for good)
+//   'saved' · 'deleted' (moved to Recently deleted, or an end deleted) · 'restored' · 'purged' (deleted for good)
 //   'cancelled' (the archer said no) · 'none' (no such session, e.g. deleted on another device,
 //   or nothing to change) · 'failed' (refused; the guarded write has told the archer)
 
@@ -45,6 +46,7 @@ export function listFinished(repo) {
  * @param deps.confirm  async (question) → boolean. Questions:
  *                        { kind: 'delete', session }  move to Recently deleted
  *                        { kind: 'purge', session }   delete for good
+ *                        { kind: 'delete-end', session, index }  delete one end
  * @param deps.now      () → Date (optional)
  */
 export function createFinishedSessions({ repo, save, trash, restore: restoreRecord, remove, confirm, now = () => new Date() }) {
@@ -93,6 +95,19 @@ export function createFinishedSessions({ repo, save, trash, restore: restoreReco
    */
   const setGear = (id, choice) => change(id, () => gearForChoice(choice, { setups: repo.list('setups') }));
 
+  /** One end replaced by `end` (Edit end); the others are kept. 'none' for an end that is not there. */
+  const setEnd = (id, index, end) =>
+    change(id, (cur) => (cur.ends?.[index] ? { ends: cur.ends.map((e, i) => (i === index ? end : e)) } : null));
+
+  /** Delete one end after a yes. The only end is never deleted: the session would have none. */
+  async function deleteEnd(id, index) {
+    const before = get(id);
+    if (!before?.ends?.[index] || before.ends.length < 2) return { status: 'none' };
+    if (!(await confirm({ kind: 'delete-end', session: before, index }))) return { status: 'cancelled' };
+    const res = change(id, (cur) => (cur.ends?.[index] && cur.ends.length > 1 ? { ends: cur.ends.filter((_, i) => i !== index) } : null));
+    return res.status === 'saved' ? { status: 'deleted' } : res;
+  }
+
   /** Move the session to Recently deleted after a yes. */
   async function moveToDeleted(id) {
     const before = get(id);
@@ -117,5 +132,5 @@ export function createFinishedSessions({ repo, save, trash, restore: restoreReco
     return remove('sessions', id) ? { status: 'purged' } : { status: 'failed' };
   }
 
-  return { get, list, deleted, change, setReview, setCompetition, setWhen, setMinutes, setGear, moveToDeleted, restore, purge };
+  return { get, list, deleted, change, setReview, setCompetition, setWhen, setMinutes, setGear, setEnd, deleteEnd, moveToDeleted, restore, purge };
 }

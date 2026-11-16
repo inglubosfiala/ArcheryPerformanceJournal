@@ -348,3 +348,30 @@ describe('arrow positions', () => {
     expect([moved.v, moved.x, moved.y]).toEqual(['M', null, null]);
   });
 });
+
+describe('changing the score of a saved arrow (Edit end)', () => {
+  const placed = { v: 9, m: 1, s: 2, x: 0.25, y: 0, spot: 1 };
+
+  it('keeps the position and grades while the new score is the ring the position lies in', () => {
+    // 0.25 of a 10–6 spot is the 9 ring
+    expect(L.rescoreArrow(placed, 9, '40t')).toEqual({ arrow: placed, dropped: false });
+  });
+
+  it('drops the position (and its spot) when the new score lies in another ring, keeping the grades', () => {
+    expect(L.rescoreArrow(placed, 8, '40t')).toEqual({ arrow: { v: 8, m: 1, s: 2, x: null, y: null }, dropped: true });
+    expect(L.rescoreArrow(placed, 10, '40t').dropped).toBe(true);
+  });
+
+  it('tells X from 10 by the ring as well', () => {
+    const x = { v: 'X', m: null, s: null, x: 0.05, y: 0 };
+    expect(L.rescoreArrow(x, 10, '40t').dropped).toBe(true);
+    expect(L.rescoreArrow({ ...x, v: 10, x: 0.15 }, 10, '40t').dropped).toBe(false);
+  });
+
+  it('only changes the score of an arrow without a position', () => {
+    expect(L.rescoreArrow({ v: 7, m: 2, s: null, x: null, y: null }, 'M', '122')).toEqual({
+      arrow: { v: 'M', m: 2, s: null, x: null, y: null },
+      dropped: false,
+    });
+  });
+});

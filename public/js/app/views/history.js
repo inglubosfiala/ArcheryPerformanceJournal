@@ -2,7 +2,7 @@
 import { h, formatDate } from '../../core/dom.js';
 import * as APL from '../../ui/apl/index.js';
 import { confirmDialog } from './confirm.js';
-import { computeStats, sumArrows, fmt } from '../stats.js';
+import { computeStats, fmt } from '../stats.js';
 import { T } from '../strings.js';
 import { icons } from '../icons.js';
 import { card, gearCard, whenCard } from './common.js';
@@ -20,6 +20,14 @@ export function askAboutFinishedSession(q) {
       title: 'Delete for good?',
       message: 'The session is removed permanently. This cannot be undone.',
       confirmLabel: T.delete,
+      danger: true,
+    });
+  }
+  if (q.kind === 'delete-end') {
+    return confirmDialog({
+      title: `Delete end ${q.index + 1}?`,
+      message: 'Its arrows, grades and let-downs are removed from the session. This cannot be undone.',
+      confirmLabel: 'Delete end',
       danger: true,
     });
   }
@@ -155,10 +163,6 @@ function detailHeader(ctx, ss, detail) {
   ];
 }
 
-/** A card holding one APL section (label, optional accessory, content). */
-const sectionCard = (id, label, children, accessory = null) =>
-  card({ class: 'apl-card' }, APL.Section({ label, id, accessory, children }));
-
 /** The review of a form session: read, or written after Edit (one session's review open at a time). */
 function formReview(ctx, ss) {
   const ov = ctx.ui.get().ov;
@@ -193,44 +197,7 @@ function renderFormDetail(ctx, ss) {
 
 function renderDetail(ctx, ss, mode) {
   if (!isScored(ss.type)) return renderFormDetail(ctx, ss);
-  return renderOverview(ctx, ss, { mode, sections: [endsTable(ss)] });
-}
-
-/** The ends as a table (until the ends list of the overview). */
-function endsTable(ss) {
-  const dateLbl = formatDate(ss.date);
-  return sectionCard(
-    'ends',
-    T.ends,
-    APL.DataTable({
-      label: 'Ends table, scrolls sideways',
-      columns: [
-        { label: 'Date', muted: true, nowrap: true },
-        { label: 'End' },
-        { label: 'Arrows', strong: true, nowrap: true },
-        { label: 'EndScore', strong: true },
-        { label: 'Grade M' },
-        { label: 'Grade S' },
-        { label: 'Let-downs' },
-        { label: 'Correct LD' },
-        { label: 'Note', muted: true },
-      ],
-      rows: ss.ends.map((e, i) => {
-        const es = computeStats([e]);
-        return [
-          dateLbl,
-          String(i + 1),
-          e.arrows.map((a) => (a.v == null ? '–' : String(a.v))).join(' '),
-          String(sumArrows(e.arrows)),
-          fmt(es.avgM),
-          fmt(es.avgS),
-          String(e.ld),
-          String(e.cld),
-          e.note || '—',
-        ];
-      }),
-    }),
-  );
+  return renderOverview(ctx, ss, { mode });
 }
 
 /** The equipment picker's choice, stored on the finished session (the page is drawn again when it changed). */

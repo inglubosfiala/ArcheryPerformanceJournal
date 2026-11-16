@@ -72,6 +72,50 @@ const strength = (patch = {}) =>
   repo.save('sessions', { type: 'strength', status: 'finished', date: '2026-11-11', minutes: 30, effort: 5, drills: [], note: '', ...patch });
 const stored = (id) => repo.get('sessions', id);
 
+describe('editing and deleting an end', () => {
+  const arrows = (...vs) => vs.map((v) => ({ v, m: 1, s: 1, x: null, y: null }));
+  const end = (...vs) => ({ arrows: arrows(...vs), ld: 0, cld: 0, note: '' });
+  const twoEnds = () => scored({ ends: [end(10, 9, 8), end('X', 10, 7)] });
+
+  it('stores a changed end; totals follow from the ends', () => {
+    const ss = twoEnds();
+    const changed = { ...end(10, 10, 10), ld: 2, cld: 1 };
+    expect(make().setEnd(ss.id, 1, changed).status).toBe('saved');
+    expect(stored(ss.id).ends[1]).toEqual(changed);
+    expect(stored(ss.id).ends[0]).toEqual(end(10, 9, 8));
+  });
+
+  it('refuses an end that is not valid (more correct let-downs than let-downs) and keeps the old one', () => {
+    const ss = twoEnds();
+    expect(make().setEnd(ss.id, 0, { ...end(10, 9, 8), ld: 0, cld: 1 }).status).toBe('failed');
+    expect(stored(ss.id).ends[0]).toEqual(end(10, 9, 8));
+  });
+
+  it('does nothing for an end that is not there', () => {
+    expect(make().setEnd(twoEnds().id, 5, end(1, 1, 1)).status).toBe('none');
+  });
+
+  it('deletes an end after a yes', async () => {
+    const ss = twoEnds();
+    expect((await make().deleteEnd(ss.id, 0)).status).toBe('deleted');
+    expect(asked).toEqual([{ kind: 'delete-end', session: expect.objectContaining({ id: ss.id }), index: 0 }]);
+    expect(stored(ss.id).ends).toEqual([end('X', 10, 7)]);
+  });
+
+  it('keeps the end after a no', async () => {
+    const ss = twoEnds();
+    answers.push(false);
+    expect((await make().deleteEnd(ss.id, 1)).status).toBe('cancelled');
+    expect(stored(ss.id).ends).toHaveLength(2);
+  });
+
+  it('never deletes the only end (delete the session instead)', async () => {
+    const ss = scored({ ends: [end(10, 9, 8)] });
+    expect((await make().deleteEnd(ss.id, 0)).status).toBe('none');
+    expect(asked).toEqual([]);
+  });
+});
+
 describe('lists', () => {
   it('lists finished sessions newest first, without the running one or deleted ones', () => {
     const older = scored({ date: '2026-11-01' });

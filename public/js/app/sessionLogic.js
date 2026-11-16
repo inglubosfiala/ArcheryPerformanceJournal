@@ -6,6 +6,7 @@
 // `cursor` / `pinned` select an arrow inside the shown end.
 
 import { emptyCompetition } from './sessionTypes.js';
+import { scoreFromPoint } from './scoring.js';
 
 export function emptyArrow() {
   return { v: null, m: null, s: null, x: null, y: null };
@@ -233,6 +234,19 @@ export function clearEndArrows(session) {
 export function moveArrow(session, i, v, x = null, y = null, spot = null) {
   if (!shownEnd(session).arrows[i]) return session;
   return enterScore({ ...clone(session), cursor: i, pinned: true }, v, x, y, spot);
+}
+
+/**
+ * A saved arrow with a new score (Edit end in History). Its grades stay; its position stays only
+ * while the new score is the score of the ring it lies in: otherwise the dot would sit in the wrong
+ * ring, so the position (and its spot) is dropped and `dropped` is true. Same score: unchanged.
+ */
+export function rescoreArrow(arrow, v, face) {
+  if (arrow.v === v) return { arrow, dropped: false };
+  const { spot: _spot, ...rest } = arrow;
+  if (arrow.x == null || arrow.y == null) return { arrow: { ...rest, v, x: null, y: null }, dropped: false };
+  if (scoreFromPoint(arrow.x, arrow.y, face) === v) return { arrow: { ...arrow, v }, dropped: false };
+  return { arrow: { ...rest, v, x: null, y: null }, dropped: true };
 }
 
 /** Clear the last scored arrow in the shown end. */
