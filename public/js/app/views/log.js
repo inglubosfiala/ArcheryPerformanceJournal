@@ -21,6 +21,7 @@ import { SESSION_TYPES, TYPE_LABELS, sessionType, isGraded } from '../sessionTyp
 import { renderFormSetup } from './sessionSetup.js';
 import { renderTypeChoice, renderStrengthChoice, renderShootingSetup } from './shootingSetup.js';
 import { renderBlankRunning } from './blankBale.js';
+import { renderGymSetup } from './gymSetup.js';
 import { SHOOTING_KINDS } from '../lastSetup.js';
 import { sessionTimer } from './timer.js';
 import * as APL from '../../ui/apl/index.js';
@@ -102,13 +103,14 @@ export function renderLog(ctx) {
 
 /**
  * New session: step 1 picks what you do (#/new); step 2 is the Shooting page
- * (#/new/shooting/<training|competition|blank>), Strength (#/new/strength-choice: SPT or gym), or the
- * form of SPT, mental or manual (#/new/<type>).
+ * (#/new/shooting/<training|competition|blank>), Strength (#/new/strength-choice: SPT or gym), the
+ * Gym setup (#/new/gym), or the form of SPT, mental or manual (#/new/<type>).
  * The old #/new/training, #/new/competition and #/new/blank lead to the Shooting page.
  */
 export function renderNewSession(ctx, params = []) {
   const [type, kind] = params;
   if (type === 'strength-choice') return renderStrengthChoice(ctx);
+  if (type === 'gym') return renderGymSetup(ctx);
   if (type === 'shooting') return renderShootingSetup(ctx, SHOOTING_KINDS.includes(kind) ? kind : 'training');
   if (SHOOTING_KINDS.includes(type)) {
     queueMicrotask(() => ctx.navigate(`new/shooting/${type}`, { replace: true }));

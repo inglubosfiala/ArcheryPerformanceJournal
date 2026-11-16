@@ -72,15 +72,19 @@ export function lastTimeOf(name, sessions = []) {
   return null;
 }
 
+/** The session prefillExercises copies from (see there), or null. */
+export function prefillSource(sessions = [], focus = []) {
+  const withExercises = sessions.filter((s) => isGym(s) && s.exercises?.length);
+  return withExercises.find((s) => (s.focus || []).some((f) => focus.includes(f))) || withExercises[0] || null;
+}
+
 /**
  * The exercises a new gym session starts with: those of the newest finished gym session whose focus
  * shares one with `focus`; else of the newest gym session; else none. Sessions without exercises
  * (a note only) are passed over. Each set is copied as not done. `sessions` newest first.
  */
 export function prefillExercises(sessions = [], focus = []) {
-  const withExercises = sessions.filter((s) => isGym(s) && s.exercises?.length);
-  const overlap = withExercises.find((s) => (s.focus || []).some((f) => focus.includes(f)));
-  const from = overlap || withExercises[0];
+  const from = prefillSource(sessions, focus);
   if (!from) return [];
   return from.exercises.map((e) => ({
     name: e.name,

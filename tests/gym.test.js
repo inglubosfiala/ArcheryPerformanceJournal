@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   prefillExercises,
+  prefillSource,
   lastTimeText,
   lastTimeOf,
   setCounts,
@@ -150,5 +151,15 @@ describe('gym: the session type', () => {
     const v8 = { schemaVersion: 8, collections: { sessions: [{ id: 'a', type: 'strength' }] }, settings: { x: 1 } };
     expect(migrate(v8, 9, migrations)).toEqual({ ...v8, schemaVersion: 9 });
     expect(() => migrate({ schemaVersion: 9 }, 8, migrations)).toThrow(/newer/);
+  });
+});
+
+describe('gym: pre-fill source', () => {
+  it('names the session the exercises come from', () => {
+    const a = gym({ focus: ['Core'], exercises: [{ name: 'Plank', unit: 's', sets: [set(60)] }] });
+    const b = gym({ focus: ['Cardio'], exercises: [{ name: 'Row', unit: 'reps', sets: [set(10)] }] });
+    expect(prefillSource([b, a], ['Core'])).toBe(a);
+    expect(prefillSource([b, a], ['Mobility'])).toBe(b);
+    expect(prefillSource([], ['Core'])).toBeNull();
   });
 });

@@ -399,6 +399,54 @@ describe('starting a blank bale session', () => {
   });
 });
 
+describe('starting a gym session', () => {
+  const GYM = { focus: ['Core'], exercises: [{ name: 'Plank', unit: 's', sets: [{ reps: 60, kg: 0, done: false }] }], note: '' };
+  const NOW = { date: '2026-11-12', time: '18:00' };
+
+  it('starts nothing until start() is called', () => {
+    expect(make().list()).toEqual([]);
+    expect(timer('gym')).toBeUndefined();
+  });
+
+  it('starts a running timer and keeps the fields, with when it started apart', () => {
+    const forms = make();
+    const res = forms.start('gym', { fields: GYM, when: NOW });
+    expect(res.status).toBe('started');
+    expect(timer('gym')).toEqual({ running: true, startedAt: iso(START), elapsedMs: 0, touchedAt: iso(START) });
+    expect(keptDraft('gym')).toEqual({ ...GYM, meta: { startedAt: iso(START), ...NOW } });
+    expect(forms.list().map((f) => f.type)).toEqual(['gym']);
+    expect(repo.getSettings().lastSetup?.gym).toBeUndefined();
+  });
+
+  it('keeps the timer paused at 0 for a session logged afterwards, and saves no minutes from it', async () => {
+    const forms = make();
+    forms.start('gym', { fields: GYM, when: { date: '2026-11-10', time: '17:00', past: true } });
+    expect(timer('gym')).toMatchObject({ running: false, elapsedMs: 0 });
+    expect(keptDraft('gym').meta.past).toBe(true);
+    clock += 30 * MIN;
+    const res = await forms.save('gym', { fields: keptDraft('gym'), date: '2026-11-10', time: '17:00', past: true });
+    expect(res.session).toMatchObject({ type: 'gym', minutes: null, focus: ['Core'] });
+    expect(res.session).not.toHaveProperty('meta');
+  });
+
+  it('saves the sets with the minutes from the timer', async () => {
+    const forms = make();
+    forms.start('gym', { fields: GYM, when: NOW });
+    clock += 52 * MIN;
+    const res = await forms.save('gym', { fields: { ...keptDraft('gym'), note: 'good' }, ...NOW });
+    expect(res.session).toMatchObject({ type: 'gym', minutes: 52, exercises: GYM.exercises, note: 'good' });
+    expect(forms.list()).toEqual([]);
+  });
+
+  it('leaves a running blank bale alone', () => {
+    const forms = make();
+    forms.start('blank', { goal: 30 });
+    forms.start('gym', { fields: GYM, when: NOW });
+    expect(forms.list().map((f) => f.type)).toEqual(['blank', 'gym']);
+    expect(keptDraft('blank').goal).toBe(30);
+  });
+});
+
 describe('discarding', () => {
   it('asks first; after a yes the timer and the kept draft are gone', async () => {
     const forms = make();

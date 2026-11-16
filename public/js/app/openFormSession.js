@@ -94,11 +94,24 @@ export function createOpenFormSessions({
    * the arrow goal and, in `meta` (not saved with the session), when it started and the equipment
    * choice. Remembered as the last blank bale setup. A blank bale already open is not started again:
    * it goes on as it is (`status: 'open'`).
+   *
+   * A gym session (the Gym setup page's Start) passes its first `fields` (focus, exercises, note) and
+   * `when` ({ date, time, past }), kept in the draft's meta; nothing is remembered as a last setup.
+   * Logged afterwards (`when.past`) its timer stays paused at 0: the duration is typed in later.
    */
-  function start(type, { goal = null, gear = null } = {}) {
+  function start(type, { goal = null, gear = null, fields = null, when = null } = {}) {
     const all = timers();
     if (isFormTimerLive(all[type], now())) return { status: 'open', timer: all[type], draft: drafts()[type] || null };
     const at = now().toISOString();
+    if (type === 'gym') {
+      const past = !!when?.past;
+      const timer = past
+        ? { running: false, startedAt: null, elapsedMs: 0, touchedAt: at }
+        : { running: true, startedAt: at, elapsedMs: 0, touchedAt: at };
+      const draft = { ...fields, meta: { startedAt: at, date: when?.date, time: when?.time, ...(past ? { past: true } : {}) } };
+      repo.saveSettings({ formTimers: { ...all, [type]: timer }, formDrafts: { ...drafts(), [type]: draft } });
+      return { status: 'started', timer, draft };
+    }
     const timer = { running: true, startedAt: at, elapsedMs: 0, touchedAt: at };
     const draft = { arrows: null, note: '', ...(goal ? { goal } : {}), meta: { startedAt: at, gear } };
     repo.saveSettings({
