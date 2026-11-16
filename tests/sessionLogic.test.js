@@ -20,6 +20,23 @@ describe('scoring and inline grading', () => {
     expect(s.cursor).toBe(1);
   });
 
+  it('without grading, the selection moves on to the next empty arrow (stays on the last)', () => {
+    const plain = (n = 3) => L.createSession({ date: '2026-11-09', distance: 18, face: '40s', arrowsPerEnd: n, grading: false });
+    let s = L.enterScore(plain(), 10);
+    expect(s.cursor).toBe(1);
+    s = L.enterScore(s, 9);
+    expect(s.cursor).toBe(2);
+    s = L.enterScore(s, 8);
+    expect(s.current.arrows.map((a) => a.v)).toEqual([10, 9, 8]);
+    expect(s.cursor).toBe(2);
+    // correcting an earlier arrow moves on to the next empty one
+    s = L.enterScore(L.selectArrow(L.enterScore(plain(4), 10), 0), 7);
+    expect(s.current.arrows.map((a) => a.v)).toEqual([7, null, null, null]);
+    expect(s.cursor).toBe(1);
+    // moving an arrow on the face keeps it selected
+    expect(L.moveArrow(s, 0, 9, 0.1, 0.1).cursor).toBe(0);
+  });
+
   it('grading is optional and can be done later', () => {
     let s = L.enterScore(L.enterScore(start(), 8), 7);
     s = L.selectArrow(s, 0);

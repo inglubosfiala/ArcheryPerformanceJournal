@@ -2,7 +2,6 @@
 // the session's counts for Finish / Discard and the context hint. Pure functions of a running
 // session (sessionLogic.js's shape); no DOM.
 import { sumArrows } from './stats.js';
-import { isMultiSpot, suggestedSpot } from './scoring.js';
 
 const scored = (arrows) => arrows.filter((a) => a && a.v != null);
 
@@ -69,26 +68,4 @@ export function sessionCounts(session) {
     arrows: ends.reduce((t, e) => t + scored(e.arrows).length, 0),
     total: sessionTotal(session),
   };
-}
-
-/**
- * The context hint next to the end's chips, for the shown end and its selected arrow:
- * - nothing entered yet: "Tap a spot or a score" ("Tap the face or a score" on a single face);
- * - the selected arrow has a score but not both grades: "Grade arrow N";
- * - otherwise the slot to fill next: "Next: spot N" on a sheet of several spots, else
- *   "Next: arrow N"; "End complete" when every slot has a score.
- */
-export function scoringHint(session) {
-  const end = session.view == null ? session.current : session.ends[session.view];
-  const { arrows } = end;
-  const cursor = session.cursor;
-  const picked = arrows[cursor];
-  const multi = isMultiSpot(session.face);
-  if (picked && picked.v != null && (picked.m == null || picked.s == null)) return `Grade arrow ${cursor + 1}`;
-  if (!scored(arrows).length) return multi ? 'Tap a spot or a score' : 'Tap the face or a score';
-  // the slot that receives the next score: the selected one while empty, else the first empty one
-  const next = picked && picked.v == null ? cursor : arrows.findIndex((a) => a.v == null);
-  if (next < 0) return 'End complete';
-  if (multi) return `Next: spot ${suggestedSpot(session.face, arrows, next) + 1}`;
-  return `Next: arrow ${next + 1}`;
 }

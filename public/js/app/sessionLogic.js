@@ -146,25 +146,39 @@ function withShown(session, fn) {
  * Record a score (target touch or quick key) in the shown end.
  * - While an arrow is selected for editing, the score and position replace that arrow (grades kept).
  * - Otherwise it fills the selected empty slot, or the first empty one. A full end ignores input.
- * The arrow that received the score stays selected so it can be graded right away.
+ * In a graded session the arrow that received the score stays selected so it can be graded right
+ * away; without grading the selection moves on to the next empty arrow (it stays when none is left).
  * A position is only kept when it lies on the face (see ON_FACE); otherwise just the score is stored.
  */
 export function enterScore(session, v, px = null, py = null, spot = null) {
+  return placeScore(session, v, px, py, spot, { advance: session.grading === false });
+}
+
+/** The index of the arrow the next score goes to (see enterScore), or -1 when the end is full. */
+export function scoreTarget(session) {
+  const arrows = shownEnd(session).arrows;
+  const cur = session.cursor;
+  return !session.pinned && arrows[cur].v != null ? nextEmpty(arrows) : cur;
+}
+
+function placeScore(session, v, px, py, spot, { advance }) {
   const onFace = px != null && py != null && Math.hypot(px, py) < ON_FACE;
   const x = onFace ? round3(px) : null;
   const y = onFace ? round3(py) : null;
-  const arrows = shownEnd(session).arrows;
-  let cur = session.cursor;
-  if (!session.pinned && arrows[cur].v != null) {
-    cur = nextEmpty(arrows);
-    if (cur < 0) return session;
-  }
+  const cur = scoreTarget(session);
+  if (cur < 0) return session;
   return withShown(session, (end, s) => {
     const { spot: _old, ...rest } = end.arrows[cur];
     // `spot` (which spot of a three-spot sheet) is only stored when known
     end.arrows[cur] = { ...rest, v, x, y, ...(spot != null && x != null ? { spot } : {}) };
     s.cursor = cur;
     s.pinned = false;
+    if (advance) {
+      // the first empty arrow after this one, else the first empty one before it
+      const after = end.arrows.findIndex((a, i) => i > cur && a.v == null);
+      const next = after >= 0 ? after : nextEmpty(end.arrows);
+      if (next >= 0) s.cursor = next;
+    }
   });
 }
 
@@ -236,7 +250,7 @@ export function clearEndArrows(session) {
  */
 export function moveArrow(session, i, v, x = null, y = null, spot = null) {
   if (!shownEnd(session).arrows[i]) return session;
-  return enterScore({ ...clone(session), cursor: i, pinned: true }, v, x, y, spot);
+  return placeScore({ ...clone(session), cursor: i, pinned: true }, v, x, y, spot, { advance: false });
 }
 
 /**

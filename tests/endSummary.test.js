@@ -7,7 +7,6 @@ import {
   sessionTotal,
   endRows,
   sessionCounts,
-  scoringHint,
 } from '../public/js/app/endSummary.js';
 
 const a = (v, m = null, s = null) => ({ v, m, s, x: null, y: null });
@@ -73,39 +72,5 @@ describe('sessionCounts', () => {
   it('an empty end being shot is not counted', () => {
     const s = { ...session('122'), ends: [end([a(9), a(8), a(7)])] };
     expect(sessionCounts(s)).toEqual({ ends: 1, arrows: 3, total: 24 });
-  });
-});
-
-describe('scoringHint', () => {
-  it('nothing entered yet: tap a spot (sheet) or the face (single face)', () => {
-    expect(scoringHint(session('40t'))).toBe('Tap a spot or a score');
-    expect(scoringHint(session('122'))).toBe('Tap the face or a score');
-  });
-  it('a scored arrow without both grades: grade it', () => {
-    let s = L.enterScore(session('40t'), 9);
-    expect(scoringHint(s)).toBe('Grade arrow 1');
-    s = L.gradeArrow(s, 'm', 1);
-    expect(scoringHint(s)).toBe('Grade arrow 1');
-  });
-  it('graded: the next spot on a sheet, the next arrow on a single face', () => {
-    let s = L.enterScore(session('40t'), 9, 0.1, 0.1, 0);
-    s = L.gradeArrow(L.gradeArrow(s, 'm', 1), 's', 2);
-    expect(scoringHint(s)).toBe('Next: spot 2');
-    let t = L.enterScore(session('122'), 9);
-    t = L.gradeArrow(L.gradeArrow(t, 'm', 1), 's', 2);
-    expect(scoringHint(t)).toBe('Next: arrow 2');
-  });
-  it('every slot scored and the selected one graded: end complete', () => {
-    let s = session('122');
-    for (const v of [9, 9, 9]) s = L.enterScore(s, v);
-    s = L.gradeArrow(L.gradeArrow(s, 'm', 1), 's', 1);
-    expect(scoringHint(s)).toBe('End complete');
-  });
-  it('follows the shown end when an earlier end is open', () => {
-    let s = session('122');
-    s = L.nextEnd(L.enterScore(s, 9));
-    s = L.goToEnd(s, 0); // opens with its first empty slot selected
-    expect(scoringHint(s)).toBe('Next: arrow 2');
-    expect(scoringHint(L.selectArrow(s, 0))).toBe('Grade arrow 1');
   });
 });

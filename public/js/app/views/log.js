@@ -9,10 +9,9 @@ import {
   spotCentres,
   zoneOf,
   suggestedSpot,
-  faceLabel,
 } from '../scoring.js';
 import { fmt } from '../stats.js';
-import { endSum, endRows, sessionCounts, sessionTotal, scoringHint, isEndComplete } from '../endSummary.js';
+import { endRows, sessionCounts, sessionTotal, isEndComplete } from '../endSummary.js';
 import * as L from '../sessionLogic.js';
 import { T } from '../strings.js';
 import { icons } from '../icons.js';
@@ -29,7 +28,6 @@ import { drawArrowMarks, liveScan } from './liveScan.js';
 import { PREVIEW_MARGIN, spotsBox, resultOnCrop } from '../scanGeometry.js';
 import { PHOTO_MAX, canScan, createScan } from '../scan.js';
 import { loupeCorner, loupeBox } from '../loupePlacement.js';
-import { activeSetup, findSightMark } from '../gearFields.js';
 
 // 'finish' or 'discard' while the scoring screen calls running.finish() / discard() after its own
 // sheet got the archer's yes (see askAboutRunningSession)
@@ -149,11 +147,12 @@ function announce(text) {
   }, 50);
 }
 
-/** Announce the selected arrow's score (the arrow that just received one). */
-function announceArrow(ctx) {
+/** Announce the score of arrow `i` (default: the selected arrow, the one that just received one). */
+function announceArrow(ctx, i) {
   const s = ctx.running.get();
-  const a = s && L.shownEnd(s).arrows[s.cursor];
-  if (a?.v != null) announce(T.arrowScored(s.cursor + 1, a.v));
+  const at = i ?? s?.cursor;
+  const a = s && L.shownEnd(s).arrows[at];
+  if (a?.v != null) announce(T.arrowScored(at + 1, a.v));
 }
 
 function renderActive(ctx, session) {
@@ -163,11 +162,12 @@ function renderActive(ctx, session) {
   const editing = L.isEditing(session);
   const endNo = L.viewIndex(session) + 1;
   const totalEnds = session.ends.length + 1;
-  const sight = sessionSightMark(ctx, session);
   const picked = current.arrows[cursor];
 
   const enter = (v, x, y, spot) => {
-    if (update(ctx, (cur) => L.enterScore(cur, v, x, y, spot))) announceArrow(ctx);
+    // the arrow receiving the score: without grading the selection moves on past it
+    const target = L.scoreTarget(ctx.running.get() ?? session);
+    if (update(ctx, (cur) => L.enterScore(cur, v, x, y, spot))) announceArrow(ctx, target);
   };
 
   // session timer: tap to pause / resume
@@ -179,11 +179,7 @@ function renderActive(ctx, session) {
   // the sheet open over the page: 'ends' (ends so far), 'finish', 'discard' or 'details'
   const { sheet, setSheet } = scoreSheet(ctx, session);
 
-  // --- top: "End n · its score ▾" (opens the ends so far), distance · face · sight mark, the timer
-  // and Finish
-  const shownSum = endSum(current);
-  const sightText = sight && (sight.elevation || sight.windage) ? [sight.elevation, sight.windage].filter(Boolean).join(' / ') : null;
-  const subtitle = [`${session.distance} m`, faceLabel(session.face), sightText && `sight ${sightText}`].filter(Boolean).join(' · ');
+  // --- top: "End n ▾" (opens the ends so far), the timer and Finish
   const header = h(
     'header',
     { class: 'score-head' },
@@ -194,7 +190,7 @@ function renderActive(ctx, session) {
         class: 'score-endbtn',
         'aria-haspopup': 'dialog',
         'aria-expanded': String(sheet === 'ends'),
-        'aria-label': `${T.endN(endNo)}${viewing ? T.endOf(totalEnds) : ''}, ${shownSum} points, ${subtitle}. ${T.endsSoFar}`,
+        'aria-label': `${T.endN(endNo)}${viewing ? T.endOf(totalEnds) : ''}. ${T.endsSoFar}`,
         onClick: () => setSheet('ends'),
         dataset: { fk: 'ends-menu' },
       },
@@ -203,10 +199,8 @@ function renderActive(ctx, session) {
         { class: 'score-title', 'aria-hidden': 'true' },
         T.endN(endNo),
         viewing ? h('span', { class: 'end-of' }, T.endOf(totalEnds)) : null,
-        h('span', { class: 'score-endbtn-sum' }, `· ${shownSum}`),
         h('span', { class: 'score-endbtn-caret' }, icons.chevron()),
       ),
-      h('span', { class: 'score-endbtn-sub', 'aria-hidden': 'true' }, subtitle),
     ),
     timerBtn,
     h(
@@ -312,10 +306,9 @@ function renderActive(ctx, session) {
       h('strong', null, `${current.ld} · ${current.cld}`),
     ),
     chip(`${T.noteForEnd}${current.note ? ' (written)' : ''}. ${T.endDetails(endNo)}`, 'details-note', icons.pencil(), 'Note', current.note ? h('span', { class: 'score-chip-dot', 'aria-hidden': 'true' }) : null),
-    h('span', { class: 'score-hint' }, scoringHint(session)),
   );
 
-  // --- bottom bar, in thumb reach: ‹ previous end, Next end, and Scan (the most used, the largest)
+  // --- bottom bar, in thumb reach: Previous (end), Next (end), and Scan (the most used, the largest)
   // at the right. There is no Save end step (every change is saved as it is made): Next opens the
   // next end, and from the end being shot it needs at least one arrow, so empty ends do not pile
   // up. It turns accent once every slot of the end has a score.
@@ -329,7 +322,7 @@ function renderActive(ctx, session) {
       onClick: () => update(ctx, L.prevEnd),
       dataset: { fk: 'end-prev' },
     },
-    icons.back(),
+    T.prevShort,
   );
   const nextEnd = () => {
     const saving = session.view == null;
@@ -340,11 +333,12 @@ function renderActive(ctx, session) {
     {
       type: 'button',
       class: ['score-next', isEndComplete(current) && 'is-ready'],
+      'aria-label': T.nextEnd,
       disabled: !L.canNextEnd(session),
       onClick: nextEnd,
       dataset: { fk: 'end-next' },
     },
-    T.nextEnd,
+    T.nextShort,
   );
 
   // --- the End n details sheet: let-downs, correct let-downs and the note (same handlers as before)
@@ -823,15 +817,6 @@ async function previewFound(canvas, found, { cancelLabel }) {
   );
 }
 
-/**
- * The sight mark for the session's distance from its own equipment (the marks belong to the setup it
- * was started with); a session recorded without marks falls back to the active setup.
- */
-function sessionSightMark(ctx, session) {
-  const gear = Array.isArray(session.gear?.sights) ? session.gear : activeSetup(ctx.repo.getSettings(), ctx.repo.list('setups'))?.fields;
-  return findSightMark(gear, session.distance);
-}
-
 // ---------------------------------------------------------------- target face
 
 const LOUPE_SPAN = 24; // viewBox units shown in the magnifier (the face is 202 wide → ~3× zoom)
@@ -983,17 +968,15 @@ function targetInput(session, enter, { hintSpot = null, onMove } = {}) {
     };
     anim = requestAnimationFrame(step);
   };
-  // the row over a multi-spot sheet: "Next: spot n" on the whole sheet; "All spots" and
-  // "Spot n of 3" while zoomed into one
+  // the row over a multi-spot sheet: "All spots" and "Spot n of 3" while zoomed into one
   const zoomOutBtn = h(
     'button',
     { type: 'button', class: 'zoom-out-btn', hidden: true, 'aria-label': 'Show all spots', onClick: () => zoomTo(null) },
     icons.back(),
     'All spots',
   );
-  const nextSpot = h('span', { class: 'next-spot', hidden: hintSpot == null }, hintSpot == null ? '' : T.nextSpot(hintSpot + 1));
   const spotOf = h('span', { class: 'spot-of', hidden: true });
-  const faceBar = multi ? h('div', { class: 'face-bar' }, zoomOutBtn, nextSpot, spotOf) : null;
+  const faceBar = multi ? h('div', { class: 'face-bar' }, zoomOutBtn, spotOf) : null;
   if (multi && zoomOutFrom != null) {
     sheet.setAttribute('viewBox', spotBox(zoomOutFrom).join(' '));
     zoomOutFrom = null;
@@ -1006,7 +989,6 @@ function targetInput(session, enter, { hintSpot = null, onMove } = {}) {
     zoomOutBtn.hidden = i == null;
     spotOf.hidden = i == null;
     spotOf.textContent = i == null ? '' : T.spotOf(i + 1, spotCentres(session.face).length);
-    nextSpot.hidden = i != null || hintSpot == null;
   }
 
   // --- one gesture's geometry, read once when the pointer lands (no layout reads while it moves)
