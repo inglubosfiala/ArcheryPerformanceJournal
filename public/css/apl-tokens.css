@@ -118,6 +118,7 @@
   --series-4: #c98500;
   --series-5: #d55181;
   --series-6: #008300;
+  --series-7: #9a5cd6;
   /* type */
   --font-sans: Inter, system-ui, -apple-system, "Segoe UI", sans-serif;
   --type-screen-title: 700 20px/26px var(--font-sans);

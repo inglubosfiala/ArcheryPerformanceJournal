@@ -8,9 +8,12 @@ import {
   SPT_PRESETS,
   drillLabel,
   MENTAL_TECHNIQUES,
+  GYM_FOCUS,
   EFFORT_MAX,
   FOCUS_MAX,
 } from '../sessionTypes.js';
+import { emptyGym } from '../gym.js';
+import { gymExercises } from './gymForm.js';
 import {
   hasHold,
   presetOf,
@@ -26,8 +29,9 @@ import { stepperTile } from './common.js';
 import { confirmDialog } from './confirm.js';
 import * as APL from '../../ui/apl/index.js';
 
-/** Empty strength / mental session fields. */
+/** Empty strength / gym / mental session fields. */
 export function emptyForm(type) {
+  if (type === 'gym') return { minutes: null, ...emptyGym() };
   if (type === 'blank') return { arrows: null, minutes: null, note: '' };
   if (type === 'manual') return { arrows: null, minutes: null, note: '' };
   return type === 'strength'
@@ -261,9 +265,11 @@ const toInt = (v) => {
  * field keeps focus); taps do.
  * `live`: the session is being done now (an SPT session with a running timer): the fields filled in
  * on the saved session are left out.
- * `pastSessions`: saved sessions, newest first: a new drill starts from the numbers last used.
+ * `pastSessions`: saved sessions, newest first: a new drill starts from the numbers last used; a gym
+ * exercise shows what was done last time.
+ * `ui`: the page's ui state (gym: which exercise menu or field is open).
  */
-export function formSections(type, value, change, { live = false, pastSessions = [] } = {}) {
+export function formSections(type, value, change, { live = false, pastSessions = [], ui = null } = {}) {
   const numberField = (label, key, fk, { suffix = '' } = {}) =>
     APL.TextField({
       label,
@@ -444,6 +450,31 @@ export function formSections(type, value, change, { live = false, pastSessions =
         numberField('Duration', 'minutes', 'minutes', { suffix: 'min' }),
       ),
       noteField('…'),
+    ];
+  }
+
+  if (type === 'gym') {
+    // a saved gym session (History): the running page's exercise cards, the focus, duration and note
+    return [
+      APL.Section({
+        label: 'Focus',
+        id: 'form-gym-focus',
+        children: APL.OptionPills({
+          label: 'Focus',
+          multiple: true,
+          value: value.focus || [],
+          options: GYM_FOCUS.map((f) => ({ value: f, label: f })),
+          onChange: (f) =>
+            change((cur) => {
+              const list = cur.focus || [];
+              return { focus: GYM_FOCUS.filter((x) => (x === f ? !list.includes(f) : list.includes(x))) };
+            }),
+          fk: 'gym-focus',
+        }),
+      }),
+      ...gymExercises(value, change, { sessions: pastSessions, ui }),
+      numberField('Duration', 'minutes', 'minutes', { suffix: 'min' }),
+      noteField('Or just write what you did…'),
     ];
   }
 

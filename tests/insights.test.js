@@ -117,4 +117,12 @@ describe('weekly load', () => {
     expect(both.min).toMatchObject({ manual: 50, blank: 30, training: 20, strength: 0 });
     expect(both.totalMin).toBe(100);
   });
+
+  it('counts gym sessions as minutes, never as arrows', () => {
+    const gym = { id: 'g', date: '2026-11-10', type: 'gym', status: 'finished', minutes: 52, focus: ['Core'], exercises: [], note: 'circuit' };
+    const week = weeklyLoad([gym, { ...gym, id: 'h', minutes: 8 }])[0];
+    expect(week).toMatchObject({ gym: 2, gymMin: 60, arrows: 0, strengthMin: 0, mentalMin: 0, totalMin: 60 });
+    expect(week.min.gym).toBe(60);
+    expect(sessionRow(gym)).toMatchObject({ type: 'gym', arrows: null, minutes: 52 });
+  });
 });

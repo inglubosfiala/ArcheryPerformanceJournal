@@ -21,6 +21,7 @@
     {"name": "series-3", "value": "#199e70", "usage": "Data: chart series 3 (Insights: SPT sessions). Validated as a categorical set on surface."},
     {"name": "series-4", "value": "#c98500", "usage": "Data: chart series 4 (Insights: mental sessions). Validated as a categorical set on surface."},
     {"name": "series-5", "value": "#d55181", "usage": "Data: chart series 5 (Insights: blank bale sessions). Validated as a categorical set on surface."},
-    {"name": "series-6", "value": "#008300", "usage": "Data: chart series 6 (Insights: manual sessions). Validated as a categorical set on surface."}
+    {"name": "series-6", "value": "#008300", "usage": "Data: chart series 6 (Insights: manual sessions). Validated as a categorical set on surface."},
+    {"name": "series-7", "value": "#9a5cd6", "usage": "Data: chart series 7 (Insights: gym sessions). Validated as a categorical set on surface, after series-6."}
   ]
 }
