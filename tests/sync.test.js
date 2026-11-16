@@ -7,9 +7,11 @@ import { collections, defaultSettings, SYNCED_SETTING_KEYS } from '../public/js/
 import { createSession } from '../public/js/app/sessionLogic.js';
 import { createSyncService } from '../public/js/sync/syncService.js';
 import { createFakeDriveStore } from './fakeDriveStore.js';
+import { SCHEMA_VERSION } from '../public/js/config.js';
+import { activeSetup } from '../public/js/app/gearFields.js';
 
 const APP = 'archery-performance-journal';
-const SCHEMA = 4;
+const SCHEMA = SCHEMA_VERSION;
 let clock;
 const now = () => new Date(clock);
 const tick = (ms = 1000) => (clock += ms);
@@ -178,6 +180,87 @@ describe('settings', () => {
     await tablet.sync();
     await phone.sync();
     expect(phone.repo.getSettings().activeSetupId).toBe('new');
+  });
+});
+
+describe('gear setups', () => {
+  /** Both devices start with the same two setups. */
+  async function twoDevices() {
+    const phone = device(drive);
+    const indoor = phone.repo.save('setups', { name: 'Indoor', fields: { brace: '8.75' } });
+    const outdoor = phone.repo.save('setups', { name: 'Outdoor', fields: { brace: '8.875' } });
+    phone.repo.saveSettings({ activeSetupId: indoor.id });
+    await phone.sync();
+    const tablet = device(drive);
+    await tablet.sync();
+    return { phone, tablet, indoor, outdoor };
+  }
+  const edit = (dev, id, patch) => dev.repo.save('setups', { ...dev.repo.get('setups', id), ...patch });
+
+  it('keeps both edits when two devices change different setups', async () => {
+    const { phone, tablet, indoor, outdoor } = await twoDevices();
+    tick();
+    edit(phone, indoor.id, { fields: { brace: '8.625' } });
+    edit(tablet, outdoor.id, { name: 'Outdoor 2026' });
+    await phone.sync();
+    await tablet.sync();
+    await phone.sync();
+    for (const dev of [phone, tablet]) {
+      expect(dev.repo.get('setups', indoor.id).fields.brace).toBe('8.625');
+      expect(dev.repo.get('setups', outdoor.id).name).toBe('Outdoor 2026');
+    }
+  });
+
+  it('the newer edit of the same setup wins whole, its tuning history included', async () => {
+    const { phone, tablet, indoor } = await twoDevices();
+    tick();
+    edit(phone, indoor.id, { fields: { brace: '8.5' }, history: [{ key: 'brace', from: '8.75', to: '8.5', at: 'p', reason: '' }] });
+    tick();
+    edit(tablet, indoor.id, { fields: { brace: '9' }, history: [{ key: 'brace', from: '8.75', to: '9', at: 't', reason: 'louder' }] });
+    await phone.sync();
+    await tablet.sync();
+    await phone.sync();
+    for (const dev of [phone, tablet]) {
+      const s = dev.repo.get('setups', indoor.id);
+      expect(s.fields.brace).toBe('9');
+      expect(s.history.map((e) => e.at)).toEqual(['t']);
+    }
+  });
+
+  it('falls back to another setup when the active one was deleted on the other device', async () => {
+    const { phone, tablet, indoor, outdoor } = await twoDevices();
+    tick();
+    phone.repo.saveSettings({ activeSetupId: outdoor.id });
+    tick();
+    tablet.repo.remove('setups', outdoor.id);
+    await phone.sync();
+    await tablet.sync();
+    await phone.sync();
+    for (const dev of [phone, tablet]) {
+      expect(dev.repo.getSettings().activeSetupId).toBe(outdoor.id);
+      expect(activeSetup(dev.repo.getSettings(), dev.repo.list('setups')).id).toBe(indoor.id);
+    }
+  });
+
+  it('a v6 Drive document and a device migrated from the same data end with one "My setup"', async () => {
+    const v6 = {
+      app: APP,
+      schemaVersion: 6,
+      updatedAt: '2026-11-08T10:00:00.000Z',
+      meta: { settingsUpdatedAt: '2026-11-08T09:00:00.000Z' },
+      settings: { gear: { riser: 'Hoyt' }, activeSnapshotId: null, loadedSnapshotId: null },
+      collections: { sessions: [], competitions: [], gearSnapshots: [] },
+    };
+    drive.put(v6);
+    const phone = device(drive);
+    phone.repo.importDocument(structuredClone(v6), { mode: 'replace' });
+    const res = await phone.sync();
+    expect(res.status).toBe('ok');
+    expect(phone.repo.list('setups').map((s) => [s.id, s.name])).toEqual([['migrated-v7', 'My setup']]);
+    expect(phone.repo.getSettings().activeSetupId).toBe('migrated-v7');
+    expect(drive.doc.schemaVersion).toBe(SCHEMA);
+    expect(drive.doc.collections.setups).toHaveLength(1);
+    expect(drive.doc.collections.gearSnapshots).toBeUndefined();
   });
 });
 
