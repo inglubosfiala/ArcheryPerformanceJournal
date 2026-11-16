@@ -79,3 +79,73 @@ half the shaft's width back to the centre of the hole. `A+ctr` / `A+ctr+cut` are
 So most of the +4 is already in the app through `255d824`. Full resolution on top adds **+1 arrow** (40 → 41), which is within the noise of 48 arrows.
 It was **not** added to the app. Measuring the tip again at full size is worth it only with more photos to prove it, or together with a better local ring fit.
 The 2 tip-right/ring-off misses (AF bottom, AP bottom) are still the clearest next precision gain.
+
+## Local ring fit (L), on HEAD d79ce1c
+
+`localRing` in `refine.mjs`. For an arrow within 6 mm of a ring line, it reads strips across the line at arc positions 3–20 mm on both sides of the arrow, staying off the shaft and its hole.
+In each strip it finds the line to 0.1 mm: the deepest thin dark dip for a black line (10/9, 8/7), or the 50 % crossing between the two ring colours for a colour step (9/8, 7/6, the spot's edge).
+A robust straight fit r(arc) through those points gives the line's radius at the arrow. The score is then taken against that line instead of the fitted ellipse.
+`crops-L/` shows the points found (cyan), the detector's point (white +) and the refined tip (magenta).
+
+**It finds the printed lines.** In AF bottom and AM top the cyan points sit on the gold/red edge and on the black 10 line.
+It fitted a line for 20 of 48 arrows (13–29 points each).
+
+**The fitted ellipse is off by about ±1.4 mm locally (sd), with no overall bias** (mean +0.1 mm; the 9/8 edge +1.2 mm on only 3 arrows). So a global correction (scaling the rings) would not help. Only a local fit can.
+
+**But the score count does not move:**
+
+| Shaft width counted (`CUTK`) | 0 | 0.25 | 0.5 | 0.75 | 1 |
+|---|---|---|---|---|---|
+| L + cut (detector's point = centre of the hole) | 40 | 40 | 39 | 42 | 41 |
+| A + L + cut (full-size shaft end) | 37 | 39 | 39 | 41 | 39 |
+| A + ctr + L + cut | 40 | 41 | 39 | 40 | 39 |
+
+The base is 40/48. The swings (39–42) don't follow the knob: single arrows near a line flip one way or the other. These are line cutters, and two errors of similar size decide each one:
+
+1. **where the ring line is**: about ±1.4 mm, which L now removes, and
+2. **where the hole is**, and which point of the shaft counts (end, centre of the hole, edge): about ±2 mm, which nothing here measures well yet.
+
+Fixing (1) alone doesn't show while (2) is as large. The 48 arrows only give scores, not hole positions, so they can't tell which point convention is right.
+
+**What would settle it:**
+- Mark the true hole position (where the shaft enters the paper) for the ~20 arrows near a line, a few minutes of clicking on the crops. Then the point error is measured in mm, not by noisy right/wrong flips, and L and the tip convention can each be judged on their own.
+- More photos, especially of line cutters.
+
+## Hand-marked holes (`mark/`)
+
+The hole centre (where the shaft enters the paper) was marked by hand on full-size crops for 45 of 48 arrows.
+3 were skipped: AA middle and AD middle (the real arrow was not in the crop) and AH middle. Damaged paper made some marks hard, so they carry ~1 mm of noise.
+Run with `node mark/eval_marks.mjs results-L.json mark/marks.json mark/manifest.json`. The page is `mark/index.html`, served by `node mark/serve.mjs 8091`.
+
+**1. If the hole is known, the fitted rings are good enough, and the WA edge rule is the right one.** Scores from the marked hole:
+
+| Rule | Right |
+|---|---|
+| hole centre, fitted rings | 37 / 45 |
+| hole centre, local ring | 38 / 45 |
+| **hole centre − half the shaft width (the WA line-cutter rule), fitted rings** | **42 / 45** |
+| same, local ring | 41 / 45 |
+
+Of the 3 misses, AJ bottom is the wrong sheet's spot. AM top and AP bottom are probably marks made hard by torn paper.
+So the local ring fit is **not** needed: the ±1.4 mm local ring offsets are real, but they don't change scores once the hole is right.
+
+**2. The bottleneck is where the detector puts the hole.** Detector point vs mark:
+- Median distance 2.2 mm. Without the 4 big misses, the radial error has a bias of −0.5 mm, sd 2.4 mm and median |err| 1.3 mm.
+- 4 arrows are 12–19 mm off (AC, AF, AI and AB middle). They still scored right only because they were far from a line.
+  `mark/outliers.jpg` shows two: in AF the point fell into a dark torn hole, and in AC the tip search stopped at a white band on the shaft.
+- The full-size tip (A, A+ctr) is not closer to the marks than the detector: mean |err| 2.9–3.4 vs 2.4 mm.
+
+**3. What to do:**
+- **Score with the edge rule:** the hole centre minus half the shaft width. On the true hole it is worth +5 arrows over the centre. The app scores the centre now.
+- **Find the hole better.** Damaged paper (dark torn areas next to the shaft) and bands on the shaft are the failures here.
+  This is where a learned detector can help, and `mark/` is already a labelling tool: these 45 marks are its first training and test data.
+
+## The edge rule tried in the app (reverted)
+
+The detector reported each shaft's hole radius (half its width / the spot's radius in px). The scan scored each arrow by the edge of its hole nearest the centre,
+and stored that point in the end. On the 16 photos: **38/48, against 40/48 without it.**
+Five arrows that were right went one ring too high (AF middle, AH top, AL bottom, AP top and bottom). All of them were already inside the right ring at the detector's point.
+
+Why: the rule is right on the **true** hole (42/45 on the hand marks), but the detector's hole centre is already ~0.8 mm too far in, with ±2.4 mm of noise.
+Taking another ~2.7 mm off pushes too many arrows over the line. The current placement (the centre of the hole, chosen on these photos)
+has absorbed part of the line-cutter effect. So the edge rule has to come **together with** a more accurate hole position, not before it. The change was reverted.

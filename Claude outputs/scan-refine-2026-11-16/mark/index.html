@@ -1,0 +1,155 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Mark the holes</title>
+<style>
+  :root { --bg: #16181c; --fg: #e8e8e8; --muted: #9aa0a6; --accent: #00e5ff; --done: #4caf50; --skip: #ff9800; }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--fg); font: 15px/1.4 system-ui, sans-serif; }
+  main { max-width: 980px; margin: 0 auto; padding: 16px; display: grid; grid-template-columns: minmax(0, 1fr) 240px; gap: 16px; }
+  @media (max-width: 760px) { main { grid-template-columns: 1fr; } }
+  h1 { font-size: 18px; margin: 0 0 4px; }
+  .muted { color: var(--muted); }
+  .stage { position: relative; width: 100%; aspect-ratio: 1; background: #000; border-radius: 6px; overflow: hidden; }
+  canvas { width: 100%; height: 100%; display: block; cursor: crosshair; image-rendering: auto; }
+  .bar { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; align-items: center; }
+  button { background: #2a2e35; color: var(--fg); border: 1px solid #3a3f47; border-radius: 6px; padding: 7px 12px; font: inherit; cursor: pointer; }
+  button:hover { background: #333842; }
+  kbd { background: #2a2e35; border: 1px solid #3a3f47; border-radius: 4px; padding: 0 5px; font-size: 12px; }
+  .list { display: grid; grid-template-columns: repeat(6, 1fr); gap: 4px; }
+  .list button { padding: 4px 0; font-size: 12px; }
+  .list .done { border-color: var(--done); color: var(--done); }
+  .list .skip { border-color: var(--skip); color: var(--skip); }
+  .list .cur { outline: 2px solid var(--accent); }
+  .status { min-height: 1.4em; }
+  aside p { margin: 0 0 10px; }
+</style>
+</head>
+<body>
+<main>
+  <section>
+    <h1 id="title">…</h1>
+    <div class="muted" id="sub"></div>
+    <div class="stage"><canvas id="cv" width="900" height="900"></canvas></div>
+    <div class="bar">
+      <button id="prev">← Prev</button>
+      <button id="next">Next →</button>
+      <button id="skip">Can't tell / not here</button>
+      <button id="clear">Clear</button>
+      <label><input type="checkbox" id="showTruth"> show real score</label>
+      <span class="status muted" id="status"></span>
+    </div>
+  </section>
+  <aside>
+    <p><b>Click the centre of the hole</b>: where the shaft goes into the paper. Not the end of the dark shaft you see, but the middle of the hole it makes.</p>
+    <p class="muted">Click again to move the mark. The view is about 50 mm across. Marks save on every click.</p>
+    <p class="muted"><kbd>←</kbd> <kbd>→</kbd> move · <kbd>S</kbd> can't tell · <kbd>Z</kbd> zoom ×2 at the cursor</p>
+    <p id="progress"></p>
+    <div class="list" id="list"></div>
+  </aside>
+</main>
+<script>
+const cv = document.getElementById('cv');
+const ctx = cv.getContext('2d');
+let items = [], marks = {}, i = 0, img = null, zoom = null, mouse = null;
+
+const save = async () => {
+  try { localStorage.setItem('holeMarks', JSON.stringify(marks)); } catch {}
+  try {
+    await fetch('/marks', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(marks) });
+    setStatus('saved');
+  } catch { setStatus('not saved to disk (server down?), kept in this browser'); }
+};
+const setStatus = (t) => { document.getElementById('status').textContent = t; };
+
+// the part of the crop shown: whole, or a zoomed half around a point (crop px)
+const view = () => {
+  const n = items[i].size;
+  if (!zoom) return { x: 0, y: 0, w: n };
+  const w = n / 2;
+  return { x: Math.min(n - w, Math.max(0, zoom.x - w / 2)), y: Math.min(n - w, Math.max(0, zoom.y - w / 2)), w };
+};
+const toCrop = (e) => {
+  const r = cv.getBoundingClientRect(), v = view();
+  return { x: v.x + ((e.clientX - r.left) / r.width) * v.w, y: v.y + ((e.clientY - r.top) / r.height) * v.w };
+};
+
+function draw() {
+  if (!img) return;
+  const v = view(), k = cv.width / v.w;
+  ctx.imageSmoothingQuality = 'high';
+  ctx.drawImage(img, v.x, v.y, v.w, v.w, 0, 0, cv.width, cv.height);
+  const m = marks[items[i].id];
+  if (m && !m.skip) {
+    const x = (m.x - v.x) * k, y = (m.y - v.y) * k;
+    ctx.strokeStyle = '#00e5ff'; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.arc(x, y, 10, 0, 2 * Math.PI); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(x - 18, y); ctx.lineTo(x - 4, y); ctx.moveTo(x + 4, y); ctx.lineTo(x + 18, y);
+    ctx.moveTo(x, y - 18); ctx.lineTo(x, y - 4); ctx.moveTo(x, y + 4); ctx.lineTo(x, y + 18); ctx.stroke();
+  }
+  // 5 mm scale bar
+  const it = items[i], bar = 5 * it.pxPerMm * k;
+  ctx.fillStyle = 'rgba(0,0,0,.55)'; ctx.fillRect(10, cv.height - 30, bar + 50, 22);
+  ctx.fillStyle = '#fff'; ctx.fillRect(16, cv.height - 21, bar, 4);
+  ctx.font = '13px system-ui'; ctx.fillText('5 mm', bar + 22, cv.height - 14);
+}
+
+function show(n) {
+  i = (n + items.length) % items.length;
+  zoom = null;
+  const it = items[i];
+  document.getElementById('title').textContent = `${it.photo} · ${['top', 'middle', 'bottom'][it.spot]} spot`;
+  document.getElementById('sub').textContent = document.getElementById('showTruth').checked ? `real score ${it.truth}` : `arrow ${i + 1} of ${items.length}`;
+  img = new Image();
+  img.onload = draw;
+  img.src = it.file;
+  renderList();
+}
+
+function renderList() {
+  const list = document.getElementById('list');
+  list.innerHTML = '';
+  items.forEach((it, k) => {
+    const b = document.createElement('button');
+    const m = marks[it.id];
+    b.textContent = k + 1;
+    b.title = it.id;
+    if (m) b.className = m.skip ? 'skip' : 'done';
+    if (k === i) b.classList.add('cur');
+    b.onclick = () => show(k);
+    list.appendChild(b);
+  });
+  const done = items.filter((it) => marks[it.id]).length;
+  document.getElementById('progress').textContent = `${done} of ${items.length} done`;
+}
+
+cv.addEventListener('click', (e) => {
+  const p = toCrop(e), it = items[i];
+  marks[it.id] = { x: +p.x.toFixed(2), y: +p.y.toFixed(2), fullX: +(it.box[0] + p.x).toFixed(2), fullY: +(it.box[1] + p.y).toFixed(2) };
+  draw(); renderList(); save();
+});
+cv.addEventListener('mousemove', (e) => { mouse = toCrop(e); });
+document.getElementById('prev').onclick = () => show(i - 1);
+document.getElementById('next').onclick = () => show(i + 1);
+document.getElementById('skip').onclick = () => { marks[items[i].id] = { skip: true }; renderList(); save(); show(i + 1); };
+document.getElementById('clear').onclick = () => { delete marks[items[i].id]; draw(); renderList(); save(); show(i); };
+document.getElementById('showTruth').onchange = () => show(i);
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'ArrowRight') show(i + 1);
+  else if (e.key === 'ArrowLeft') show(i - 1);
+  else if (e.key === 's' || e.key === 'S') document.getElementById('skip').click();
+  else if (e.key === 'z' || e.key === 'Z') { zoom = zoom ? null : (mouse || { x: items[i].size / 2, y: items[i].size / 2 }); draw(); }
+});
+
+(async () => {
+  items = await (await fetch('manifest.json')).json();
+  try { marks = await (await fetch('/marks')).json(); } catch {}
+  if (!Object.keys(marks).length) { try { marks = JSON.parse(localStorage.getItem('holeMarks') || '{}'); } catch {} }
+  const first = items.findIndex((it) => !marks[it.id]);
+  show(first < 0 ? 0 : first);
+})();
+</script>
+</body>
+</html>

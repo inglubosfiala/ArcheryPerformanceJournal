@@ -9,7 +9,7 @@ os.makedirs(out, exist_ok=True)
 val = lambda v: 10 if v == 'X' else (0 if v == 'M' else v)
 cache = {}
 for r in json.load(open(res))['rows']:
-    if val(r['read'][variant]) == r['truth']:
+    if val(r['read'][variant]) == r['truth'] and not (len(sys.argv) > 5 and r['photo'] + str(r['spot']) in sys.argv[5].split(',')):
         continue
     name = r['photo']
     if name not in cache:
@@ -31,6 +31,13 @@ for r in json.load(open(res))['rows']:
             x, y = o['cx'] + ca * u1 - sa * u2, o['cy'] + sa * u1 + ca * u2
             pts.append(((x - box[0]) * k, (y - box[1]) * k))
         d.line(pts, fill=(0, 255, 0), width=1)
+    for q in r.get('ringPts', []):
+        qx, qy = (q['x'] - box[0]) * k, (q['y'] - box[1]) * k
+        d.ellipse((qx - 2, qy - 2, qx + 2, qy + 2), fill=(0, 220, 255))
+    b = r.get('baseFull')
+    if b:
+        bx, by = (b['x'] - box[0]) * k, (b['y'] - box[1]) * k
+        d.line((bx - 6, by, bx + 6, by), fill=(255, 255, 255), width=2); d.line((bx, by - 6, bx, by + 6), fill=(255, 255, 255), width=2)
     cx, cy = (t['x'] - box[0]) * k, (t['y'] - box[1]) * k
     d.ellipse((cx - 5, cy - 5, cx + 5, cy + 5), outline=(255, 0, 255), width=2)
     d.text((6, 6), f"{name} spot {r['spot']} real {r['truth']} read {r['read'][variant]} ({variant})", fill=(255, 0, 255))

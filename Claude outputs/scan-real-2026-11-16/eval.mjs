@@ -38,7 +38,7 @@ for (const [name, m] of Object.entries(meta)) {
   const src = fs.readFileSync(m.rgba);
   const truth = name.split('_').slice(1).map(Number);
   const look = (box) => {
-    const scale = Math.min(1, PHOTO_MAX / Math.max(box.w, box.h));
+    const scale = Math.min(1, (+process.env.MAX || PHOTO_MAX) / Math.max(box.w, box.h));
     const pic = draw(src, m.width, box, scale);
     return { box, scale, pic, res: detectArrows(pic, face, 3, { debug: !!debugDir, ...JSON.parse(process.env.OPTS || '{}') }) };
   };
