@@ -3016,3 +3016,11 @@ a.apl-sessionrow:hover {
   display: flex;
   flex-direction: column;
 }
+
+/* a running SPT session's header: the timer and Finish side by side */
+.form-head-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: auto;
+}

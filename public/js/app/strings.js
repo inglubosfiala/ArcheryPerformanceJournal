@@ -69,6 +69,9 @@ export const T = {
   discardLoss: 'All arrows, grades and notes of this session are deleted. It will not appear in History and ',
   cannotBeUndone: 'cannot be undone',
   finishInstead: 'Finish and save instead',
+  // the same sheets over a running gym or SPT session (formFinish.js)
+  keepGoing: 'Continue session',
+  discardFormLoss: (name) => `Everything in this ${name} is deleted and its timer stops. It will not appear in History and `,
   endSaved: (n, total) => `End ${n} saved, total ${total}`,
   endDetails: (n) => `End ${n} details`,
   mentalProgram: 'Mental program (M)',

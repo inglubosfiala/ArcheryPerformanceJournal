@@ -2463,10 +2463,16 @@ button.arrow-count:hover {
   padding-top: 0;
 }
 
+/* the top bar sits above the end (sticky, see .session-head), 6px over it as the end's rows are */
+.apl-screen > .score-head {
+  padding-bottom: 6px;
+}
+
 .score-screen {
-  /* the main area's height less the bottom bar (56px button + its padding + its top border) */
-  height: calc(100cqh - var(--tap-primary) - 2 * 8px - 1px);
-  min-height: 560px;
+  /* the main area's height less the top bar (44px row + 6px under it) and the bottom bar (56px
+     button + its padding + its top border) */
+  height: calc(100cqh - var(--tap-min) - 6px - var(--tap-primary) - 2 * 8px - 1px);
+  min-height: 510px;
   gap: 6px;
 }
 
@@ -2708,4 +2714,13 @@ button.arrow-count:hover {
 .score-next:disabled,
 .score-scan:disabled {
   opacity: 0.45;
+}
+
+/* A running session's top bar (title or end, timer, Finish) stays at the top of the scrolling main
+   area on every session type, so Finish is always in reach. */
+.session-head {
+  position: sticky;
+  top: 0;
+  z-index: 3;
+  background: var(--ground);
 }

@@ -339,7 +339,7 @@ const router = createRouter((r) => {
   }
   const changed = r.name !== route.name || r.params.join('/') !== route.params.join('/');
   route = r;
-  if (changed) ui.quietSet({ importPreview: null, gearMenu: null, gearEdit: null, sightMenu: null, sightEdit: null, ov: null, gymMenu: null, gymRename: null, gymOther: null });
+  if (changed) ui.quietSet({ importPreview: null, gearMenu: null, gearEdit: null, sightMenu: null, sightEdit: null, ov: null, gymMenu: null, gymRename: null, gymOther: null, formSheet: null });
   renderNow({ scrollTop: changed });
   if (changed && auth.configured && auth.isSignedIn() && !auth.getToken()) renewIfSafe();
 });

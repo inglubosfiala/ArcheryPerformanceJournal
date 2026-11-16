@@ -23,7 +23,7 @@ import { renderTypeChoice, renderStrengthChoice, renderShootingSetup } from './s
 import { renderBlankRunning } from './blankBale.js';
 import { renderGymSetup } from './gymSetup.js';
 import { renderGymRunning } from './gymRunning.js';
-import { doneSets } from '../gym.js';
+import { answeredOnFormPage } from './formFinish.js';
 import { SHOOTING_KINDS } from '../lastSetup.js';
 import { sessionTimer } from './timer.js';
 import * as APL from '../../ui/apl/index.js';
@@ -73,13 +73,14 @@ export function askAboutRunningSession(q) {
  * openFormSession.js).
  */
 export function askAboutOpenFormSession(q) {
+  // a running gym or SPT session asks on its own Finish sheets first; that answer is not asked again
+  if (answeredOnFormPage(q.kind)) return Promise.resolve(true);
   if (q.kind === 'save') {
     // Save asks only OK / Cancel; the duration (from the timer) and the note are then edited on the
     // session's History page, which opens next.
     const { type, fields, minutes } = q;
     const facts = [
       type === 'blank' || type === 'manual' ? `${fields.arrows || 0} ${fields.arrows === 1 ? 'arrow' : 'arrows'}` : null,
-      type === 'gym' ? `${doneSets(fields.exercises)} ${doneSets(fields.exercises) === 1 ? 'set' : 'sets'}` : null,
       minutes != null ? `${minutes} min` : null,
     ].filter(Boolean);
     return confirmDialog({
@@ -202,7 +203,7 @@ function renderActive(ctx, session) {
   const subtitle = [`${session.distance} m`, faceLabel(session.face), sightText && `sight ${sightText}`].filter(Boolean).join(' · ');
   const header = h(
     'header',
-    { class: 'score-head' },
+    { class: 'score-head session-head' },
     h(
       'button',
       {
@@ -457,10 +458,12 @@ function renderActive(ctx, session) {
     content: h(
       'div',
       { class: 'apl-screen' },
+      // the top bar (end, timer, Finish) stays on screen while Total is scrolled to
+      header,
       h(
         'div',
         { class: 'apl-screen-body log-body' },
-        h('section', { class: 'score-screen', 'aria-label': T.endN(endNo) }, header, strip, input, under, chips),
+        h('section', { class: 'score-screen', 'aria-label': T.endN(endNo) }, strip, input, under, chips),
         totalSection,
       ),
       APL.BottomBar({ children: h('div', { class: 'score-actions' }, prevBtn, nextBtn, photoButton(ctx, session)) }),
