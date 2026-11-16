@@ -275,7 +275,7 @@ function competitionSection(fields, { setKind, quietKind }) {
   });
 }
 
-/** Distance, face and arrows per end of a scored kind. */
+/** Distance, face and arrows per end of a scored kind (its grading is under When). */
 function scoredSections(fields, setKind) {
   const { size, kind } = faceParts(fields.face) || faceParts('40t');
   const suggested = DISTANCE_DEFAULTS[fields.distance]?.face === fields.face;
@@ -337,18 +337,22 @@ function scoredSections(fields, setKind) {
         fk: 'n-chip',
       }),
     }),
-    APL.Section({
-      label: 'Grading',
-      id: 'setup-grading',
-      children: APL.Switch({
-        title: 'Mental grading',
-        detail: 'Grade each arrow on the mental program (M) and the shooting cycle (S)',
-        checked: fields.grading !== false,
-        onChange: (on) => setKind({ grading: on }),
-        fk: 'grading',
-      }),
-    }),
   ];
+}
+
+/** Whether a scored kind is graded (M / S per arrow); shown right under When. */
+function gradingSection(fields, setKind) {
+  return APL.Section({
+    label: 'Grading',
+    id: 'setup-grading',
+    children: APL.Switch({
+      title: 'Mental grading',
+      detail: 'Grade each arrow on the mental program (M) and the shooting cycle (S)',
+      checked: fields.grading !== false,
+      onChange: (on) => setKind({ grading: on }),
+      fk: 'grading',
+    }),
+  });
 }
 
 /**
@@ -475,6 +479,7 @@ export function renderShootingSetup(ctx, kind) {
         })
       : null,
     when,
+    blank ? null : gradingSection(fields, setKind),
     kind === 'competition' ? competitionSection(fields, { setKind, quietKind }) : null,
     ...(blank ? blankSections(fields, setKind, { past, quietKind }) : scoredSections(fields, setKind)),
     equipment.section,
