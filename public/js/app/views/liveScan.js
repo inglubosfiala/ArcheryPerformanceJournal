@@ -12,7 +12,7 @@ import { resultOffCrop, arrowMarkLayout } from '../scanGeometry.js';
 import { createSteadyReading, nextLook } from '../scan.js';
 
 const FRAME_MAX = 560; // frames are scaled to this many pixels on their long side for detection
-const VIEW_MAX = 1280; // the overlay and the kept picture: the whole frame, up to this size
+const VIEW_MAX = 1920; // the overlay and the kept picture: the whole frame, up to this size (the preview is cut from it)
 const TICK_MS = 120; // pause between analyses (each takes 0.2–0.6 s on a phone)
 
 /** What the status line says for each kind of reading (see createSteadyReading). */
@@ -332,7 +332,7 @@ export function liveScan({ face, maxArrows, spotHint = 0 }) {
       return;
     }
     media
-      .getUserMedia({ video: { facingMode: { ideal: 'environment' }, width: { ideal: 1280 }, height: { ideal: 720 } }, audio: false })
+      .getUserMedia({ video: { facingMode: { ideal: 'environment' }, width: { ideal: 1920 }, height: { ideal: 1080 } }, audio: false })
       .then((s) => {
         if (closed) {
           s.getTracks().forEach((t) => t.stop());

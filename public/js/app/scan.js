@@ -18,10 +18,15 @@
 import * as L from './sessionLogic.js';
 import { consensus } from './photoDetect.js';
 import { ringEdges, scoreFromPoint, scoringZoneAt } from './scoring.js';
-import { CLOSE_UP_MARGIN, spotsBox, isCloseUp, keepCloseUp, withArrows, moveArrow, arrowMarkLayout } from './scanGeometry.js';
+import { CLOSE_UP_MARGIN, spotsBox, isCloseUp, keepCloseUp, withArrows, moveArrow, arrowMarkLayout, resultOnCrop } from './scanGeometry.js';
 
 /** A photo is read at most this many pixels on its long side (each of the two looks). */
 export const PHOTO_MAX = 640;
+/**
+ * …and shown, to check the found arrows, at up to this many: the preview fills a phone's screen,
+ * some 2000 device pixels tall, where the analysed picture would be blown up and blurred.
+ */
+export const PREVIEW_MAX = 2048;
 
 /** The live camera locks when the agreed reading goes back at least this long… */
 export const LOCK_MS = 1000;
@@ -60,21 +65,28 @@ export function nextLook(res, bounds, scale = 1) {
  * from the full-size photo, so the same number of analysed pixels shows the target in much more
  * detail). The close-up is kept when it finds the face again. A photo shows no more of the sheet
  * than it does, so a partial sheet gets its close-up too.
- * Returns { picture, res }: the picture drawn for the kept look, and what was found on it.
+ * Returns { picture, res }: the kept look drawn again for the preview, as sharp as the photo allows
+ * (up to PREVIEW_MAX), and what was found on it.
  */
 async function readPhoto(photo, room, detect) {
   const look = async (box) => {
     const scale = Math.min(1, PHOTO_MAX / Math.max(box.w, box.h));
     const picture = photo.draw(box, scale);
-    return { picture, res: await detect(picture, room), scale };
+    return { picture, res: await detect(picture, room), scale, box };
   };
   const whole = { x: 0, y: 0, w: photo.width, h: photo.height };
   const first = await look(whole);
   if (first.res.error) return first;
   const box = spotsBox(first.res.spots, { margin: CLOSE_UP_MARGIN, bounds: whole, scale: first.scale });
-  if (!isCloseUp(box, whole)) return first;
-  const second = await look(box);
-  return keepCloseUp(first.res, second.res) ? second : first;
+  const kept = isCloseUp(box, whole) ? await look(box).then((second) => (keepCloseUp(first.res, second.res) ? second : first)) : first;
+  return sharper(photo, kept);
+}
+
+/** The kept look drawn again at up to PREVIEW_MAX, with what was found moved to match. */
+function sharper(photo, { picture, res, scale, box }) {
+  const view = Math.min(1, PREVIEW_MAX / Math.max(box.w, box.h));
+  if (view <= scale) return { picture, res };
+  return { picture: photo.draw(box, view), res: resultOnCrop(res, { x: 0, y: 0 }, view / scale) };
 }
 
 /**

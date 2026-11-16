@@ -30,7 +30,7 @@ import * as APL from '../../ui/apl/index.js';
 import { detectArrows } from '../photoDetect.js';
 import { drawArrowMarks, liveScan } from './liveScan.js';
 import { PREVIEW_MARGIN, spotsBox, resultOnCrop } from '../scanGeometry.js';
-import { PHOTO_MAX, canScan, createScan } from '../scan.js';
+import { PREVIEW_MAX, canScan, createScan } from '../scan.js';
 import { loupeCorner, loupeBox } from '../loupePlacement.js';
 
 // 'finish' or 'discard' while the scoring screen calls running.finish() / discard() after its own
@@ -647,7 +647,7 @@ function cropToSpots(source, res) {
   const box = spotsBox(res.spots, { margin: PREVIEW_MARGIN, bounds: { x: 0, y: 0, w: source.width, h: source.height } });
   const w = Math.max(1, box.w);
   const hgt = Math.max(1, box.h);
-  const k = Math.min(3, PHOTO_MAX / Math.max(w, hgt));
+  const k = Math.min(3, PREVIEW_MAX / Math.max(w, hgt));
   const canvas = h('canvas', { class: 'photo-preview' });
   canvas.width = Math.round(w * k);
   canvas.height = Math.round(hgt * k);
