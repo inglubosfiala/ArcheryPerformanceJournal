@@ -56,46 +56,15 @@
           </ul>
         </div>
 
-        <!-- Live-scan illustration (replace with the demo clip once it is filmed) -->
-        <figure class="phone" aria-label="Illustration: the live camera marks each arrow on the target with its score">
-          <svg viewBox="0 0 240 300" role="img" aria-hidden="true">
-            <rect x="0" y="0" width="240" height="300" rx="22" class="phone-screen" />
-            <g transform="translate(120 140)">
-              <circle r="100" fill="#ffffff" stroke="#c9ced2" stroke-width="1" />
-              <circle r="90" fill="#ffffff" stroke="#9aa1a7" stroke-width="0.6" />
-              <circle r="80" fill="#1a1a1a" />
-              <circle r="70" fill="#1a1a1a" stroke="#4a4f53" stroke-width="0.6" />
-              <circle r="60" fill="#00a6d6" />
-              <circle r="50" fill="#00a6d6" stroke="#00799c" stroke-width="0.6" />
-              <circle r="40" fill="#ee4049" />
-              <circle r="30" fill="#ee4049" stroke="#b02a31" stroke-width="0.6" />
-              <circle r="20" fill="#ffe14d" />
-              <circle r="10" fill="#ffe14d" stroke="#c9a800" stroke-width="0.6" />
-              <circle r="5" fill="none" stroke="#c9a800" stroke-width="0.6" />
-              <!-- arrows: impact point, leader line, score label -->
-              <g class="hit">
-                <circle cx="-3" cy="2" r="3" />
-                <line x1="-3" y1="2" x2="-46" y2="-58" />
-                <rect x="-62" y="-74" width="30" height="20" rx="6" />
-                <text x="-47" y="-60">X</text>
-              </g>
-              <g class="hit">
-                <circle cx="14" cy="-8" r="3" />
-                <line x1="14" y1="-8" x2="58" y2="-62" />
-                <rect x="44" y="-78" width="30" height="20" rx="6" />
-                <text x="59" y="-64">10</text>
-              </g>
-              <g class="hit">
-                <circle cx="-16" cy="22" r="3" />
-                <line x1="-16" y1="22" x2="-62" y2="72" />
-                <rect x="-78" y="62" width="30" height="20" rx="6" />
-                <text x="-63" y="76">9</text>
-              </g>
-            </g>
-            <rect x="20" y="256" width="200" height="28" rx="14" class="phone-status" />
-            <text x="120" y="275" class="phone-status-text">X · 10 · 9: hold steady…</text>
-          </svg>
-          <figcaption>Live scan: the score appears next to each hit.</figcaption>
+        <!-- Real app screens, captured at 390 x 844 with demo data -->
+        <figure class="shot shot-hero">
+          <img
+            src="./screens/scoring.webp"
+            width="390"
+            height="844"
+            alt="The scoring screen: end 5 on a 40 cm triple face, two arrows plotted with their M and S grades, the score keys and the sight mark"
+          />
+          <figcaption>Scoring an end: each arrow with its mental and shot grade.</figcaption>
         </figure>
       </section>
 
@@ -126,11 +95,15 @@
               mid-end and it picks up exactly where you left off.
             </p>
           </div>
-          <div class="pillar-art keys" aria-hidden="true">
-            <span class="key z-gold">X</span><span class="key z-gold">10</span><span class="key z-gold">9</span>
-            <span class="key z-red">8</span><span class="key z-red">7</span><span class="key z-blue">6</span>
-            <span class="key z-miss">M</span>
-          </div>
+          <figure class="shot">
+            <img
+              src="./screens/session.webp"
+              width="390"
+              height="844"
+              loading="lazy"
+              alt="A finished training session: total 348, average arrow 9.67, 25 tens, average M and S grades, program 75 %, and the equipment it was shot with"
+            />
+          </figure>
         </article>
 
         <article class="pillar">
@@ -153,28 +126,15 @@
               routine, relaxation, blank boss, self-talk.
             </p>
           </div>
-          <figure class="pillar-art chart">
-            <svg viewBox="0 0 280 200" role="img" aria-labelledby="chart-title">
-              <title id="chart-title">Example chart: average arrow by mental grade, from 9.4 at M1 down to 7.9 at M5</title>
-              <text x="0" y="14" class="chart-title">Avg arrow by mental grade</text>
-              <line x1="34" y1="170" x2="276" y2="170" class="axis" />
-              <g class="bars">
-                <rect x="44" y="46" width="34" height="124" fill="#0b6e4f" />
-                <rect x="92" y="58" width="34" height="112" fill="#7cc29a" />
-                <rect x="140" y="80" width="34" height="90" fill="#f2d65c" />
-                <rect x="188" y="96" width="34" height="74" fill="#f2994a" />
-                <rect x="236" y="118" width="34" height="52" fill="#b3261e" />
-              </g>
-              <g class="vals">
-                <text x="61" y="40">9.4</text><text x="109" y="52">9.1</text><text x="157" y="74">8.7</text>
-                <text x="205" y="90">8.4</text><text x="253" y="112">7.9</text>
-              </g>
-              <g class="cats">
-                <text x="61" y="188">M1</text><text x="109" y="188">M2</text><text x="157" y="188">M3</text>
-                <text x="205" y="188">M4</text><text x="253" y="188">M5</text>
-              </g>
-            </svg>
-            <figcaption>Example data. Yours will show your own pattern.</figcaption>
+          <figure class="shot">
+            <img
+              src="./screens/mental-grades.webp"
+              width="390"
+              height="844"
+              loading="lazy"
+              alt="Average arrow by mental grade for one session: 10.0 at M1, 9.7 at M2, 9.5 at M3, 8.8 at M4, then the session's ends"
+            />
+            <figcaption>Average arrow by mental grade, per session.</figcaption>
           </figure>
         </article>
 
@@ -231,6 +191,39 @@
             slipped before the score did.
           </p>
         </div>
+        <div class="wrap shots-row">
+          <figure class="shot">
+            <img
+              src="./screens/insights.webp"
+              width="390"
+              height="844"
+              loading="lazy"
+              alt="Insights charts: average arrow per session, mental and shot grades over time, and the mental program share rising from about 50 % to 80 %"
+            />
+            <figcaption>Insights: score and grades over weeks.</figcaption>
+          </figure>
+          <figure class="shot">
+            <img
+              src="./screens/history.webp"
+              width="390"
+              height="844"
+              loading="lazy"
+              alt="The session list: competition, mental, SPT and training sessions, each with its score, grades and program share"
+            />
+            <figcaption>History: training, SPT, mental and competitions.</figcaption>
+          </figure>
+          <figure class="shot">
+            <img
+              src="./screens/dashboard.webp"
+              width="390"
+              height="844"
+              loading="lazy"
+              alt="The dashboard: history, insights, equipment, grades, settings and a new session button"
+            />
+            <figcaption>Dashboard: everything one tap away.</figcaption>
+          </figure>
+        </div>
+        <p class="wrap shots-note">Screens show demo data.</p>
       </section>
 
       <!-- Privacy -->
