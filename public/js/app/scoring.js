@@ -195,10 +195,20 @@ export function scoringZones(face) {
  * A tap exactly on a ring line scores the lower ring (the X line counts as the X).
  */
 export function scoreFromPoint(x, y, face) {
+  return scoringZoneAt(x, y, face)?.value ?? 'M';
+}
+
+/**
+ * The scoring zone a point lies in, by the rule of scoreFromPoint: its value and its inner and
+ * outer edges (fractions of the radius). On a compound face the outer 10 ring and the 9 ring are
+ * one zone (both score 9). Null off the face.
+ */
+export function scoringZoneAt(x, y, face) {
   const d = round9(Math.hypot(x, y));
-  const [inner, ...rest] = scoringZones(face);
-  if (d <= round9(inner.edge)) return inner.value;
-  return rest.find((z) => d < round9(z.edge))?.value ?? 'M';
+  const zones = scoringZones(face);
+  const k = d <= round9(zones[0].edge) ? 0 : zones.findIndex((z, i) => i > 0 && d < round9(z.edge));
+  if (k < 0) return null;
+  return { value: zones[k].value, inner: k > 0 ? zones[k - 1].edge : 0, edge: zones[k].edge };
 }
 
 // Guard against float noise such as 0.3 * 10 = 3.0000000000000004 or 0.7 * 10 = 6.999999999999999.

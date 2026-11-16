@@ -17,7 +17,7 @@
 
 import * as L from './sessionLogic.js';
 import { consensus } from './photoDetect.js';
-import { ringEdges, scoreFromPoint } from './scoring.js';
+import { ringEdges, scoreFromPoint, scoringZoneAt } from './scoring.js';
 import { CLOSE_UP_MARGIN, spotsBox, isCloseUp, keepCloseUp, withArrows, moveArrow, arrowMarkLayout } from './scanGeometry.js';
 
 /** A photo is read at most this many pixels on its long side (each of the two looks). */
@@ -128,17 +128,19 @@ function foundArrows(res, face, size) {
       offset = null;
     },
     /**
-     * The ring the held arrow is in right now, to tint it: the edge of its spot in the picture, and
-     * the ring's inner and outer edges as fractions of the spot's radius. Null when nothing is held
-     * or the arrow is off the face.
+     * The scoring zone the held arrow is in right now, to tint it: the edge of its spot in the
+     * picture, and the zone's inner and outer edges as fractions of the spot's radius. It is the
+     * zone its score comes from (on a line, the lower ring; on a compound face the outer 10 and the
+     * 9 ring together), so the tint and the score in the label always agree. Null when nothing is
+     * held or the arrow is off the face.
      */
     heldRing() {
       if (held < 0) return null;
       const a = arrows[held];
-      const k = rings.findIndex((f) => Math.hypot(a.x, a.y) <= f);
-      if (k < 0) return null;
+      const zone = scoringZoneAt(a.x, a.y, face);
+      if (!zone) return null;
       const outer = (res.spots[res.partial ? 0 : (a.spot ?? 0)] || res.spots[0]).outer;
-      return { outer, inner: k > 0 ? rings[k - 1] : 0, edge: rings[k] };
+      return { outer, inner: zone.inner, edge: zone.edge };
     },
     /** The arrows as they go into the end: { v, x, y, spot }. */
     toEnd() {

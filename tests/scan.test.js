@@ -331,6 +331,20 @@ describe('the found arrows', () => {
     await make().start();
   });
 
+  it('tints the zone the score comes from: on a ring line, the lower ring', async () => {
+    camera = [shot([{ x: 0.3, y: 0, spot: 2 }])];
+    previews = [
+      ({ found }) => {
+        found.grab(found.arrows[0].image, 26);
+        found.drag({ x: 200, y: 310 }); // exactly on the 10 / 9 line (0.2 of the spot's radius)
+        expect(found.scores()).toEqual([9]);
+        expect(found.heldRing()).toEqual({ outer: triple()[2].outer, inner: 0.2, edge: 0.4 });
+        return false;
+      },
+    ];
+    await make().start();
+  });
+
   it('the overlay rings agree with the score of every face in the app', () => {
     for (const face of FACE_IDS) {
       const edges = ringEdges(face);
@@ -346,6 +360,34 @@ describe('the found arrows', () => {
       });
       expect(scoreFromPoint(1.01, 0, face)).toBe('M');
     }
+  });
+});
+
+describe('the found arrows on a compound face', () => {
+  beforeEach(async () => {
+    await running.start({ ...SETUP, face: '40tc' });
+  });
+
+  it('tints the outer 10 and the 9 ring as one zone, since both score 9', async () => {
+    camera = [shot([{ x: 0.3, y: 0, spot: 2 }])];
+    let seen;
+    previews = [
+      ({ found }) => {
+        found.grab(found.arrows[0].image, 26);
+        const nine = { outer: triple()[2].outer, inner: 0.1, edge: 0.4 };
+        expect([found.scores(), found.heldRing()]).toEqual([[9], nine]);
+        found.drag({ x: 200, y: 327.5 }); // into the outer 10 ring (0.15): still 9, same zone
+        expect([found.scores(), found.heldRing()]).toEqual([[9], nine]);
+        found.drag({ x: 200, y: 322 }); // into the X ring: 10
+        expect([found.scores(), found.heldRing()]).toEqual([[10], { outer: triple()[2].outer, inner: 0, edge: 0.1 }]);
+        seen = found.toEnd()[0].v;
+        found.drop();
+        return true;
+      },
+    ];
+    expect((await make().start()).status).toBe('used');
+    expect(seen).toBe(10);
+    expect(L.shownEnd(running.get()).arrows[0].v).toBe(10);
   });
 });
 
