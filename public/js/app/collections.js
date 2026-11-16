@@ -157,12 +157,15 @@ export const defaultSettings = {
   gearUnits: {},
   // the setup of the last session of each kind of shooting (lastSetup.js); this device only
   lastSetup: defaultLastSetup(),
+  // the user's wording of the M and S grades, only what differs from the defaults (gradeTexts.js); synced
+  gradeTexts: null,
 };
 
 /** Settings shared between devices by Google Drive sync; all others stay on the device. */
-// Only which gear setup is active: the setups themselves sync as a collection. lastSetup changes on
-// its own (starting a session) and would otherwise make a fresh device's settings look newer.
-export const SYNCED_SETTING_KEYS = ['activeSetupId'];
+// Which gear setup is active (the setups themselves sync as a collection) and the grade wording.
+// lastSetup changes on its own (starting a session) and would otherwise make a fresh device's
+// settings look newer.
+export const SYNCED_SETTING_KEYS = ['activeSetupId', 'gradeTexts'];
 
 /** The Ink accent follows the text colour, so it is light in dark mode (see applyTheme in main.js). */
 export const INK_ACCENT = '#14181C';

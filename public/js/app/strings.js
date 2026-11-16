@@ -15,6 +15,8 @@ export const RUBRIC = {
     'Cycle falls apart',
   ],
 };
+// the default names of the two grade scales; the user can rename them in Settings › Grades
+export const SCALE_NAMES = { m: 'Mental program', s: 'Shooting cycle' };
 
 export const T = {
   appTitle: 'Performance Journal',
