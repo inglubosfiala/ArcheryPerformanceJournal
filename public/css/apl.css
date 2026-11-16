@@ -1772,3 +1772,111 @@ a.apl-sessionrow:hover {
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: var(--space-3);
 }
+
+/* sight marks of a setup (gearSights.js) */
+.sight-mark {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: 12px var(--space-4);
+  border-radius: var(--radius-xl);
+  border: 1px solid var(--border);
+  background: var(--surface);
+}
+.sight-mark.is-editing {
+  border-color: var(--accent-bright);
+}
+.sight-mark-head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+.sight-dist {
+  margin: 0;
+  min-width: 64px;
+  font-size: 22px;
+  line-height: 28px;
+  font-weight: 700;
+}
+.sight-meta {
+  flex: 1;
+  min-width: 0;
+  font-size: 13px;
+  line-height: 18px;
+  color: var(--muted);
+}
+.sight-tiles {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-2);
+}
+.sight-tile {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: var(--space-2) 6px;
+  border-radius: var(--radius-md);
+  background: var(--surface-sunken);
+}
+.sight-tile-label {
+  font-size: 12px;
+  line-height: 16px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.sight-tile-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  min-height: var(--tap-min);
+}
+.sight-value {
+  flex: 1;
+  text-align: center;
+  font-size: 26px;
+  line-height: 32px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+.sight-step {
+  width: var(--tap-min);
+  height: var(--tap-min);
+  border-radius: 50%;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--ink);
+  font-size: 20px;
+  font-weight: 700;
+  flex-shrink: 0;
+  touch-action: manipulation;
+}
+.sight-add {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin-top: 6px;
+}
+.sight-add-h {
+  margin: 0;
+  font-weight: 400;
+}
+.sight-add-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+.sight-add-chip {
+  min-height: var(--tap-min);
+  min-width: 64px;
+  padding: 0 var(--space-4);
+  border-radius: var(--radius-pill);
+  border: 1px dashed var(--border-dashed);
+  background: transparent;
+  color: var(--accent-bright);
+  font: var(--type-body-strong);
+  font-size: 14px;
+}

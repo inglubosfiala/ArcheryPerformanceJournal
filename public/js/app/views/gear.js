@@ -26,6 +26,7 @@ import {
 } from '../gearFields.js';
 import { T } from '../strings.js';
 import { fieldSheet, openFieldSheet } from './gearSheet.js';
+import { renderSightsPage } from './gearSights.js';
 
 export function renderGear(ctx, params = []) {
   const [id, sub] = params;
@@ -35,7 +36,7 @@ export function renderGear(ctx, params = []) {
     queueMicrotask(() => ctx.navigate('gear', { replace: true }));
     return { content: h('div', { class: 'apl-screen gear-screen' }) };
   }
-  if (sub === 'sights') return renderSightsPage(ctx, setup);
+  if (sub === 'sights') return renderSights(ctx, setup);
   return renderSetup(ctx, setup);
 }
 
@@ -395,18 +396,18 @@ function openField(ctx, setupId, key) {
 
 // ---------------------------------------------------------------- sight marks (a page of the setup)
 
-function renderSightsPage(ctx, setup) {
-  return {
-    content: h(
+function renderSights(ctx, setup) {
+  const sight = String(setup.fields?.sight || '').trim();
+  const header = h(
+    'header',
+    { class: 'apl-header gear-header gear-top' },
+    backLink(`#/gear/${encodeURIComponent(setup.id)}`, `Back to ${setup.name}`),
+    h(
       'div',
-      { class: 'apl-screen gear-screen' },
-      h(
-        'header',
-        { class: 'apl-header gear-header' },
-        backLink(`#/gear/${encodeURIComponent(setup.id)}`, `Back to ${setup.name}`),
-        h('h1', { class: 'gear-title' }, T.sightMarks),
-      ),
-      h('div', { class: 'apl-screen-body gear-body' }, h('p', { class: 'apl-cap13' }, `${markCount(setup.fields)} marks`)),
+      { class: 'gear-active-title' },
+      h('h1', { class: 'gear-title' }, T.sightMarks),
+      h('span', { class: 'gear-sub' }, [setup.name, sight].filter(Boolean).join(' · ')),
     ),
-  };
+  );
+  return renderSightsPage(ctx, setup, { header });
 }
