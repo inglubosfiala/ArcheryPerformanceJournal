@@ -3100,3 +3100,95 @@ a.apl-sessionrow:hover {
 .set-version {
   text-align: center;
 }
+
+
+/* Settings › Grades (settingsGrades.js) */
+.grades-reset {
+  min-height: var(--tap-min);
+  padding: 0 12px;
+  border: 0;
+  border-radius: var(--radius-pill);
+  background: transparent;
+  color: var(--accent-bright);
+  font: var(--type-body-strong);
+}
+.grades-reset:disabled {
+  color: var(--muted);
+}
+.grades-body {
+  gap: var(--space-4);
+}
+.grades-rows {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+.grades-row {
+  display: grid;
+  grid-template-columns: 40px minmax(0, 1fr);
+  gap: 10px;
+  align-items: start;
+}
+.grade-badge.grades-badge {
+  width: 40px;
+  height: 40px;
+  border-radius: var(--radius-md);
+  font: 800 18px/1 var(--font-sans);
+  margin-top: 4px;
+}
+.grades-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+.grades-input textarea {
+  resize: none;
+}
+.grades-input.is-edited {
+  border-color: var(--accent-bright);
+}
+.grades-meta {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--space-2);
+  font: var(--type-caption);
+  color: var(--muted);
+}
+.grades-default {
+  min-width: 0;
+}
+.grades-count {
+  flex: none;
+}
+.grades-preview {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-4);
+  border-radius: var(--radius-xl);
+  border: 1px solid var(--border);
+  background: var(--surface);
+}
+.grades-preview > .apl-label {
+  color: var(--muted);
+}
+
+/* the user's wording of the chosen grades (gradeWording in common.js): one muted line, cut with … */
+.grade-wording {
+  margin: 0;
+  min-height: 18px;
+  font-size: 13px;
+  line-height: 18px;
+  color: var(--muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.grade-wording strong {
+  color: var(--ink-soft);
+  font-weight: 600;
+}
+.grade-wording-part + .grade-wording-part {
+  margin-left: 12px;
+}

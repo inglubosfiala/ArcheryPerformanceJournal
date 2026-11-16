@@ -9,6 +9,8 @@ import { exportBackup, parseBackup } from '../../backup/backup.js';
 import { checkForUpdate, storageInfo } from '../../pwa/updates.js';
 import { card } from './common.js';
 import { paypalMeUrl } from '../support.js';
+import { renderGrades } from './settingsGrades.js';
+import { isDefault, scaleName } from '../gradeTexts.js';
 
 // the APL themes; 'system' follows the device (this device only, not synced)
 const THEMES = [
@@ -38,6 +40,7 @@ const PAGES = {
 };
 
 export function renderSettings(ctx, params = []) {
+  if (params[0] === 'grades') return renderGrades(ctx);
   const page = PAGES[params[0]];
   if (!page) return overview(ctx);
   return {
@@ -94,6 +97,19 @@ function overview(ctx) {
       h(
         'div',
         { class: 'apl-screen-body history-body' },
+        settingsGroup('Training', [
+          settingsRow({
+            page: 'grades',
+            icon: 'M S',
+            accent: true,
+            title: 'Grades',
+            sub: rowSub(
+              isDefault(settings, 'm') && isDefault(settings, 's')
+                ? 'Default wording of the M and S grades'
+                : `Your wording · ${scaleName(settings, 'm')} · ${scaleName(settings, 's')}`,
+            ),
+          }),
+        ]),
         settingsGroup('App', [
           settingsRow({ page: 'appearance', icon: APL.Icon({ name: 'theme' }), title: 'Appearance', sub: rowSub(`Theme: ${theme}`) }),
           settingsRow({

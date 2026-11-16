@@ -72,8 +72,8 @@ const sync = createSyncController({
   service: syncService,
   store: driveStore,
   debounceMs: SYNC_DEBOUNCE_MS,
-  // the status is shown only on Settings; avoid re-rendering (and disturbing typing) elsewhere
-  onStatus: () => route.name === 'settings' && shell && renderNow(),
+  // the status is shown only on Settings › Sync & backup; avoid re-rendering (and disturbing typing) elsewhere
+  onStatus: () => route.name === 'settings' && route.params[0] === 'sync' && shell && renderNow(),
   onPulled: () => {
     if (shell) renderNow();
   },
