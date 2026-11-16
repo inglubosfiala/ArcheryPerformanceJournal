@@ -97,7 +97,7 @@ export function weekStart(date) {
 
 /**
  * Training load per week (oldest first), with empty weeks in between filled in:
- * sessions per type, arrows shot, and strength / mental minutes.
+ * sessions per type, arrows shot, and strength (SPT), gym and mental minutes.
  */
 const emptyWeek = (week) => ({
   week,
@@ -107,11 +107,13 @@ const emptyWeek = (week) => ({
   strength: 0,
   mental: 0,
   manual: 0,
+  gym: 0,
   arrows: 0,
   strengthMin: 0,
+  gymMin: 0,
   mentalMin: 0,
   // minutes per session type (scored sessions: from the session timer), and their total
-  min: { training: 0, blank: 0, competition: 0, strength: 0, mental: 0, manual: 0 },
+  min: { training: 0, blank: 0, competition: 0, strength: 0, mental: 0, manual: 0, gym: 0 },
   totalMin: 0,
 });
 
@@ -129,6 +131,7 @@ export function weeklyLoad(sessions) {
     if (isScored(s.type)) row.arrows += computeStats(s.ends || []).arrows;
     else if (countsArrows(type)) row.arrows += s.arrows || 0;
     else if (type === 'strength') row.strengthMin += s.minutes || 0;
+    else if (type === 'gym') row.gymMin += s.minutes || 0;
     else if (type === 'mental') row.mentalMin += s.minutes || 0;
   }
   const weeks = [...byWeek.keys()].sort();

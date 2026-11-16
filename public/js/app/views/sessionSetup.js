@@ -12,6 +12,7 @@ import { sessionDates, gearCards } from './common.js';
 import { datePicker, timePicker } from './pickers.js';
 import { emptyForm, formSections, showsStartTimer } from './sessionForms.js';
 import { sessionTimer } from './timer.js';
+import { formFinish } from './formFinish.js';
 
 // ---------------------------------------------------------------- shared by the setup pages
 
@@ -164,9 +165,10 @@ export function renderFormSetup(ctx, type) {
 
   const discardForm = async () => {
     const res = await ctx.openForms.discard(type);
-    if (res.status !== 'discarded') return;
+    if (res.status !== 'discarded') return res;
     dropPageDraft();
     ctx.navigate('home', { replace: true });
+    return res;
   };
 
   const saveForm = async () => {
@@ -177,9 +179,10 @@ export function renderFormSetup(ctx, type) {
       past,
       gear: noGear ? {} : equipment.chosenGear(),
     });
-    if (res.status !== 'saved') return;
+    if (res.status !== 'saved') return res;
     dropPageDraft();
     ctx.navigate(`history/${res.session.id}`, { replace: true });
+    return res;
   };
 
   // a timed form whose start is not in the past: its timer runs, it is a running session
@@ -196,23 +199,47 @@ export function renderFormSetup(ctx, type) {
           )
         : null;
 
-  // no back button on a running SPT session (Save or Discard end it; the tab bar leaves it running)
+  // no back button on a running SPT session (Finish ends it; the tab bar leaves it running)
   const back = !(running && type === 'strength');
   // the manual type is offered as "Log afterwards"
   const title = type === 'manual' ? 'Log afterwards' : `${TYPE_LABELS[type]} session`;
   // a drill card's own green "Start timer" is the primary action while it shows: Save steps down
   const saveVariant = type === 'strength' && showsStartTimer(form.drills) ? 'secondary' : 'primary';
 
+  // a running SPT session ends as the scoring screen does: Finish in the header opens End the
+  // session (save · discard · continue), instead of Save at the bottom and Discard in the page
+  const drills = form.drills || [];
+  const doneDrills = drills.filter((d) => d.done).length;
+  const clock = L.formatClock(L.timerElapsed(formTimer));
+  const ending = sptRunning
+    ? formFinish(ctx, type, {
+        summary: [`${drills.length} ${drills.length === 1 ? 'drill' : 'drills'}`, `${doneDrills} done`, clock].join(' · '),
+        facts: [
+          [String(drills.length), drills.length === 1 ? 'drill' : 'drills'],
+          [String(doneDrills), 'done'],
+          [clock, 'on the timer'],
+        ],
+        save: saveForm,
+        discard: discardForm,
+      })
+    : null;
+
+  const header = APL.ScreenHeader({
+    title,
+    onBack: back ? () => ctx.navigate('new') : null,
+    backLabel: 'Back to session type',
+    trailing: sptRunning
+      ? h('span', { class: 'form-head-actions' }, sessionTimer(formTimer, toggleFormTimer), ending.button)
+      : null,
+  });
+  // a running session's top bar stays on screen while the page scrolls
+  if (running) header.classList.add('session-head');
+
   return {
     content: h(
       'div',
       { class: 'apl-screen' },
-      APL.ScreenHeader({
-        title,
-        onBack: back ? () => ctx.navigate('new') : null,
-        backLabel: 'Back to session type',
-        trailing: sptRunning ? sessionTimer(formTimer, toggleFormTimer) : null,
-      }),
+      header,
       h(
         'div',
         { class: 'apl-screen-body' },
@@ -227,7 +254,7 @@ export function renderFormSetup(ctx, type) {
               : [],
         }),
         equipment?.section,
-        running
+        running && !sptRunning
           ? h(
               'button',
               {
@@ -240,9 +267,12 @@ export function renderFormSetup(ctx, type) {
             )
           : null,
       ),
-      APL.BottomBar({
-        children: APL.Button({ children: 'Save session', variant: saveVariant, onClick: saveForm, fk: 'form-save' }),
-      }),
+      sptRunning
+        ? null
+        : APL.BottomBar({
+            children: APL.Button({ children: 'Save session', variant: saveVariant, onClick: saveForm, fk: 'form-save' }),
+          }),
     ),
+    overlay: ending?.overlay ?? null,
   };
 }

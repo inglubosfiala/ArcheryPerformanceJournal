@@ -64,7 +64,7 @@ export function renderBlankRunning(ctx, open) {
 
   const header = h(
     'header',
-    { class: 'apl apl-header bb-header' },
+    { class: 'apl apl-header bb-header session-head' },
     APL.IconButton({
       icon: 'back',
       label: 'Back to dashboard — the session keeps running',

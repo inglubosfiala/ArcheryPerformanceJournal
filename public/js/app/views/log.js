@@ -18,8 +18,11 @@ import { icons } from '../icons.js';
 import { faceSheet, faceViewBox, VB } from './face.js';
 import { SESSION_TYPES, TYPE_LABELS, sessionType, isGraded } from '../sessionTypes.js';
 import { renderFormSetup } from './sessionSetup.js';
-import { renderTypeChoice, renderShootingSetup } from './shootingSetup.js';
+import { renderTypeChoice, renderStrengthChoice, renderShootingSetup } from './shootingSetup.js';
 import { renderBlankRunning } from './blankBale.js';
+import { renderGymSetup } from './gymSetup.js';
+import { renderGymRunning } from './gymRunning.js';
+import { answeredOnFormPage } from './formFinish.js';
 import { SHOOTING_KINDS } from '../lastSetup.js';
 import { sessionTimer } from './timer.js';
 import * as APL from '../../ui/apl/index.js';
@@ -68,6 +71,8 @@ export function askAboutRunningSession(q) {
  * openFormSession.js).
  */
 export function askAboutOpenFormSession(q) {
+  // a running gym or SPT session asks on its own Finish sheets first; that answer is not asked again
+  if (answeredOnFormPage(q.kind)) return Promise.resolve(true);
   if (q.kind === 'save') {
     // Save asks only OK / Cancel; the duration (from the timer) and the note are then edited on the
     // session's History page, which opens next.
@@ -100,11 +105,14 @@ export function renderLog(ctx) {
 
 /**
  * New session: step 1 picks what you do (#/new); step 2 is the Shooting page
- * (#/new/shooting/<training|competition|blank>) or the form of SPT, mental or manual (#/new/<type>).
+ * (#/new/shooting/<training|competition|blank>), Strength (#/new/strength-choice: SPT or gym), the
+ * Gym setup (#/new/gym), or the form of SPT, mental or manual (#/new/<type>).
  * The old #/new/training, #/new/competition and #/new/blank lead to the Shooting page.
  */
 export function renderNewSession(ctx, params = []) {
   const [type, kind] = params;
+  if (type === 'strength-choice') return renderStrengthChoice(ctx);
+  if (type === 'gym') return renderGymSetup(ctx);
   if (type === 'shooting') return renderShootingSetup(ctx, SHOOTING_KINDS.includes(kind) ? kind : 'training');
   if (SHOOTING_KINDS.includes(type)) {
     queueMicrotask(() => ctx.navigate(`new/shooting/${type}`, { replace: true }));
@@ -121,6 +129,15 @@ export function renderBlankBale(ctx) {
   queueMicrotask(() => ctx.navigate('new/shooting/blank', { replace: true }));
   return renderShootingSetup(ctx, 'blank');
 }
+
+/** The running gym session (#/gym); none open: the Gym setup page. */
+export function renderGym(ctx) {
+  const open = ctx.openForms.list().find((f) => f.type === 'gym');
+  if (open) return renderGymRunning(ctx, open);
+  queueMicrotask(() => ctx.navigate('new/gym', { replace: true }));
+  return renderGymSetup(ctx);
+}
+
 /** Apply a session transition to the running session; the page is drawn again when it changed. */
 function update(ctx, fn, { rerender = true } = {}) {
   const changed = ctx.running.apply(fn);
@@ -182,7 +199,7 @@ function renderActive(ctx, session) {
   // --- top: "End n ▾" (opens the ends so far), the timer and Finish
   const header = h(
     'header',
-    { class: 'score-head' },
+    { class: 'score-head session-head' },
     h(
       'button',
       {
@@ -435,10 +452,12 @@ function renderActive(ctx, session) {
     content: h(
       'div',
       { class: 'apl-screen' },
+      // the top bar (end, timer, Finish) stays on screen while Total is scrolled to
+      header,
       h(
         'div',
         { class: 'apl-screen-body log-body' },
-        h('section', { class: 'score-screen', 'aria-label': T.endN(endNo) }, header, strip, input, under, chips),
+        h('section', { class: 'score-screen', 'aria-label': T.endN(endNo) }, strip, input, under, chips),
         totalSection,
       ),
       APL.BottomBar({ children: h('div', { class: 'score-actions' }, prevBtn, nextBtn, photoButton(ctx, session)) }),

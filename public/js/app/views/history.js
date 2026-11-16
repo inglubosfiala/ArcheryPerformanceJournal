@@ -6,7 +6,7 @@ import { computeStats, fmt } from '../stats.js';
 import { T } from '../strings.js';
 import { icons } from '../icons.js';
 import { card, gearCard, whenCard } from './common.js';
-import { TYPE_LABELS, isScored, sessionType, formSummary, setupSummary } from '../sessionTypes.js';
+import { TYPE_LABELS, isScored, sessionType, formSummary, setupSummary, newestFirst } from '../sessionTypes.js';
 import { formSections } from './sessionForms.js';
 import { formatDuration } from '../sessionLogic.js';
 import { competitionLogCard } from './competitionLog.js';
@@ -171,7 +171,13 @@ function formReview(ctx, ss) {
   return reviewSection(ctx, ss, { editing, onToggle: () => ctx.ui.set({ ov: { id: ss.id, review: !editing } }) });
 }
 
-/** Strength / mental session: its form (editable, saved as you go), the review and delete. */
+/** The gym sessions before this one, newest first, for an exercise's "last time" line. */
+function gymBefore(ctx, ss) {
+  const all = ctx.repo.list('sessions', { sort: newestFirst }).filter((s) => s.type === 'gym');
+  return all.slice(all.findIndex((s) => s.id === ss.id) + 1);
+}
+
+/** Strength / gym / mental session: its form (editable, saved as you go), the review and delete. */
 function renderFormDetail(ctx, ss) {
   const change = (update, { rerender = true } = {}) => {
     if (ctx.finished.change(ss.id, update).status === 'saved' && rerender) ctx.rerender();
@@ -186,9 +192,12 @@ function renderFormDetail(ctx, ss) {
         'div',
         { class: 'apl-screen-body history-body' },
         when,
-        card({ class: 'apl-card apl-form-card' }, formSections(ss.type, ss, change)),
+        ss.type === 'gym'
+          ? // its exercises are cards of their own, laid out like the running gym session
+            h('div', { class: 'gym-body gym-detail' }, ...formSections('gym', ss, change, { ui: ctx.ui, pastSessions: gymBefore(ctx, ss) }))
+          : card({ class: 'apl-card apl-form-card' }, formSections(ss.type, ss, change)),
         whenCard(ctx, ss),
-        ss.type === 'mental' || ss.type === 'strength' ? null : gearCard(ctx, ss, finishedGear(ctx, ss)),
+        ss.type === 'mental' || ss.type === 'strength' || ss.type === 'gym' ? null : gearCard(ctx, ss, finishedGear(ctx, ss)),
         formReview(ctx, ss),
         deleteButton(ctx, ss),
       ),

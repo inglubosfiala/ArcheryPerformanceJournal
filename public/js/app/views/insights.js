@@ -28,7 +28,7 @@ const VIEWS = [
 
 // one fixed colour per session type: the series-1…6 data tokens, validated as a set.
 // The chart order keeps the validated adjacent pairs (slot n next to slot n+1) in stacked bars.
-const CHART_TYPES = ['training', 'competition', 'strength', 'mental', 'blank', 'manual'];
+const CHART_TYPES = ['training', 'competition', 'strength', 'mental', 'blank', 'manual', 'gym'];
 const TYPE_COLORS = {
   training: 'var(--series-1)',
   competition: 'var(--series-2)',
@@ -36,6 +36,7 @@ const TYPE_COLORS = {
   mental: 'var(--series-4)',
   blank: 'var(--series-5)',
   manual: 'var(--series-6)',
+  gym: 'var(--series-7)',
 };
 
 const DEFAULTS = { range: '90d', type: 'all', distance: 'all', sortKey: 'date', sortDir: 'desc', q: '' };
@@ -388,6 +389,7 @@ function loadView(sessions) {
       ...CHART_TYPES.filter((t) => w[t]).map((t) => `${TYPE_LABELS[t]}: ${w[t]}`),
       w.arrows ? `Arrows: ${w.arrows}` : null,
       w.strengthMin ? `SPT: ${w.strengthMin} min` : null,
+      w.gymMin ? `Gym: ${w.gymMin} min` : null,
       w.mentalMin ? `Mental: ${w.mentalMin} min` : null,
     ].filter(Boolean),
   }));
@@ -419,6 +421,7 @@ function loadView(sessions) {
     ['Arrows', (w) => String(w.arrows || '–')],
     ['Time', (w) => (w.totalMin ? fmtMin(w.totalMin) : '–')],
     ['SPT min', (w) => String(w.strengthMin || '–')],
+    ['Gym min', (w) => String(w.gymMin || '–')],
     ['Mental min', (w) => String(w.mentalMin || '–')],
   ];
   return h(

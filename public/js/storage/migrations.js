@@ -140,6 +140,15 @@ export const migrations = [
       return { ...doc, settings: { ...doc.settings, lastSetup } };
     },
   },
+  {
+    // v9: the gym session type. As in v4 and v5, only the version changes, so older app versions
+    // refuse the data instead of dropping gym sessions on sync.
+    from: 8,
+    to: 9,
+    up(doc) {
+      return { ...doc };
+    },
+  },
 ];
 
 export class NewerVersionError extends Error {
