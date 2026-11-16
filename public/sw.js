@@ -90,6 +90,7 @@ const SHELL = [
   './js/app/views/insights.js',
   './js/app/views/charts.js',
   './js/app/views/settings.js',
+  './js/app/support.js',
 ];
 
 self.addEventListener('install', (event) => {

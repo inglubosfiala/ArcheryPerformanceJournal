@@ -22,6 +22,11 @@ export const SUPPORT_URL = 'https://ko-fi.com/archeryjournal';
 // QR code of SUPPORT_URL, shown under the button so someone else can scan it. Regenerate it when the
 // link changes; empty = no QR code.
 export const SUPPORT_QR = './icons/support-qr.svg';
+// PayPal.Me name (the part after paypal.me/), for one-tap tips with the amount filled in. Empty = no
+// PayPal buttons; the Ko-fi link above stays as the other way to tip.
+export const PAYPAL_ME = 'archeryjournalapp';
+// The tip amounts offered as buttons, in euros.
+export const TIP_AMOUNTS = [3, 5, 10];
 
 // ---------------------------------------------------------------- Google Drive sync (optional)
 // OAuth client ID of type "Web application" from Google Cloud (public, no secret). Empty = sync hidden.

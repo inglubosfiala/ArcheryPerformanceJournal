@@ -1967,6 +1967,19 @@ button.arrow-count:hover {
   text-decoration: none;
 }
 
+/* PayPal: the amounts side by side, as wide as the card */
+.support-paypal {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.support-amounts {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(64px, 1fr));
+  gap: var(--space-2);
+}
+
 /* the QR code keeps its white quiet zone in both themes, so phones can read it */
 .support-qr {
   display: flex;

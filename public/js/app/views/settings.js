@@ -3,10 +3,11 @@
 import { h } from '../../core/dom.js';
 import * as APL from '../../ui/apl/index.js';
 import { confirmDialog } from './confirm.js';
-import { APP_VERSION, SUPPORT_URL, SUPPORT_QR } from '../../config.js';
+import { APP_VERSION, SUPPORT_URL, SUPPORT_QR, PAYPAL_ME, TIP_AMOUNTS } from '../../config.js';
 import { exportBackup, parseBackup } from '../../backup/backup.js';
 import { checkForUpdate, storageInfo } from '../../pwa/updates.js';
 import { card } from './common.js';
+import { paypalMeUrl } from '../support.js';
 
 // the APL themes; 'system' follows the device (this device only, not synced)
 const THEMES = [
@@ -236,29 +237,47 @@ export function renderSettings(ctx) {
 
 // ---------------------------------------------------------------- Support
 
+/** A link that looks like a secondary button and opens in the browser. */
+function tipLink(href, label, fk, extra = []) {
+  return h(
+    'a',
+    {
+      class: ['apl', 'apl-btn', 'apl-btn--secondary', 'support-link', ...extra],
+      href,
+      target: '_blank',
+      rel: 'noopener noreferrer',
+      dataset: { fk },
+    },
+    label,
+  );
+}
+
 /**
- * The "Support the journal" card: a link that opens the tip page in the browser and, when there is
- * one, a QR code of that page for another phone to scan. Nothing when no link is set. The app stays
- * free; this is only an offer.
+ * The "Support the journal" card: PayPal buttons with the amount filled in (when a PayPal.Me name is
+ * set), a link to the tip page and, when there is one, a QR code of that page for another phone to
+ * scan. Nothing when neither is set. The app stays free; this is only an offer.
  */
-export function supportCard(url = SUPPORT_URL, qr = SUPPORT_QR) {
-  if (!url) return null;
+export function supportCard(url = SUPPORT_URL, qr = SUPPORT_QR, paypal = PAYPAL_ME, amounts = TIP_AMOUNTS) {
+  if (!url && !paypal) return null;
   return sectionCard('set-support', 'Support the journal', [
     caption(
       'The journal is free and stays free, with no ads and no account. If it helps your shooting, you can buy me a coffee to keep it going.',
     ),
-    h(
-      'a',
-      {
-        class: ['apl', 'apl-btn', 'apl-btn--secondary', 'support-link'],
-        href: url,
-        target: '_blank',
-        rel: 'noopener noreferrer',
-        dataset: { fk: 'support' },
-      },
-      '☕ Buy me a coffee',
-    ),
-    qr
+    paypal
+      ? h(
+          'div',
+          { class: 'support-paypal' },
+          h('div', { class: 'apl-cap13' }, 'Tip with PayPal'),
+          h(
+            'div',
+            { class: 'support-amounts' },
+            amounts.map((a) => tipLink(paypalMeUrl(paypal, a), `€${a}`, `support-paypal-${a}`)),
+            tipLink(paypalMeUrl(paypal), 'Other', 'support-paypal-other'),
+          ),
+        )
+      : null,
+    url ? tipLink(url, paypal ? '☕ Other ways (Ko-fi)' : '☕ Buy me a coffee', 'support') : null,
+    url && qr
       ? h(
           'figure',
           { class: 'support-qr' },
