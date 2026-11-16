@@ -9,7 +9,7 @@ export const TYPE_LABELS = {
   competition: 'Competition',
   strength: 'SPT', // specific physical training: the bow-strength drills
   mental: 'Mental',
-  manual: 'Manual',
+  manual: 'Logged afterwards', // shown as "Log afterwards" on the New session page
 };
 
 /** Session types that record a number of arrows instead of scoring them. */
@@ -89,6 +89,35 @@ export const emptyReview = () => ({ good: '', workOn: '', how: '' });
 
 /** A competition session's details (placement is usually known only after the event). */
 export const emptyCompetition = () => ({ event: '', round: '', conditions: '', placement: '' });
+
+/** Rounds offered as chips; any other round is typed in ("Other"). */
+export const ROUNDS = ['WA 18 m', 'WA 25 m', 'WA 70 m'];
+/** Conditions offered as chips; stored in the competition's `conditions` text, comma-joined. */
+export const CONDITIONS = ['Hall', 'Sun', 'Wind', 'Rain', 'Cold', 'Low light'];
+
+/**
+ * A conditions text as chips and the rest: each comma- or semicolon-separated part that names a
+ * condition (any case) becomes its chip; the other parts stay as text, in their order.
+ */
+export function parseConditions(text) {
+  const parts = String(text || '')
+    .split(/[,;]/)
+    .map((p) => p.trim())
+    .filter(Boolean);
+  const chips = [];
+  const rest = [];
+  for (const p of parts) {
+    const c = CONDITIONS.find((x) => x.toLowerCase() === p.toLowerCase());
+    if (c && !chips.includes(c)) chips.push(c);
+    else if (!c) rest.push(p);
+  }
+  return { chips: CONDITIONS.filter((c) => chips.includes(c)), rest: rest.join(', ') };
+}
+
+/** Chips and the typed rest back into one conditions text ("Hall, Wind, dusty"). */
+export function joinConditions(chips, rest = '') {
+  return [...CONDITIONS.filter((c) => chips.includes(c)), String(rest || '').trim()].filter(Boolean).join(', ');
+}
 
 /**
  * One line describing a scored session's setup: "18 m · face", then the `more` parts given (ends,

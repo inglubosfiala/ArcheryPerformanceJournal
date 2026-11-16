@@ -46,6 +46,8 @@ export const icons = {
   more: () => icon(22, c(5, 12, 1.2), c(12, 12, 1.2), c(19, 12, 1.2)),
   chevron: () => icon(16, p('m9 6 6 6-6 6')),
   copy: () => icon(18, s('rect', { x: 8, y: 8, width: 12, height: 12, rx: 2 }), p('M16 8V5a1 1 0 0 0-1-1H5a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h3')),
+  // two halves of a head: the mental session type
+  mental: () => icon(22, p('M9 3a5 5 0 0 0-5 5c0 2 1 3 2 4v4h6'), p('M15 3a5 5 0 0 1 5 5c0 2-1 3-2 4v4h-6'), p('M10 20h4')),
   pencil: () => icon(18, p('M4 20h4L19 9l-4-4L4 16z'), p('M13.5 6.5l4 4')),
   check: () => icon(18, p('M5 12.5l4.5 4.5L19 7.5')),
   clock: () => icon(18, c(12, 12, 9), p('M12 7v5l3 2')),

@@ -28,7 +28,7 @@ import { icons } from './app/icons.js';
 import * as L from './app/sessionLogic.js';
 import { TYPE_LABELS, sessionType } from './app/sessionTypes.js';
 import { guideSheet } from './app/views/common.js';
-import { renderLog, renderNewSession, askAboutRunningSession, askAboutOpenFormSession } from './app/views/log.js';
+import { renderLog, renderNewSession, renderBlankBale, askAboutRunningSession, askAboutOpenFormSession } from './app/views/log.js';
 import * as APL from './ui/apl/index.js';
 import { startTimerTicker } from './app/views/timer.js';
 import { createRunningSession } from './app/runningSession.js';
@@ -88,7 +88,7 @@ const TABS = [
   ['gear', T.tabs.gear, icons.gear],
   ['settings', T.tabs.settings, icons.settings],
 ];
-const VIEWS = { home: renderDashboard, insights: renderInsights, log: renderLog, new: renderNewSession, history: renderHistory, gear: renderGear, settings: renderSettings };
+const VIEWS = { home: renderDashboard, insights: renderInsights, log: renderLog, new: renderNewSession, blank: renderBlankBale, history: renderHistory, gear: renderGear, settings: renderSettings };
 
 let route = { name: 'home', params: [] };
 let shell;
@@ -131,7 +131,7 @@ function renderNow({ scrollTop = false } = {}) {
   shell.app.classList.toggle('app-wide', route.name === 'insights');
   for (const [name, el] of Object.entries(shell.tabButtons)) {
     // the new-session setup and the running session are opened from the Dashboard, so its tab stays marked
-    if (name === route.name || (name === 'home' && (route.name === 'new' || route.name === 'log'))) el.setAttribute('aria-current', 'page');
+    if (name === route.name || (name === 'home' && (route.name === 'new' || route.name === 'log' || route.name === 'blank'))) el.setAttribute('aria-current', 'page');
     else el.removeAttribute('aria-current');
   }
 
@@ -214,11 +214,12 @@ function renderRunning() {
     );
   }
   for (const f of ctx.openForms.list()) {
-    if (route.name === 'new' && route.params[0] === f.type) continue;
+    // not on its own page: the blank bale's (#/blank), or the form of SPT / mental (#/new/<type>)
+    if (f.type === 'blank' ? route.name === 'blank' : route.name === 'new' && route.params[0] === f.type) continue;
     const arrows = f.draft?.arrows || 0;
     items.push(
       bar({
-        href: `#/new/${f.type}`,
+        href: f.type === 'blank' ? '#/blank' : `#/new/${f.type}`,
         title: `${TYPE_LABELS[f.type]} running`,
         detail: f.type === 'blank' ? `${arrows} ${arrows === 1 ? 'arrow' : 'arrows'}` : null,
         timer: f.timer,

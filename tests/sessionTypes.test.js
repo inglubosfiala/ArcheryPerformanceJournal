@@ -133,3 +133,22 @@ describe('setup line of a scored session', () => {
     expect(setupSummary(ss, '4 ends', '', null, '60 min')).toBe(`18 m · ${faceLabel('40t')} · 4 ends · 60 min`);
   });
 });
+
+describe('competition conditions as chips', () => {
+  it('reads known conditions as chips, in the chip order, and keeps the rest as text', async () => {
+    const { parseConditions } = await import('../public/js/app/sessionTypes.js');
+    expect(parseConditions('wind; HALL, light, dusty')).toEqual({ chips: ['Hall', 'Wind'], rest: 'light, dusty' });
+    expect(parseConditions('Low light')).toEqual({ chips: ['Low light'], rest: '' });
+    expect(parseConditions('')).toEqual({ chips: [], rest: '' });
+    expect(parseConditions(undefined)).toEqual({ chips: [], rest: '' });
+  });
+
+  it('joins chips and the rest into one comma-separated text', async () => {
+    const { joinConditions, parseConditions } = await import('../public/js/app/sessionTypes.js');
+    expect(joinConditions(['Wind', 'Hall'], ' dusty ')).toBe('Hall, Wind, dusty');
+    expect(joinConditions([], '')).toBe('');
+    const text = 'Hall, Rain, dusty';
+    const { chips, rest } = parseConditions(text);
+    expect(joinConditions(chips, rest)).toBe(text);
+  });
+});

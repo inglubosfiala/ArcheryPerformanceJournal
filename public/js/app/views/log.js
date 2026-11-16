@@ -16,8 +16,10 @@ import { T } from '../strings.js';
 import { icons } from '../icons.js';
 import { card } from './common.js';
 import { faceSheet, faceViewBox, VB } from './face.js';
-import { SESSION_TYPES, TYPE_LABELS, isScored, sessionType } from '../sessionTypes.js';
-import { renderTypeChoice, renderScoredSetup, renderFormSetup } from './sessionSetup.js';
+import { SESSION_TYPES, TYPE_LABELS, sessionType } from '../sessionTypes.js';
+import { renderFormSetup } from './sessionSetup.js';
+import { renderTypeChoice, renderShootingSetup } from './shootingSetup.js';
+import { SHOOTING_KINDS } from '../lastSetup.js';
 import { sessionTimer } from './timer.js';
 import * as APL from '../../ui/apl/index.js';
 import { detectArrows } from '../photoDetect.js';
@@ -86,13 +88,29 @@ export function renderLog(ctx) {
   return active ? renderActive(ctx, active) : renderTypeChoice(ctx);
 }
 
-/** New-session setup, reachable from the bottom bar even while a session is in progress. */
-/** New session: step 1 picks the type (#/new), step 2 asks that type's details (#/new/<type>). */
+/**
+ * New session: step 1 picks what you do (#/new); step 2 is the Shooting page
+ * (#/new/shooting/<training|competition|blank>) or the form of SPT, mental or manual (#/new/<type>).
+ * The old #/new/training, #/new/competition and #/new/blank lead to the Shooting page.
+ */
 export function renderNewSession(ctx, params = []) {
-  const type = params[0];
-  if (!SESSION_TYPES.includes(type)) return renderTypeChoice(ctx);
-  if (isScored(type)) return renderScoredSetup(ctx, type, ctx.running.get());
-  return renderFormSetup(ctx, type);
+  const [type, kind] = params;
+  if (type === 'shooting') return renderShootingSetup(ctx, SHOOTING_KINDS.includes(kind) ? kind : 'training');
+  if (SHOOTING_KINDS.includes(type)) {
+    queueMicrotask(() => ctx.navigate(`new/shooting/${type}`, { replace: true }));
+    return renderShootingSetup(ctx, type);
+  }
+  if (SESSION_TYPES.includes(type)) return renderFormSetup(ctx, type);
+  return renderTypeChoice(ctx);
+}
+
+/** The running blank bale session (#/blank); none open: its setup on the Shooting page. */
+export function renderBlankBale(ctx) {
+  if (!ctx.openForms.list().some((f) => f.type === 'blank')) {
+    queueMicrotask(() => ctx.navigate('new/shooting/blank', { replace: true }));
+    return renderShootingSetup(ctx, 'blank');
+  }
+  return renderFormSetup(ctx, 'blank');
 }
 /** Apply a session transition to the running session; the page is drawn again when it changed. */
 function update(ctx, fn, { rerender = true } = {}) {
