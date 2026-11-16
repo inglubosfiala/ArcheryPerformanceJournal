@@ -2005,6 +2005,27 @@ a.apl-sessionrow:hover {
   background: var(--surface-sunken);
   color: var(--ink-soft);
 }
+/* the cards of a choice page (Strength: SPT or Gym) */
+.ns-type--choice {
+  padding: var(--space-4);
+  gap: 12px;
+}
+.ns-type--choice .ns-type-well {
+  width: 48px;
+  height: 48px;
+  border-radius: var(--radius-lg);
+}
+.ns-type--choice .ns-type-title {
+  font-size: 19px;
+  line-height: 24px;
+}
+.ns-type--choice .ns-type-detail {
+  font-size: 14px;
+}
+.ns-type-well--accent {
+  background: var(--accent-icon-bg);
+  color: var(--accent-bright);
+}
 .ns-divider {
   display: flex;
   align-items: center;

@@ -29,15 +29,19 @@ const START_LABELS = { training: 'Start training', competition: 'Start competiti
 
 // ---------------------------------------------------------------- step 1
 
-/** A card of step 1: an icon well, the title and its line, a chevron; `extra` below. */
-function typeCard({ href, icon, title, detail, fk, extra = null, big = false }) {
+/**
+ * A card of step 1: an icon well, the title and its line, a chevron; `extra` below. `big`: the
+ * highlighted card; `choice`: a card of a choice page (big text on the plain surface), `accent` its
+ * well in the accent colours.
+ */
+function typeCard({ href, icon, title, detail, fk, extra = null, big = false, choice = false, accent = false }) {
   return h(
     'a',
-    { href, class: ['ns-type', big && 'ns-type--big'], dataset: { fk } },
+    { href, class: ['ns-type', big && 'ns-type--big', choice && 'ns-type--choice'], dataset: { fk } },
     h(
       'span',
       { class: 'ns-type-row' },
-      h('span', { class: 'ns-type-well', 'aria-hidden': 'true' }, icon),
+      h('span', { class: ['ns-type-well', accent && 'ns-type-well--accent'], 'aria-hidden': 'true' }, icon),
       h(
         'span',
         { class: 'ns-type-text' },
@@ -51,8 +55,46 @@ function typeCard({ href, icon, title, detail, fk, extra = null, big = false }) 
 }
 
 /**
- * Step 1: Shooting (training, competition, blank bale on one card), SPT, Mental and, for a session
- * that is already over, Log afterwards (the manual type).
+ * Strength (#/new/strength-choice): SPT (its own page, #/new/strength) or Gym (#/new/gym). Opening
+ * this page starts nothing.
+ */
+export function renderStrengthChoice(ctx) {
+  const tags = (list) => h('span', { class: 'ns-type-tags' }, list.map((t) => h('span', { class: 'ns-type-tag' }, t)));
+  return {
+    content: h(
+      'div',
+      { class: 'apl-screen' },
+      APL.ScreenHeader({ title: 'Strength', onBack: () => ctx.navigate('new'), backLabel: 'Back to session type' }),
+      h(
+        'nav',
+        { class: 'apl-screen-body ns-types', 'aria-label': 'Strength session' },
+        typeCard({
+          href: '#/new/strength',
+          icon: APL.Icon({ name: 'stopwatch', size: 24 }),
+          title: TYPE_LABELS.strength,
+          detail: 'Archery-specific strength with the bow',
+          fk: 'strength-spt',
+          extra: tags(['SPT holds', 'Draws with bow', 'Band draws', 'Interval timer']),
+          choice: true,
+          accent: true,
+        }),
+        typeCard({
+          href: '#/new/gym',
+          icon: icons.dumbbell(24),
+          title: TYPE_LABELS.gym,
+          detail: 'Exercises, sets and reps — or just a note',
+          fk: 'strength-gym',
+          extra: tags(['Upper body', 'Core', 'Cardio', 'Mobility']),
+          choice: true,
+        }),
+      ),
+    ),
+  };
+}
+
+/**
+ * Step 1: Shooting (training, competition, blank bale on one card), Strength (SPT or gym), Mental
+ * and, for a session that is already over, Log afterwards (the manual type).
  */
 export function renderTypeChoice(ctx) {
   return {
@@ -77,10 +119,10 @@ export function renderTypeChoice(ctx) {
           ),
         }),
         typeCard({
-          href: '#/new/strength',
-          icon: APL.Icon({ name: 'stopwatch', size: 22 }),
-          title: TYPE_LABELS.strength,
-          detail: 'Holds, draws and band drills with the timer',
+          href: '#/new/strength-choice',
+          icon: icons.dumbbell(),
+          title: 'Strength',
+          detail: 'SPT drills or a gym workout',
           fk: 'type-strength',
         }),
         typeCard({
