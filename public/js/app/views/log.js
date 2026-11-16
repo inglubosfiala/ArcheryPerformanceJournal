@@ -987,15 +987,14 @@ function targetInput(session, enter, { hintSpot = null, onMove } = {}) {
     };
     anim = requestAnimationFrame(step);
   };
-  // the row over a multi-spot sheet: "All spots" and "Spot n of 3" while zoomed into one
+  // the row over a multi-spot sheet: "All spots" (back to the whole sheet) while zoomed into one
   const zoomOutBtn = h(
     'button',
     { type: 'button', class: 'zoom-out-btn', hidden: true, 'aria-label': 'Show all spots', onClick: () => zoomTo(null) },
     icons.back(),
     'All spots',
   );
-  const spotOf = h('span', { class: 'spot-of', hidden: true });
-  const faceBar = multi ? h('div', { class: 'face-bar' }, zoomOutBtn, spotOf) : null;
+  const faceBar = multi ? h('div', { class: 'face-bar' }, zoomOutBtn) : null;
   if (multi && zoomOutFrom != null) {
     sheet.setAttribute('viewBox', spotBox(zoomOutFrom).join(' '));
     zoomOutFrom = null;
@@ -1006,8 +1005,6 @@ function targetInput(session, enter, { hintSpot = null, onMove } = {}) {
     setBox(i == null ? fullBox : spotBox(i));
     btn.classList.toggle('is-zoomed', i != null);
     zoomOutBtn.hidden = i == null;
-    spotOf.hidden = i == null;
-    spotOf.textContent = i == null ? '' : T.spotOf(i + 1, spotCentres(session.face).length);
   }
 
   // --- one gesture's geometry, read once when the pointer lands (no layout reads while it moves)

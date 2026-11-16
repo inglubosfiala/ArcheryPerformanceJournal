@@ -52,7 +52,6 @@ export const T = {
   prevShort: 'Previous',
   nextShort: 'Next',
   scoreOnly: 'or enter the score only',
-  spotOf: (n, count) => `Spot ${n} of ${count}`,
   saveAndNext: 'Save this end and start the next',
   finish: 'Finish session',
   discardSession: 'Discard session',

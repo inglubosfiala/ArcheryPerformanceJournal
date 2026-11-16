@@ -2475,8 +2475,9 @@ button.arrow-count:hover {
   gap: 6px;
 }
 
-/* the face: a row over a multi-spot sheet, then the stage (the loupe docks inside it) */
+/* the face: the stage (the loupe docks inside it), with a row floating over a multi-spot sheet */
 .score-face {
+  position: relative;
   flex: 1 1 0;
   min-height: 180px;
   margin-inline: calc(-1 * var(--space-5));
@@ -2489,14 +2490,10 @@ button.arrow-count:hover {
   padding-inline: var(--space-5);
 }
 
-/* the square stage: as large as the face's box allows (less the row over a multi-spot sheet) */
+/* the square stage: as large as the face's box allows */
 .score-face .target-stage {
   align-self: center;
   width: min(100cqw, 100cqh, 560px);
-}
-
-.score-face:has(.face-bar) .target-stage {
-  width: min(100cqw, 100cqh - var(--tap-min) - var(--space-1), 560px);
 }
 
 /* a block, so the stage is exactly as tall as it (no space under an inline button) */
@@ -2504,30 +2501,24 @@ button.arrow-count:hover {
   display: block;
 }
 
+/* over a zoomed spot only ("All spots", back to the whole sheet, at the right): it floats over the
+   top of the face, so it takes no room between the arrows and the face */
 .face-bar {
+  position: absolute;
+  inset: 4px 0 auto;
+  z-index: 2;
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  min-height: var(--tap-min);
+  justify-content: flex-end;
+  pointer-events: none;
 }
 
-.spot-of {
-  font-size: 13px;
-  color: var(--muted);
-}
-
-.spot-of[hidden] {
-  display: none;
+.face-bar > * {
+  pointer-events: auto;
 }
 
 .face-bar .zoom-out-btn {
   position: static;
-  height: var(--tap-min);
-  padding: 0 12px 0 0;
-  background: transparent;
-  box-shadow: none;
-  font-size: 14px;
-  font-weight: 600;
 }
 
 /* the spot suggested for the selected arrow (a hint: any spot can be tapped) */
