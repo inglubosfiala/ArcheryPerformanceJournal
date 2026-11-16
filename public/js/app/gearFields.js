@@ -189,9 +189,6 @@ export function filledCount(fields) {
 export const SIGHT_KEYS = ['distance', 'elevation', 'windage', 'note'];
 export const DEFAULT_SIGHT_DISTANCES = ['18', '30', '50', '60', '70', '90'];
 
-/** A row with nothing typed in it (it is not kept). */
-export const isBlankMark = (m) => SIGHT_KEYS.every((k) => !String(m?.[k] ?? '').trim());
-
 /** A row with a mark set (elevation or windage), not just a distance. */
 export const hasMark = (m) => Boolean(String(m?.elevation ?? '').trim() || String(m?.windage ?? '').trim());
 
