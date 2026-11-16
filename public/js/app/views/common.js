@@ -2,8 +2,8 @@
 import { h, todayIso } from '../../core/dom.js';
 import * as APL from '../../ui/apl/index.js';
 import { zoneOf } from '../scoring.js';
-import { RUBRIC, T } from '../strings.js';
-import { gradeText } from '../gradeTexts.js';
+import { T } from '../strings.js';
+import { gradeText, scaleName } from '../gradeTexts.js';
 import { gearChoices, setupSummary } from '../gearFields.js';
 import { isScored } from '../sessionTypes.js';
 import { datePicker, timePicker } from './pickers.js';
@@ -26,8 +26,8 @@ export function gradeWording(settings, grades, fk) {
   return h('p', { class: 'grade-wording', dataset: fk ? { fk } : undefined }, parts);
 }
 
-/** Bottom sheet with the full M/S rubric. */
-export function guideSheet(onClose) {
+/** Bottom sheet with the full M/S rubric, in the user's wording (Settings › Grades). */
+export function guideSheet(onClose, settings) {
   return {
     onClose,
     node: APL.Dialog({
@@ -48,15 +48,15 @@ export function guideSheet(onClose) {
               'tr',
               null,
               h('th', { scope: 'col' }, h('span', { class: 'sr-only' }, 'Grade')),
-              h('th', { scope: 'col' }, T.mentalProgram),
-              h('th', { scope: 'col' }, T.shootingCycle),
+              h('th', { scope: 'col' }, `${scaleName(settings, 'm')} (M)`),
+              h('th', { scope: 'col' }, `${scaleName(settings, 's')} (S)`),
             ),
           ),
           h(
             'tbody',
             null,
             [1, 2, 3, 4, 5].map((g) =>
-              h('tr', null, h('th', { scope: 'row' }, gradeBadge(g)), h('td', null, RUBRIC.m[g - 1]), h('td', null, RUBRIC.s[g - 1])),
+              h('tr', null, h('th', { scope: 'row' }, gradeBadge(g)), h('td', null, gradeText(settings, 'm', g)), h('td', null, gradeText(settings, 's', g))),
             ),
           ),
         ),

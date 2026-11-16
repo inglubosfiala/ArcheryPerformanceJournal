@@ -31,6 +31,7 @@ import { drawArrowMarks, liveScan } from './liveScan.js';
 import { PREVIEW_MARGIN, spotsBox, resultOnCrop } from '../scanGeometry.js';
 import { PHOTO_MAX, canScan, createScan } from '../scan.js';
 import { loupeCorner, loupeBox } from '../loupePlacement.js';
+import { gradeWording } from './common.js';
 
 // 'finish' or 'discard' while the scoring screen calls running.finish() / discard() after its own
 // sheet got the archer's yes (see askAboutRunningSession)
@@ -303,7 +304,7 @@ function renderActive(ctx, session) {
       onKey: (k) => enter(k, null, null),
       fk: 'quick',
     }),
-    graded ? gradePanel(session, { onGrade: (kind, g) => update(ctx, (c) => L.gradeArrow(c, kind, g)) }) : null,
+    graded ? gradePanel(session, { settings: ctx.repo.getSettings(), onGrade: (kind, g) => update(ctx, (c) => L.gradeArrow(c, kind, g)) }) : null,
   );
 
   // --- the end's let-downs and note (one sheet), and what to do next
@@ -1310,8 +1311,11 @@ function targetInput(session, enter, { hintSpot = null, onMove } = {}) {
 
 // ---------------------------------------------------------------- inline grades
 
-/** Two compact rows (M and S, grades 1–5) for the selected arrow, styled like the score keys. */
-function gradePanel(session, { onGrade }) {
+/**
+ * Two compact rows (M and S, grades 1–5) for the selected arrow, styled like the score keys, and under
+ * them one line with the user's wording of its chosen grades (Settings › Grades).
+ */
+function gradePanel(session, { settings, onGrade }) {
   const a = L.shownEnd(session).arrows[session.cursor];
   const row = (kind, label, full) =>
     APL.GradeKeys({
@@ -1322,5 +1326,11 @@ function gradePanel(session, { onGrade }) {
       onChange: (g) => onGrade(kind, g),
       fk: `grade-${kind}`,
     });
-  return h('div', { class: 'grade-panel' }, row('m', 'M', T.mentalProgram), row('s', 'S', T.shootingCycle));
+  return h(
+    'div',
+    { class: 'grade-panel' },
+    row('m', 'M', T.mentalProgram),
+    row('s', 'S', T.shootingCycle),
+    gradeWording(settings, { m: a.m, s: a.s }, 'grade-wording'),
+  );
 }

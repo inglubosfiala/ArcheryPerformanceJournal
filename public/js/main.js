@@ -143,7 +143,7 @@ function renderNow({ scrollTop = false } = {}) {
 
   // overlays: the grading sheet comes from the view; the guide is global
   const st = ui.get();
-  const overlay = st.guide ? { ...guideSheet(() => ui.set({ guide: false })), key: 'guide' } : result.overlay ? { ...result.overlay, key: 'view' } : null;
+  const overlay = st.guide ? { ...guideSheet(() => ui.set({ guide: false }), repo.getSettings()), key: 'guide' } : result.overlay ? { ...result.overlay, key: 'view' } : null;
   renderOverlay(overlay, focusKey);
 
   if (!overlay && focusKey) {
