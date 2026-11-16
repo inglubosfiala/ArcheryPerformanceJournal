@@ -633,6 +633,10 @@ function sessionSightMark(ctx, session) {
 const LOUPE_SPAN = 24; // viewBox units shown in the magnifier (the face is 202 wide → ~3× zoom)
 // A finger aiming a new arrow aims this many screen pixels above itself, so it never hides the point.
 const AIM_OFFSET_PX = 64;
+// A finger on the face is undecided at first: held still this long it aims; moved further than
+// TOUCH_SLOP_PX before that, mostly up or down, it scrolls the page and places no arrow.
+const AIM_HOLD_MS = 140;
+const TOUCH_SLOP_PX = 10;
 const LOUPE_SIZE = 132; // the loupe's lens, in px (base.css .loupe-lens, via --loupe-size)
 const LOUPE_MAX_SHARE = 0.4; // …at most this share of the stage's width
 // The spot an arrow was just placed on (multi-spot sheets): placing re-renders the page, and the new
@@ -961,8 +965,20 @@ function targetInput(session, enter, { hintSpot = null, onMove } = {}) {
     if (pos && active) applyMove(pos);
   };
 
+  // A finger not yet decided between aiming and scrolling (see AIM_HOLD_MS)
+  let holdTimer = 0;
+  const decide = () => {
+    clearTimeout(holdTimer);
+    holdTimer = 0;
+    if (!active?.pending) return;
+    active.pending = false;
+    activate();
+  };
+
   const end = (ev, commit) => {
     if (!active || ev.pointerId !== active.id) return;
+    clearTimeout(holdTimer);
+    holdTimer = 0;
     // the last move counts (it may still be waiting for its frame); a cancelled touch drops it
     if (commit) flushMove();
     else {
@@ -1017,22 +1033,32 @@ function targetInput(session, enter, { hintSpot = null, onMove } = {}) {
     // the whole sheet too, without zooming in first.
     const whole = multi && zoomed == null;
     const grab = onMove ? grabAt(p, ev.pointerType === 'mouse' ? 26 : whole ? 34 : 44) : null;
+    const from = { x: ev.clientX, y: ev.clientY, moved: 0 };
+    // A finger off the placed arrows may be starting to scroll the page: it stays undecided until
+    // it holds still (aims) or moves away up or down (scrolls). Grabbing an arrow is decided at once.
+    const undecided = !grab && ev.pointerType === 'touch';
     // multi-spot sheet not zoomed yet: a touch off the arrows only picks the spot
     if (whole && !grab) {
-      active = { id: ev.pointerId, p, mode: 'pick' };
+      active = { id: ev.pointerId, p, mode: 'pick', from, pending: undecided };
       return;
     }
-    const from = { x: ev.clientX, y: ev.clientY, moved: 0 };
     // a finger aiming a new arrow aims above itself; a mouse or pen where it points
     const offset = !grab && ev.pointerType === 'touch';
     active = grab
       ? { id: ev.pointerId, mode: 'move', idx: grab.i, off: grab.off, p: aimFrom(p, grab.off), origin: aimFrom(p, grab.off), from, moved: 0, tapPicks: whole }
-      : { id: ev.pointerId, mode: 'aim', off: { x: 0, y: 0 }, offset, p: offset ? toFace(ev, { offset }) : p, from, moved: 0 };
-    if (grab) {
-      sheet.querySelector(`[data-arrow="${grab.i}"]`)?.classList.add('is-grabbed');
-      guideNumber.textContent = String(grab.i + 1);
+      : { id: ev.pointerId, mode: 'aim', off: { x: 0, y: 0 }, offset, p: offset ? toFace(ev, { offset }) : p, from, moved: 0, pending: undecided };
+    if (undecided) holdTimer = setTimeout(decide, AIM_HOLD_MS);
+    else activate();
+  });
+  // the loupe and the aim guides appear once the touch is known to aim (or move an arrow)
+  function activate() {
+    if (active.mode === 'pick') return;
+    if (active.mode === 'move') {
+      const i = active.idx;
+      sheet.querySelector(`[data-arrow="${i}"]`)?.classList.add('is-grabbed');
+      guideNumber.textContent = String(i + 1);
       moveGuide.setAttribute('visibility', 'visible');
-      loupeTag.textContent = `Move ${grab.i + 1} · was ${L.shownEnd(session).arrows[grab.i].v}`;
+      loupeTag.textContent = `Move ${i + 1} · was ${L.shownEnd(session).arrows[i].v}`;
       loupeTag.hidden = false;
       loupe.classList.add('is-moving');
       btn.classList.add('moving');
@@ -1041,14 +1067,34 @@ function targetInput(session, enter, { hintSpot = null, onMove } = {}) {
     btn.classList.add('aiming');
     corner = null;
     show(active.p);
-  });
+  }
   btn.addEventListener('pointermove', (ev) => {
     if (!active || ev.pointerId !== active.id) return;
+    if (active.pending) {
+      const dx = ev.clientX - active.from.x;
+      const dy = ev.clientY - active.from.y;
+      if (Math.hypot(dx, dy) < TOUCH_SLOP_PX) return;
+      // up or down: the page scrolls (touch-action: pan-y), no arrow; sideways: aim from here
+      if (Math.abs(dy) > Math.abs(dx)) {
+        end(ev, false);
+        return;
+      }
+      decide();
+    }
     pending = { clientX: ev.clientX, clientY: ev.clientY };
     if (!frame) frame = requestAnimationFrame(flushMove);
   });
   btn.addEventListener('pointerup', (ev) => end(ev, true));
   btn.addEventListener('pointercancel', (ev) => end(ev, false));
+  // once a finger aims or drags an arrow, the page must not scroll under it (the face allows pan-y
+  // so an undecided touch can scroll); touchmove has to be non-passive to be cancelled
+  btn.addEventListener(
+    'touchmove',
+    (ev) => {
+      if (active && !active.pending && ev.cancelable) ev.preventDefault();
+    },
+    { passive: false },
+  );
   btn.addEventListener('contextmenu', (ev) => ev.preventDefault());
 
   return h(

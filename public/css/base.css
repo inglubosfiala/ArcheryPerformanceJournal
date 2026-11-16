@@ -580,7 +580,8 @@ textarea {
 }
 
 .target-btn {
-  touch-action: none; /* finger drags aim instead of scrolling the page */
+  /* an undecided finger may scroll the page up or down; once it aims, log.js cancels touchmove */
+  touch-action: pan-y;
   user-select: none;
   -webkit-user-select: none;
   -webkit-touch-callout: none;
