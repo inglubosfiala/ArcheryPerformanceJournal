@@ -36,7 +36,7 @@ const LONG_DATE = { weekday: 'long', day: 'numeric', month: 'long', year: 'numer
 let uid = 0;
 
 /**
- * Field + popup panel shared by the pickers: opens on tap, closes on Escape, an outside tap or focus
+ * Field + popup panel of the date picker: opens on tap, closes on Escape, an outside tap or focus
  * leaving it. `render(focus)` fills the panel each time it opens.
  * The field is an APL FieldButton: `field` ({ icon, value, hint }) gives its accent-bright icon and
  * the value over the hint.

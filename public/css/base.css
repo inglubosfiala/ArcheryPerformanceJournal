@@ -1589,96 +1589,6 @@ body {
   }
 }
 
-/* time picker: big HH:MM display, hour grid then minute grid */
-.tp-head {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-}
-
-.cal-nav {
-  font: inherit;
-  font-size: 14px;
-  font-weight: 700;
-}
-
-.tp-display {
-  flex: 1;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 2px;
-}
-
-.tp-seg {
-  border: 0;
-  border-radius: 12px;
-  padding: 2px 8px;
-  background: transparent;
-  color: var(--muted);
-  font-family: var(--font-display);
-  font-size: 40px;
-  font-weight: 800;
-  line-height: 1.1;
-  font-variant-numeric: tabular-nums;
-}
-
-.tp-seg.is-on {
-  background: color-mix(in srgb, var(--accent) 16%, transparent);
-  color: var(--accent);
-}
-
-.tp-colon {
-  font-family: var(--font-display);
-  font-size: 36px;
-  font-weight: 800;
-  color: var(--muted);
-}
-
-.tp-hint {
-  text-align: center;
-}
-
-.tp-grid {
-  display: grid;
-  grid-template-columns: repeat(6, 1fr);
-  gap: 4px;
-  animation: cal-slide-next 160ms ease-out;
-}
-
-.tp-cell {
-  height: var(--tap-min);
-  border: 0;
-  border-radius: 12px;
-  background: var(--subtle);
-  color: var(--ink);
-  font: inherit;
-  font-size: 15px;
-  font-weight: 600;
-  font-variant-numeric: tabular-nums;
-  transition: transform 80ms;
-}
-
-.tp-minutes .tp-cell {
-  height: 48px;
-}
-
-.tp-cell:active {
-  transform: scale(0.92);
-}
-
-.tp-cell.is-selected {
-  background: var(--accent);
-  color: var(--on-accent);
-  box-shadow: 0 2px 8px color-mix(in srgb, var(--accent) 45%, transparent);
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .tp-grid {
-    animation: none;
-  }
-}
-
 /* −1 is narrower and quieter than the + buttons */
 .arrow-add-row {
   display: grid;
@@ -1723,13 +1633,6 @@ body {
   .arrow-add-btn.is-flashed-minus {
     animation-duration: 1ms;
   }
-}
-
-/* the time field sits in the right column: its panel opens aligned to the right edge */
-.picker-panel.tp {
-  left: auto;
-  right: 0;
-  transform-origin: top right;
 }
 
 /* blank bale: arrow count on the left, timer on the right, one row */
