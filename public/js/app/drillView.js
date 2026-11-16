@@ -1,12 +1,12 @@
 // What an SPT drill card shows, worked out from the drill alone: the preset it matches, its summary
 // line, how long its interval timer runs, and the next value of a −/+ tile. Pure: no DOM.
-import { DRILLS, DRILL_LIMITS, SPT_PRESETS } from './sessionTypes.js';
+import { DRILLS, DRILL_LIMITS, SPT_PRESETS, emptyDrill } from './sessionTypes.js';
 import { tabataPlan, tabataClock } from './tabata.js';
 
 /** Whether a drill has a hold time (and so a rest and an interval timer). */
 export const hasHold = (drill) => !!DRILLS.find((d) => d.id === drill?.kind)?.hold;
 
-/** The preset whose numbers the drill has (rest = hold), or null. */
+/** The preset whose numbers the drill has, or null. */
 export function presetOf(drill, presets = SPT_PRESETS) {
   if (!hasHold(drill)) return null;
   return (
@@ -15,13 +15,30 @@ export function presetOf(drill, presets = SPT_PRESETS) {
         drill.sets === p.sets &&
         drill.reps === p.reps &&
         drill.holdSec === p.hold &&
-        drill.restSec === p.hold,
+        drill.restSec === p.rest,
     ) || null
   );
 }
 
 /** The drill's fields for a preset. */
-export const presetFields = (p) => ({ sets: p.sets, reps: p.reps, holdSec: p.hold, restSec: p.hold });
+export const presetFields = (p) => ({ sets: p.sets, reps: p.reps, holdSec: p.hold, restSec: p.rest });
+
+const NUMBERS = ['sets', 'reps', 'holdSec', 'restSec'];
+
+/**
+ * A new drill of `kind`, with the numbers of the last one of that kind used: the latest in this
+ * session's drills, else in the newest saved session that has one (`sessions` newest first), else
+ * the standard defaults. Only the numbers are taken, never `done`.
+ */
+export function newDrill(kind, { drills = [], sessions = [] } = {}) {
+  const fresh = emptyDrill(kind);
+  const lastOf = (list) => [...(list || [])].reverse().find((d) => d?.kind === kind);
+  const last = lastOf(drills) ?? sessions.map((s) => lastOf(s.drills)).find(Boolean);
+  if (!last) return fresh;
+  const out = { ...fresh };
+  for (const k of NUMBERS) if (k in fresh && last[k] != null) out[k] = last[k];
+  return out;
+}
 
 const plural = (n, one, many) => `${n} ${n === 1 ? one : many}`;
 

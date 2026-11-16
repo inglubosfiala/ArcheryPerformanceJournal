@@ -7,7 +7,6 @@ import {
   DRILL_LIMITS,
   SPT_PRESETS,
   drillLabel,
-  emptyDrill,
   MENTAL_TECHNIQUES,
   EFFORT_MAX,
   FOCUS_MAX,
@@ -20,6 +19,7 @@ import {
   drillDuration,
   stepValue,
   clampValue,
+  newDrill,
 } from '../drillView.js';
 import { tabataTimer } from './tabataTimer.js';
 import { stepperTile } from './common.js';
@@ -67,9 +67,10 @@ const drillIcon = (d) => APL.Icon({ name: hasHold(d) ? 'stopwatch' : 'bow' });
 /**
  * The Drills section: a card per drill, then the "+ …" chips that add one. `change` as in
  * formSections. The −/+ tiles and preset chips change a card in place (no page redraw, so a held
- * button keeps repeating); adding, removing, finishing and opening a drill redraw the page.
+ * button keeps repeating); adding, removing and finishing a drill redraw the page. A drill added
+ * starts from the numbers of the last one of its kind (this session's, else `pastSessions`').
  */
-function drillsSection(drills, change) {
+function drillsSection(drills, change, pastSessions) {
   const setDrill = (i, patch, opts) =>
     change((cur) => ({ drills: (cur.drills || []).map((d, j) => (j === i ? withPatch(d, patch) : d)) }), opts);
   return APL.Section({
@@ -96,7 +97,10 @@ function drillsSection(drills, change) {
                 class: 'drill-add-chip',
                 'aria-label': `Add ${d.label}`,
                 dataset: { fk: `add-${d.id}` },
-                onClick: () => change((cur) => ({ drills: [...(cur.drills || []), emptyDrill(d.id)] })),
+                onClick: () =>
+                  change((cur) => ({
+                    drills: [...(cur.drills || []), newDrill(d.id, { drills: cur.drills, sessions: pastSessions })],
+                  })),
               },
               `+ ${d.short || d.label}`,
             ),
@@ -258,8 +262,9 @@ const toInt = (v) => {
  * `live`: the session is being shot now (New session page with a running timer) — a blank bale count
  * is then tapped up with big +1 / +3 / +6 buttons instead of typed. Editing a saved one keeps the field.
  * `timer`: the session timer, shown on the count's row (right of it).
+ * `pastSessions`: saved sessions, newest first: a new drill starts from the numbers last used.
  */
-export function formSections(type, value, change, { live = false, timer = null } = {}) {
+export function formSections(type, value, change, { live = false, timer = null, pastSessions = [] } = {}) {
   const numberField = (label, key, fk, { suffix = '' } = {}) =>
     APL.TextField({
       label,
@@ -448,7 +453,7 @@ export function formSections(type, value, change, { live = false, timer = null }
 
   if (type === 'strength') {
     return [
-      drillsSection(value.drills || [], change),
+      drillsSection(value.drills || [], change, pastSessions),
       // While the session runs the page is just the timer and the drills (as on the blank bale
       // page): the timer is the duration, and the duration, effort and note are filled in on the
       // saved session.

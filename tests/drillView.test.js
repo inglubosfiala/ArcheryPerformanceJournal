@@ -7,6 +7,7 @@ import {
   stepValue,
   clampValue,
   hasHold,
+  newDrill,
 } from '../public/js/app/drillView.js';
 import { SPT_PRESETS, emptyDrill } from '../public/js/app/sessionTypes.js';
 
@@ -20,14 +21,34 @@ describe('SPT drill card helpers', () => {
     expect(hasHold(emptyDrill('band'))).toBe(false);
   });
 
-  it('finds the preset a drill matches (rest = hold), or none', () => {
-    expect(presetOf(emptyDrill('spt'))?.label).toBe('10 × 10 s');
-    expect(presetOf(spt(1, 6, 20, 20))?.label).toBe('6 × 20 s');
-    expect(presetOf(spt(2, 5, 30, 30))?.label).toBe('2 × 5 × 30 s');
-    expect(presetOf(spt(2, 5, 30, 20))).toBeNull(); // rest differs
-    expect(presetOf(spt(1, 10, 15, 15))).toBeNull();
+  it('finds the preset a drill matches, or none', () => {
+    expect(SPT_PRESETS).toHaveLength(2);
+    expect(presetOf(spt(1, 6, 20, 40))?.label).toBe('6 × 20 s · 40 s rest');
+    expect(presetOf(spt(1, 6, 15, 40))?.label).toBe('6 × 15 s · 40 s rest');
+    expect(presetOf(spt(1, 6, 20, 20))).toBeNull(); // rest differs
+    expect(presetOf(spt(2, 6, 20, 40))).toBeNull(); // sets differ
+    expect(presetOf(emptyDrill('spt'))).toBeNull();
     expect(presetOf({ kind: 'draw', sets: 1, reps: 10 })).toBeNull();
     for (const p of SPT_PRESETS) expect(presetOf({ kind: 'spt', ...presetFields(p) })).toBe(p);
+  });
+
+  it('starts a new drill from the numbers last used for its kind', () => {
+    const saved = [
+      { type: 'strength', drills: [spt(1, 6, 15, 40), { kind: 'draw', sets: 3, reps: 12, holdSec: null, done: true }] },
+      { type: 'strength', drills: [spt(2, 5, 30, 30)] },
+    ]; // newest first
+    // nothing used yet: the standard defaults
+    expect(newDrill('spt')).toEqual(emptyDrill('spt'));
+    // the newest saved session's last drill of that kind; `done` is never copied
+    expect(newDrill('spt', { sessions: saved })).toEqual({ kind: 'spt', sets: 1, reps: 6, holdSec: 15, restSec: 40 });
+    expect(newDrill('draw', { sessions: saved })).toEqual({ kind: 'draw', sets: 3, reps: 12, holdSec: null });
+    // this session's own drills come first
+    expect(newDrill('spt', { drills: [spt(1, 8, 25, 35), spt(1, 6, 20, 40)], sessions: saved })).toMatchObject({
+      reps: 6,
+      holdSec: 20,
+      restSec: 40,
+    });
+    expect(newDrill('band', { sessions: saved })).toEqual(emptyDrill('band'));
   });
 
   it('says what a drill is in one line', () => {

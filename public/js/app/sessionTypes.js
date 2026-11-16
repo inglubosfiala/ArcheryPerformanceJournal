@@ -56,14 +56,13 @@ export const DRILL_IDS = DRILLS.map((d) => d.id);
 export const drillLabel = (id) => DRILLS.find((d) => d.id === id)?.label || id;
 
 /**
- * Common routines for a drill with a hold, offered as one-tap chips: sets × reps × hold seconds,
- * with a rest after each hold as long as the hold. Edit freely: the chip whose numbers match the
+ * Common routines for a drill with a hold, offered as one-tap chips: sets × reps holds of `hold`
+ * seconds, with `rest` seconds after each hold. Edit freely: the chip whose numbers match the
  * drill shows as selected.
  */
 export const SPT_PRESETS = [
-  { label: '10 × 10 s', sets: 1, reps: 10, hold: 10 },
-  { label: '6 × 20 s', sets: 1, reps: 6, hold: 20 },
-  { label: '2 × 5 × 30 s', sets: 2, reps: 5, hold: 30 },
+  { label: '6 × 20 s · 40 s rest', sets: 1, reps: 6, hold: 20, rest: 40 },
+  { label: '6 × 15 s · 40 s rest', sets: 1, reps: 6, hold: 15, rest: 40 },
 ];
 
 /** What the −/+ tiles of a drill allow: [min, max, step] per drill field. */

@@ -14,7 +14,7 @@ import {
   ARROWS_PER_END_MAX,
   DEFAULT_ARROWS_PER_END,
 } from '../scoring.js';
-import { SESSION_TYPES, TYPE_LABELS, hourMinute, setupSummary, emptyCompetition } from '../sessionTypes.js';
+import { SESSION_TYPES, TYPE_LABELS, hourMinute, setupSummary, emptyCompetition, newestFirst } from '../sessionTypes.js';
 import { gearChoices, gearForChoice } from '../gearFields.js';
 import { sessionDates, gearCards } from './common.js';
 import { datePicker, timePicker } from './pickers.js';
@@ -451,6 +451,11 @@ export function renderFormSetup(ctx, type) {
           live: running,
           timer:
             type === 'blank' && running ? sessionTimer(formTimer, toggleFormTimer, { size: 'lg' }) : null,
+          // SPT: a new drill starts from the numbers last used in a saved session
+          pastSessions:
+            type === 'strength'
+              ? ctx.repo.list('sessions', { sort: newestFirst }).filter((s) => s.type === 'strength')
+              : [],
         }),
         equipment?.section,
         running
