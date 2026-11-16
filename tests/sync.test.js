@@ -9,6 +9,7 @@ import { createSyncService } from '../public/js/sync/syncService.js';
 import { createFakeDriveStore } from './fakeDriveStore.js';
 import { SCHEMA_VERSION } from '../public/js/config.js';
 import { activeSetup } from '../public/js/app/gearFields.js';
+import { gradeText, scaleName, setGradeText, setScaleName, resetScale } from '../public/js/app/gradeTexts.js';
 
 const APP = 'archery-performance-journal';
 const SCHEMA = SCHEMA_VERSION;
@@ -180,6 +181,29 @@ describe('settings', () => {
     await tablet.sync();
     await phone.sync();
     expect(phone.repo.getSettings().activeSetupId).toBe('new');
+  });
+
+  it('syncs the grade wording, and the newer edit wins', async () => {
+    const phone = device(drive);
+    phone.repo.saveSettings({ gradeTexts: setGradeText(null, 'm', 2, 'Phone text') });
+    expect(phone.repo.getMeta().settingsUpdatedAt).not.toBeNull();
+    await phone.sync();
+    const tablet = device(drive);
+    await tablet.sync();
+    expect(gradeText(tablet.repo.getSettings(), 'm', 2)).toBe('Phone text');
+
+    tick();
+    tablet.repo.saveSettings({ gradeTexts: setScaleName(tablet.repo.getSettings().gradeTexts, 'm', 'Head') });
+    await tablet.sync();
+    await phone.sync();
+    expect(scaleName(phone.repo.getSettings(), 'm')).toBe('Head');
+    expect(gradeText(phone.repo.getSettings(), 'm', 2)).toBe('Phone text');
+
+    tick();
+    phone.repo.saveSettings({ gradeTexts: resetScale(phone.repo.getSettings().gradeTexts, 'm') });
+    await phone.sync();
+    await tablet.sync();
+    expect(tablet.repo.getSettings().gradeTexts).toBeNull();
   });
 });
 

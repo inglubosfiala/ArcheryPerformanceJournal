@@ -6,24 +6,17 @@ import { paypalMeUrl } from '../public/js/app/support.js';
 
 describe('Settings support card', () => {
   it('is left out when no support link is set', () => {
-    expect(supportCard('', '', '')).toBeNull();
+    expect(supportCard('', '')).toBeNull();
   });
 
   it('links to the tip page in a new tab, without passing on the app as referrer', () => {
-    const node = supportCard('https://ko-fi.com/example', '', '');
+    const node = supportCard('https://ko-fi.com/example', '');
     const link = node.querySelector('a.support-link');
     expect(link.getAttribute('href')).toBe('https://ko-fi.com/example');
     expect(link.target).toBe('_blank');
     expect(link.rel).toBe('noopener noreferrer');
     expect(link.textContent).toContain('Buy me a coffee');
     expect(node.textContent).toContain('Support the journal');
-  });
-
-  it('shows the QR code of the support page when there is one', () => {
-    const img = supportCard('https://ko-fi.com/example', './icons/qr.svg').querySelector('.support-qr img');
-    expect(img.getAttribute('src')).toBe('./icons/qr.svg');
-    expect(img.alt).toBeTruthy();
-    expect(supportCard('https://ko-fi.com/example', '').querySelector('.support-qr')).toBeNull();
   });
 });
 
@@ -44,7 +37,7 @@ describe('PayPal tips', () => {
   });
 
   it('offers one button per amount and one for another amount, each in a new tab', () => {
-    const node = supportCard('https://ko-fi.com/example', '', 'archer', [3, 5, 10]);
+    const node = supportCard('https://ko-fi.com/example', 'archer', [3, 5, 10]);
     const links = [...node.querySelectorAll('.support-amounts a')];
     expect(links.map((a) => a.textContent)).toEqual(['€3', '€5', '€10', 'Other']);
     expect(links.map((a) => a.getAttribute('href'))).toEqual([
@@ -57,14 +50,14 @@ describe('PayPal tips', () => {
   });
 
   it('keeps Ko-fi as the other way to tip', () => {
-    const node = supportCard('https://ko-fi.com/example', '', 'archer');
+    const node = supportCard('https://ko-fi.com/example', 'archer');
     const kofi = node.querySelector('a[href="https://ko-fi.com/example"]');
     expect(kofi.textContent).toContain('Ko-fi');
   });
 
   it('shows the card with PayPal alone, and no PayPal buttons without a name', () => {
-    expect(supportCard('', '', 'archer').querySelectorAll('.support-amounts a').length).toBeGreaterThan(0);
-    expect(supportCard('https://ko-fi.com/example', '', '').querySelector('.support-paypal')).toBeNull();
+    expect(supportCard('', 'archer').querySelectorAll('.support-amounts a').length).toBeGreaterThan(0);
+    expect(supportCard('https://ko-fi.com/example', '').querySelector('.support-paypal')).toBeNull();
   });
 
   it('points the Dashboard row to PayPal.Me when a name is set', () => {

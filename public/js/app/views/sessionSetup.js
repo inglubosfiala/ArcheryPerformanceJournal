@@ -214,11 +214,6 @@ export function renderFormSetup(ctx, type) {
   const ending = sptRunning
     ? formFinish(ctx, type, {
         summary: [`${drills.length} ${drills.length === 1 ? 'drill' : 'drills'}`, `${doneDrills} done`, clock].join(' · '),
-        facts: [
-          [String(drills.length), drills.length === 1 ? 'drill' : 'drills'],
-          [String(doneDrills), 'done'],
-          [clock, 'on the timer'],
-        ],
         save: saveForm,
         discard: discardForm,
       })

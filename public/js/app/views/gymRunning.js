@@ -62,11 +62,6 @@ export function renderGymRunning(ctx, open) {
   const setsText = `${sets} ${sets === 1 ? 'set' : 'sets'}`;
   const ending = formFinish(ctx, 'gym', {
     summary: [exercisesText, `${setsText} done`, clock].filter(Boolean).join(' · '),
-    facts: [
-      [String(exerciseCount), exerciseCount === 1 ? 'exercise' : 'exercises'],
-      [String(sets), sets === 1 ? 'set done' : 'sets done'],
-      ...(clock ? [[clock, 'on the timer']] : []),
-    ],
     save: finish,
     discard,
   });

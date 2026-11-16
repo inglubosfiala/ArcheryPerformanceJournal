@@ -193,7 +193,7 @@ function renderActive(ctx, session) {
     update(ctx, (c) => (c.timer?.running ? L.pauseTimer(c) : L.resumeTimer(c))),
   );
 
-  // the sheet open over the page: 'ends' (ends so far), 'finish', 'discard' or 'details'
+  // the sheet open over the page: 'ends' (ends so far), 'finish' or 'details'
   const { sheet, setSheet } = scoreSheet(ctx, session);
 
   // --- top: "End n ▾" (opens the ends so far), the timer and Finish
@@ -488,7 +488,7 @@ async function finishFromPage(ctx) {
   }
 }
 
-/** Discard (after the Discard confirmation's yes): the session is deleted, the Dashboard opens. */
+/** Discard (from the Finish sheet, not asked again): the session is deleted, the Dashboard opens. */
 async function discardFromPage(ctx) {
   ctx.ui.quietSet({ score: null });
   answeredOnPage = 'discard';
@@ -504,8 +504,7 @@ async function discardFromPage(ctx) {
 function scoreOverlay(ctx, session, { sheet, setSheet }) {
   const close = () => setSheet(null);
   if (sheet === 'ends') return endsPanel(session, close);
-  if (sheet === 'finish') return finishSheet(ctx, session, { close, setSheet });
-  if (sheet === 'discard') return discardSheet(ctx, session, close);
+  if (sheet === 'finish') return finishSheet(ctx, session, close);
   return null;
 }
 
@@ -548,8 +547,8 @@ function endsPanel(session, close) {
   };
 }
 
-/** "End the session": Finish and save · Discard session… · Keep shooting. */
-function finishSheet(ctx, session, { close, setSheet }) {
+/** "End the session": Finish and save · Discard session (at once) · Keep shooting. */
+function finishSheet(ctx, session, close) {
   const c = sessionCounts(session);
   const clock = L.formatClock(L.timerElapsed(session.timer || { running: false, elapsedMs: 0 }));
   const summary = [
@@ -580,69 +579,13 @@ function finishSheet(ctx, session, { close, setSheet }) {
         }),
         h(
           'button',
-          { type: 'button', class: 'score-danger-btn', onClick: () => setSheet('discard'), dataset: { fk: 'discard-open' } },
+          { type: 'button', class: 'score-danger-btn', onClick: () => discardFromPage(ctx), dataset: { fk: 'discard' } },
           icons.trash(),
-          T.discardEllipsis,
+          T.discardSession,
         ),
         h('button', { type: 'button', class: 'score-text-btn', onClick: close, dataset: { fk: 'keep-shooting' } }, T.keepShooting),
       ),
     }),
-  };
-}
-
-/** Discard confirmation: what is lost, Keep shooting first (also Esc and the scrim). */
-function discardSheet(ctx, session, close) {
-  const c = sessionCounts(session);
-  const clock = L.formatClock(L.timerElapsed(session.timer || { running: false, elapsedMs: 0 }));
-  const fact = (value, label) => h('span', { class: 'score-fact' }, h('strong', null, value), h('span', null, label));
-  return {
-    onClose: close,
-    returnFk: 'finish-open',
-    node: h(
-      'section',
-      {
-        class: 'apl apl-dialog apl-dialog--sheet',
-        role: 'alertdialog',
-        'aria-modal': 'true',
-        'aria-labelledby': 'score-discard-title',
-        'aria-describedby': 'score-discard-desc',
-      },
-      h(
-        'div',
-        { class: 'score-discard-head' },
-        h('span', { class: 'score-discard-well', 'aria-hidden': 'true' }, icons.trash()),
-        h('h2', { class: 'apl-dialog-title', id: 'score-discard-title' }, T.discardTitle),
-      ),
-      h(
-        'div',
-        { class: 'score-facts' },
-        fact(String(c.ends), c.ends === 1 ? 'end' : 'ends'),
-        fact(String(c.arrows), c.arrows === 1 ? 'arrow' : 'arrows'),
-        fact(clock, 'shot'),
-      ),
-      h('p', { class: 'score-discard-desc', id: 'score-discard-desc' }, T.discardLoss, h('strong', null, T.cannotBeUndone), '.'),
-      h(
-        'div',
-        { class: 'score-sheet' },
-        h(
-          'button',
-          { type: 'button', class: 'apl apl-btn', onClick: close, dataset: { autofocus: '', fk: 'keep-shooting' } },
-          T.keepShooting,
-        ),
-        APL.Button({
-          children: T.finishInstead,
-          variant: 'secondary',
-          disabled: !L.canFinish(session),
-          onClick: () => finishFromPage(ctx),
-          fk: 'finish-instead',
-        }),
-        h(
-          'button',
-          { type: 'button', class: 'score-danger-btn', onClick: () => discardFromPage(ctx), dataset: { fk: 'discard' } },
-          T.discardSession,
-        ),
-      ),
-    ),
   };
 }
 
