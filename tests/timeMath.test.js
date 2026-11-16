@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeAll, afterAll } from 'vitest';
+import { describe, it, expect, afterAll } from 'vitest';
 import {
   parseTime,
   formatTime,
@@ -15,12 +15,10 @@ import {
   timeHint,
 } from '../public/js/app/timeMath.js';
 
-// the DST cases need a zone with summer time; the app's users are in Central Europe
-let tz;
-beforeAll(() => {
-  tz = process.env.TZ;
-  process.env.TZ = 'Europe/Bratislava';
-});
+// The DST cases need a zone with summer time; the app's users are in Central Europe. Set while the
+// file loads, before the describe blocks below build their dates (CI runs in UTC).
+const tz = process.env.TZ;
+process.env.TZ = 'Europe/Bratislava';
 afterAll(() => {
   if (tz === undefined) delete process.env.TZ;
   else process.env.TZ = tz;
