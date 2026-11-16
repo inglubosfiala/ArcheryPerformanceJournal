@@ -73,6 +73,13 @@ export const T = {
   reviewWorkOnPh: 'One or two things for the next session…',
   reviewHow: 'How will I improve it',
   reviewHowPh: 'Drills, cues, a plan for the next session…',
+  notWrittenYet: 'Not written yet',
+  // quick cue chips under each review prompt: tapping one inserts the word at the cursor
+  reviewCues: {
+    good: ['Mental program', 'Expansion', 'Rhythm'],
+    workOn: ['Back tension', 'Bow arm', 'Follow-through'],
+    how: ['SPT holds', 'Blank bale', 'Shot routine'],
+  },
   ends: 'Ends',
   deleteSession: 'Delete session',
   confirmDeleteSession: 'It moves to Recently deleted, where you can restore it for 7 days.',

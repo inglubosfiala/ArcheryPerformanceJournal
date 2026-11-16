@@ -13,6 +13,7 @@ import { formSections } from './sessionForms.js';
 import { formatDuration } from '../sessionLogic.js';
 import { competitionLogCard } from './competitionLog.js';
 import { TRASH_DAYS } from '../../config.js';
+import { renderOverview, reviewSection } from './sessionOverview.js';
 
 /** The finished session's questions to the archer (the `confirm` adapter of ctx.finished). */
 export function askAboutFinishedSession(q) {
@@ -32,7 +33,7 @@ export function renderHistory(ctx, params) {
   if (id === 'deleted') return renderTrash(ctx);
   if (id) {
     const session = ctx.finished.get(id);
-    if (session) return renderDetail(ctx, session);
+    if (session) return renderDetail(ctx, session, params[1] === 'review' && isScored(session.type) ? 'finished' : 'history');
   }
   return renderList(ctx);
 }
@@ -160,6 +161,13 @@ function detailHeader(ctx, ss, detail) {
 const sectionCard = (id, label, children, accessory = null) =>
   card({ class: 'apl-card' }, APL.Section({ label, id, accessory, children }));
 
+/** The review of a form session: read, or written after Edit (one session's review open at a time). */
+function formReview(ctx, ss) {
+  const ov = ctx.ui.get().ov;
+  const editing = ov?.id === ss.id && !!ov.review;
+  return reviewSection(ctx, ss, { editing, onToggle: () => ctx.ui.set({ ov: { id: ss.id, review: !editing } }) });
+}
+
 /** Strength / mental session: its form (editable, saved as you go), the review and delete. */
 function renderFormDetail(ctx, ss) {
   const change = (update, { rerender = true } = {}) => {
@@ -178,67 +186,22 @@ function renderFormDetail(ctx, ss) {
         card({ class: 'apl-card apl-form-card' }, formSections(ss.type, ss, change)),
         whenCard(ctx, ss),
         ss.type === 'mental' || ss.type === 'strength' ? null : gearCard(ctx, ss, finishedGear(ctx, ss)),
-        reviewCard(ctx, ss),
+        formReview(ctx, ss),
         deleteButton(ctx, ss),
       ),
     ),
   };
 }
 
-/** Competition details, editable (placement is usually known only after the event). */
-function competitionCard(ctx, ss) {
-  const field = (key, label, placeholder) =>
-    APL.TextField({
-      label,
-      placeholder,
-      value: ss.competition?.[key] || '',
-      fk: `comp-${key}`,
-      onInput: (e) => ctx.finished.setCompetition(ss.id, key, e.target.value),
-    });
-  return sectionCard('comp', 'Competition', [
-    field('event', 'Event', 'Event name'),
-    h('div', { class: 'apl-grid-2' }, field('round', 'Round', 'e.g. WA 18 m'), field('placement', 'Placement', 'e.g. 3rd of 24')),
-    field('conditions', 'Conditions', 'hall, wind, light'),
-  ]);
+function renderDetail(ctx, ss, mode) {
+  if (!isScored(ss.type)) return renderFormDetail(ctx, ss);
+  return renderOverview(ctx, ss, { mode, sections: [sessionGroup(ss), endsTable(ss)] });
 }
 
-function renderDetail(ctx, ss) {
-  if (!isScored(ss.type)) return renderFormDetail(ctx, ss);
-  const st = computeStats(ss.ends);
+/** The ends as a table (until the ends list of the overview). */
+function endsTable(ss) {
   const dateLbl = formatDate(ss.date);
-  const usedSetup = ss.gearSnapshotId ? ctx.repo.get('setups', ss.gearSnapshotId) : null;
-  const [header, when] = detailHeader(
-    ctx,
-    ss,
-    setupSummary(ss, `${st.arrows} arrows`, ss.minutes != null ? formatDuration(ss.minutes) : '', usedSetup?.name),
-  );
-
-  const byM = sectionCard(
-    'bym',
-    T.avgByM,
-    h(
-      'ul',
-      { class: 'plain-list bars' },
-      [1, 2, 3, 4, 5].map((g) => {
-        const r = st.byM[g];
-        const w = r.avgArrow == null ? 0 : Math.round(r.avgArrow * 10);
-        return h(
-          'li',
-          { class: 'bar-row' },
-          h('span', { class: `grade-badge g${g} wide` }, `M${g}`),
-          h(
-            'div',
-            { class: 'bar-track', role: 'img', 'aria-label': `M${g}: average arrow ${fmt(r.avgArrow)} over ${r.n} arrows` },
-            h('div', { class: 'bar-fill', style: { width: `${w}%` } }),
-          ),
-          h('span', { class: 'apl-cap bar-value' }, h('strong', null, fmt(r.avgArrow)), ` · ${r.n} arr`),
-        );
-      }),
-    ),
-    h('span', { class: 'apl-cap' }, `LD ${st.cld}/${st.ld} correct`),
-  );
-
-  const ends = sectionCard(
+  return sectionCard(
     'ends',
     T.ends,
     APL.DataTable({
@@ -270,62 +233,12 @@ function renderDetail(ctx, ss) {
       }),
     }),
   );
-
-  return {
-    content: h(
-      'div',
-      { class: 'apl-screen' },
-      header,
-      h(
-        'div',
-        { class: 'apl-screen-body history-body' },
-        when,
-        APL.StatTiles({
-          label: 'Session figures',
-          items: [
-            ['Total', String(st.total)],
-            ['Avg arrow', fmt(st.avgArrow, 2)],
-            ['10s (X)', `${st.tens} (${st.xs})`],
-            ['Avg M', fmt(st.avgM)],
-            ['Avg S', fmt(st.avgS)],
-            ['M1–2 %', st.programPct == null ? '–' : `${st.programPct}%`],
-          ],
-        }),
-        sessionType(ss) === 'competition' ? competitionCard(ctx, ss) : null,
-        whenCard(ctx, ss),
-        gearCard(ctx, ss, finishedGear(ctx, ss)),
-        reviewCard(ctx, ss),
-        sessionGroup(ss),
-        byM,
-        ends,
-        deleteButton(ctx, ss),
-      ),
-    ),
-  };
 }
 
 /** The equipment picker's choice, stored on the finished session (the page is drawn again when it changed). */
 const finishedGear = (ctx, ss) => (choice) => {
   if (ctx.finished.setGear(ss.id, choice).status === 'saved') ctx.rerender();
 };
-
-/** What went well / what to work on: free text, saved as you type. */
-function reviewCard(ctx, ss) {
-  const field = (key, label, placeholder) =>
-    APL.TextArea({
-      label,
-      rows: 6,
-      placeholder,
-      value: ss.review?.[key] || '',
-      fk: `review-${key}`,
-      onInput: (e) => ctx.finished.setReview(ss.id, key, e.target.value),
-    });
-  return sectionCard('review', T.review, [
-    field('good', T.reviewGood, T.reviewGoodPh),
-    field('workOn', T.reviewWorkOn, T.reviewWorkOnPh),
-    field('how', T.reviewHow, T.reviewHowPh),
-  ]);
-}
 
 /** All arrows of the session placed on one target face, with the group centre (mean point of impact). */
 function sessionGroup(ss) {

@@ -73,6 +73,7 @@ const SHELL = [
   './js/app/views/sessionSetup.js',
   './js/app/views/shootingSetup.js',
   './js/app/views/blankBale.js',
+  './js/app/views/sessionOverview.js',
   './js/app/views/setupFaces.js',
   './js/app/views/timer.js',
   './js/ui/apl/index.js',

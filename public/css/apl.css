@@ -2128,3 +2128,334 @@ a.apl-sessionrow:hover {
     transition: none;
   }
 }
+
+/* ---------------------------------------------------------------- Session overview (sessionOverview.js) */
+.ov-header {
+  padding-right: 4px;
+}
+.ov-title {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-width: 0;
+}
+.ov-title--pad {
+  padding-left: 12px;
+}
+.ov-title h1 {
+  margin: 0;
+  font-size: 20px;
+  line-height: 26px;
+  font-weight: 700;
+}
+.ov-body {
+  gap: var(--space-4);
+}
+.ov-saved {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 14px;
+  border-radius: var(--radius-lg);
+  background: var(--accent-tint);
+  border: 1px solid var(--accent-tint-border);
+  color: var(--ink-soft);
+  font-size: 14px;
+  line-height: 20px;
+}
+.ov-saved svg {
+  color: var(--accent-bright);
+  flex-shrink: 0;
+}
+.ov-saved strong {
+  color: var(--ink);
+}
+.ov-card {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: var(--space-4);
+  border-radius: 18px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  min-width: 0;
+}
+.ov-card.is-editing {
+  border-color: var(--accent);
+}
+.ov-card-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-height: 24px;
+}
+.ov-card-head .apl-label {
+  margin: 0;
+}
+.ov-edit {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: var(--tap-min);
+  padding: 0 14px;
+  margin: -10px -6px -10px 0;
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--border);
+  background: var(--surface-sunken);
+  color: var(--ink);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+}
+.ov-stack {
+  display: flex;
+  flex-direction: column;
+}
+.ov-stack--end {
+  align-items: flex-end;
+  text-align: right;
+}
+.ov-summary-top {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 12px;
+}
+.ov-total {
+  font-size: 48px;
+  line-height: 1;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  color: var(--ink);
+}
+.ov-avg {
+  font-size: 24px;
+  line-height: 30px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+.ov-delta {
+  font-size: 12px;
+  line-height: 16px;
+  color: var(--accent-bright);
+}
+.ov-delta.is-down {
+  color: var(--ink-soft);
+}
+.ov-counts {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 6px;
+}
+.ov-count {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 8px 0;
+  border-radius: var(--radius-sm);
+  background: var(--surface-sunken);
+}
+.ov-count-n {
+  font-size: 18px;
+  line-height: 22px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+.ov-count-l {
+  font-size: 12px;
+  line-height: 16px;
+  color: var(--muted);
+}
+.ov-facts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 16px;
+  font-size: 13px;
+  line-height: 18px;
+  color: var(--ink-soft);
+}
+.ov-grades {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+.ov-grade {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+.ov-grade-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+}
+.ov-grade-label {
+  font-size: 14px;
+  color: var(--ink-soft);
+}
+.ov-grade-avg {
+  font-size: 22px;
+  line-height: 28px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+.ov-dist {
+  display: flex;
+  gap: 2px;
+  height: 10px;
+  border-radius: 5px;
+  overflow: hidden;
+}
+.ov-dist--empty {
+  background: var(--surface-sunken);
+}
+.ov-dist-seg {
+  min-width: 4px;
+  box-shadow: inset 0 0 0 1px var(--data-edge);
+}
+.ov-insight {
+  margin: 0;
+  padding: 10px 12px;
+  border-radius: var(--radius-md);
+  background: var(--surface-sunken);
+  font-size: 14px;
+  line-height: 20px;
+  color: var(--ink-soft);
+}
+.ov-insight strong {
+  color: var(--ink);
+}
+.ov-prompt {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  --tone: var(--review-good);
+}
+.ov-prompt--work {
+  --tone: var(--review-work);
+}
+.ov-prompt--how {
+  --tone: var(--review-how);
+}
+.ov-prompt-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  font-size: 14px;
+  line-height: 20px;
+  font-weight: 700;
+  color: var(--tone);
+}
+.ov-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 4px;
+  background: var(--tone);
+  flex-shrink: 0;
+}
+.ov-prompt-text {
+  margin: 0;
+  font-size: 15px;
+  line-height: 22px;
+  color: var(--ink);
+  white-space: pre-line;
+  overflow-wrap: anywhere;
+}
+.ov-prompt-text.is-empty {
+  color: var(--muted);
+}
+/* while writing, the label of each textarea takes its prompt's colour and dot */
+.ov-prompt .apl-textfield > .apl-cap13 {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--tone);
+}
+.ov-prompt .apl-textfield > .apl-cap13::before {
+  content: '';
+  width: 8px;
+  height: 8px;
+  border-radius: 4px;
+  background: var(--tone);
+}
+.ov-cues {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.ov-cue {
+  min-height: var(--tap-min);
+  padding: 0 12px;
+  border-radius: var(--radius-pill);
+  border: 1px dashed var(--border-dashed);
+  background: transparent;
+  color: var(--accent-bright);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+}
+.ov-list {
+  padding: 0;
+  gap: 0;
+  overflow: hidden;
+}
+.ov-list-head {
+  padding: 14px 14px 8px;
+}
+.ov-row {
+  display: grid;
+  grid-template-columns: 1fr auto 16px;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  min-height: 52px;
+  padding: 0 12px 0 14px;
+  border: none;
+  border-top: 1px solid var(--border-soft);
+  background: transparent;
+  color: var(--ink);
+  font: inherit;
+  font-size: 15px;
+  text-align: left;
+}
+.ov-row-k {
+  color: var(--ink-soft);
+}
+.ov-row-v {
+  font-weight: 600;
+  text-align: right;
+  overflow-wrap: anywhere;
+}
+.ov-row-go {
+  display: flex;
+  color: var(--muted);
+}
+.ov-sheet {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+.ov-sheet > .card {
+  margin: 0;
+  padding: 0;
+  border: none;
+  background: transparent;
+}
+.ov-actions {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 10px;
+}
+
+/* No visible scrollbars anywhere (pages and lists still scroll by touch, wheel and keyboard) */
+* {
+  scrollbar-width: none;
+}
+*::-webkit-scrollbar {
+  display: none;
+}

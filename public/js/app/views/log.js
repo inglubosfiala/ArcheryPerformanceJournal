@@ -322,7 +322,8 @@ function renderActive(ctx, session) {
   // Finish asks OK / Cancel first; the timer is paused meanwhile and runs on if it is cancelled
   const finish = async () => {
     const res = await ctx.running.finish();
-    if (res.status === 'finished') ctx.navigate(`history/${res.session.id}`, { replace: true });
+    // the overview opens with the review to write
+    if (res.status === 'finished') ctx.navigate(`history/${encodeURIComponent(res.session.id)}/review`, { replace: true });
   };
   const discard = async () => {
     const res = await ctx.running.discard();

@@ -101,6 +101,9 @@
   --on-danger: #0b0e10;
   --score-miss: #d7d9db;
   --data-edge: transparent;
+  --review-good: #4fd1a1;
+  --review-work: #f2b84b;
+  --review-how: #7fb4ff;
   --grade-1: #0b6e4f;
   --grade-2: #7cc29a;
   --grade-3: #f2d65c;
@@ -166,6 +169,9 @@
   --danger: #c62828;
   --on-danger: #ffffff;
   --data-edge: #808a91;
+  --review-good: #086646;
+  --review-work: #8a5800;
+  --review-how: #1d4ed8;
   color-scheme: light;
 }
 
@@ -192,6 +198,9 @@
     --danger: #c62828;
     --on-danger: #ffffff;
     --data-edge: #808a91;
+    --review-good: #086646;
+    --review-work: #8a5800;
+    --review-how: #1d4ed8;
     color-scheme: light;
   }
 }
