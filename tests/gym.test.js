@@ -14,6 +14,7 @@ import {
   kgText,
   repsStep,
   withAddedSet,
+  withoutSet,
   newExercise,
   moved,
   emptyGym,
@@ -161,5 +162,18 @@ describe('gym: pre-fill source', () => {
     expect(prefillSource([b, a], ['Core'])).toBe(a);
     expect(prefillSource([b, a], ['Mobility'])).toBe(b);
     expect(prefillSource([], ['Core'])).toBeNull();
+  });
+});
+
+describe('gym: removing a set', () => {
+  const ex = { name: 'Row', unit: 'reps', sets: [set(10, 40), set(10, 45), set(8, 45, false)] };
+  it('takes out the last set, or the one given, leaving the others as they are', () => {
+    expect(withoutSet(ex).sets).toEqual([set(10, 40), set(10, 45)]);
+    expect(withoutSet(ex, 0).sets).toEqual([set(10, 45), set(8, 45, false)]);
+    expect(ex.sets).toHaveLength(3);
+  });
+  it('leaves an exercise without sets as it is', () => {
+    expect(withoutSet({ name: 'Plank', unit: 's', sets: [] }).sets).toEqual([]);
+    expect(withoutSet(withoutSet({ name: 'Plank', unit: 's', sets: [set(60)] })).sets).toEqual([]);
   });
 });

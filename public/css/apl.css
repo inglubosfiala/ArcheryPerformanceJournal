@@ -2959,8 +2959,23 @@ a.apl-sessionrow:hover {
   font-size: 14px;
   font-weight: 600;
 }
-.gym-add-set {
-  align-self: flex-start;
+.gym-set-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.gym-remove-set {
+  min-height: 44px;
+  padding: 0 12px;
+  border: none;
+  border-radius: var(--radius-pill);
+  background: transparent;
+  color: var(--muted);
+  font: inherit;
+  font-size: 14px;
+  font-weight: 600;
 }
 .gym-chip--other {
   border-style: solid;

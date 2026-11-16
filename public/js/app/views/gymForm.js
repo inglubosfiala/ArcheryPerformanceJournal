@@ -1,6 +1,7 @@
 // The exercises of a gym session, drawn with the APL look: one card per exercise with its sets (done,
-// reps, kg), "+ Add set (copy last)", the ⋯ menu (rename, move, remove) and "Add an exercise". The
-// running gym session (gymRunning.js) and a saved one in History (sessionForms.js) both use it.
+// reps, kg), "+ Add set (copy last)" and "− Remove last set", the ⋯ menu (rename, move, remove) and
+// "Add an exercise". The running gym session (gymRunning.js) and a saved one in History
+// (sessionForms.js) both use it.
 //
 // `change(update, { rerender })` stores a change: `update(current) → patch` runs on the current fields,
 // as in sessionForms.js. `ui` is the page's ui state ({ get, set }) for which menu or field is open.
@@ -18,6 +19,7 @@ import {
   progressText,
   setCounts,
   withAddedSet,
+  withoutSet,
   newExercise,
   moved,
 } from '../gym.js';
@@ -227,11 +229,43 @@ function exerciseCard(e, i, value, change, { sessions, ui }) {
     menuOpen ? menuRow(i, exercises.length, act) : null,
     h('div', { class: 'gym-sets' }, (e.sets || []).map((s, k) => setRow(e, s, i, k, updSet(k)))),
     h(
-      'button',
-      { type: 'button', class: 'gym-add-set', dataset: { fk: `gym-${i}-add-set` }, onClick: () => upd(withAddedSet) },
-      '+ Add set (copy last)',
+      'div',
+      { class: 'gym-set-actions' },
+      h(
+        'button',
+        { type: 'button', class: 'gym-add-set', dataset: { fk: `gym-${i}-add-set` }, onClick: () => upd(withAddedSet) },
+        '+ Add set (copy last)',
+      ),
+      total
+        ? h(
+            'button',
+            {
+              type: 'button',
+              class: 'gym-remove-set',
+              'aria-label': `Remove set ${total} of ${e.name}`,
+              dataset: { fk: `gym-${i}-remove-set` },
+              onClick: () => removeLastSet(e, upd),
+            },
+            '− Remove last set',
+          )
+        : null,
     ),
   );
+}
+
+/** Take out an exercise's last set; one marked done is asked about first. */
+async function removeLastSet(e, upd) {
+  const last = e.sets.at(-1);
+  if (last?.done) {
+    const ok = await confirmDialog({
+      title: `Remove set ${e.sets.length}?`,
+      message: `This set of ${e.name} is marked done. It is taken out of the session.`,
+      confirmLabel: 'Remove',
+      danger: true,
+    });
+    if (!ok) return;
+  }
+  upd((x) => withoutSet(x));
 }
 
 /** "Add an exercise": a chip per suggestion not added yet, and Other… (a name and reps or seconds). */

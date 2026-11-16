@@ -120,6 +120,11 @@ export function withAddedSet(exercise) {
   return { ...exercise, sets: [...(exercise.sets || []), last ? { ...last, done: false } : newSet(exercise.unit)] };
 }
 
+/** The exercise without its set `k` (the last one when `k` is left out). */
+export function withoutSet(exercise, k = (exercise.sets?.length || 0) - 1) {
+  return { ...exercise, sets: (exercise.sets || []).filter((_, j) => j !== k) };
+}
+
 /** Move item `i` of a list up (-1) or down (+1); unchanged at the ends. */
 export function moved(list, i, by) {
   const j = i + by;
