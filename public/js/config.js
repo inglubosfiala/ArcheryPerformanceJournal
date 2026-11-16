@@ -1,6 +1,6 @@
 export const APP_NAME = 'Archery Performance Journal';
 export const APP_ID = 'archery-performance-journal';
-export const SCHEMA_VERSION = 7;
+export const SCHEMA_VERSION = 8;
 export const APP_VERSION = '__APP_VERSION__';
 export const BACKUP_REMINDER_DAYS = 30;
 // deleted sessions stay in Recently deleted (History) this long before they are removed for good

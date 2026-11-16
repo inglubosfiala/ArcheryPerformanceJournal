@@ -10,6 +10,7 @@
 //   'none' (nothing to do) · 'failed' (the save was refused; the guarded save has told the archer)
 
 import * as L from './sessionLogic.js';
+import { rememberSetup } from './lastSetup.js';
 
 /** The running session in the repository, or null. */
 export function findRunning(repo) {
@@ -74,8 +75,11 @@ export function createRunningSession({
         } else if (!remove('sessions', running.id)) return { status: 'failed' };
       }
     }
-    const { distance, face, arrowsPerEnd } = setup;
-    saveSettings({ lastSetup: { distance, face, arrowsPerEnd } });
+    // remembered for the next session of this kind (the Shooting page starts from it)
+    const { distance, face, arrowsPerEnd, type = 'training', competition } = setup;
+    const gear = setup.gearSnapshotId || (setup.gear ? null : 'none');
+    const comp = type === 'competition' ? { round: competition?.round || '', conditions: competition?.conditions || '' } : {};
+    saveSettings(rememberSetup(repo.getSettings(), type, { distance, face, arrowsPerEnd, gear, ...comp }));
     const session = save('sessions', L.createSession({ ...setup, now: now() }));
     return session ? { status: 'started', session } : { status: 'failed' };
   }

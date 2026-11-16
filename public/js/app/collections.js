@@ -1,6 +1,7 @@
 // What the app stores (ARCHITECTURE §6.4). The repository validates before every save and on import.
 import { FACE_IDS, ARROWS_PER_END_MAX, isValidArrowsPerEnd, isValidArrowValue } from './scoring.js';
 import { sightErrors, historyErrors } from './gearFields.js';
+import { defaultLastSetup, isGoal } from './lastSetup.js';
 import { SESSION_TYPES, DRILL_IDS, MENTAL_TECHNIQUES, EFFORT_MAX, FOCUS_MAX, isScored, countsArrows, isTime, emptyReview, emptyCompetition } from './sessionTypes.js';
 
 const isStr = (v) => typeof v === 'string';
@@ -42,6 +43,7 @@ function validateForm(r) {
   if (r.note != null && !isStr(r.note)) errs.push('invalid note');
   if (countsArrows(r.type)) {
     if (!isOptInt(r.arrows, 0, 10000)) errs.push('invalid arrow count');
+    else if (r.goal != null && (r.type !== 'blank' || !isGoal(r.goal))) errs.push('invalid arrow goal');
     else if (r.type === 'manual' && !r.arrows && !r.minutes) errs.push('enter the arrows or the duration');
   } else if (r.type === 'strength') {
     if (!isOptInt(r.effort, 1, EFFORT_MAX)) errs.push('invalid effort');
@@ -129,7 +131,8 @@ export const defaultSettings = {
   activeSetupId: null,
   // the unit a gear field is shown in where it has two (e.g. { brace: 'cm' }); this device only
   gearUnits: {},
-  lastSetup: { distance: 18, face: '40t', arrowsPerEnd: 3 },
+  // the setup of the last session of each kind of shooting (lastSetup.js); this device only
+  lastSetup: defaultLastSetup(),
 };
 
 /** Settings shared between devices by Google Drive sync; all others stay on the device. */

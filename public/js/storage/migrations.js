@@ -121,6 +121,25 @@ export const migrations = [
       };
     },
   },
+  {
+    // v8: the last setup per kind of shooting. settings.lastSetup (this device only) was one object
+    // for every scored session; it becomes { training, competition, blank }, the old value copied into
+    // training and competition. Sessions are unchanged (a blank bale session may now carry `goal`).
+    from: 7,
+    to: 8,
+    up(doc) {
+      const old = doc.settings?.lastSetup;
+      if (!old || typeof old !== 'object' || 'training' in old || 'competition' in old || 'blank' in old) return { ...doc };
+      const { distance, face, arrowsPerEnd } = old;
+      const scored = { distance, face, arrowsPerEnd, gear: null };
+      const lastSetup = {
+        training: { ...scored },
+        competition: { ...scored, round: '', conditions: '' },
+        blank: { goal: null, gear: null },
+      };
+      return { ...doc, settings: { ...doc.settings, lastSetup } };
+    },
+  },
 ];
 
 export class NewerVersionError extends Error {

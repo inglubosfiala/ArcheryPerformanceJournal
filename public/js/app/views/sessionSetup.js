@@ -6,6 +6,7 @@ import { h, todayIso } from '../../core/dom.js';
 import * as APL from '../../ui/apl/index.js';
 import * as L from '../sessionLogic.js';
 import { T } from '../strings.js';
+import { lastSetupOf } from '../lastSetup.js';
 import {
   DISTANCES,
   DISTANCE_DEFAULTS,
@@ -78,7 +79,7 @@ export function renderTypeChoice(ctx) {
 function setupState(ctx) {
   const settings = ctx.repo.getSettings();
   // distance and face are remembered from the last session; arrows per end always start at the default
-  const last = settings.lastSetup;
+  const last = lastSetupOf(settings, 'training');
   // a face no longer offered (the single 40 cm 10–6 spot) falls back to the triple
   const lastFace = SETUP_FACES.includes(last.face) ? last.face : '40t';
   const setup = ctx.ui.get().setup || {

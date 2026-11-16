@@ -25,6 +25,7 @@ import {
   uniqueName,
 } from '../gearFields.js';
 import { T } from '../strings.js';
+import { lastSetupOf } from '../lastSetup.js';
 import { fieldSheet, openFieldSheet } from './gearSheet.js';
 import { renderSightsPage } from './gearSights.js';
 
@@ -176,7 +177,7 @@ function renderList(ctx) {
   const setups = orderedSetups(settings, ctx.repo.list('setups'));
   const active = activeSetup(settings, setups);
   const sessions = ctx.repo.list('sessions');
-  const distance = Number(settings.lastSetup?.distance) || 18;
+  const distance = lastSetupOf(settings, 'training').distance;
   const others = setups.filter((s) => s !== active);
 
   const activeCard = (s) => {
