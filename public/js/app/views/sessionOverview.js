@@ -3,7 +3,7 @@
 // (`history`: a read view where each part has its own Edit). Top to bottom: the score summary, the
 // process grades, the performance review, the group, the ends and the details.
 // The review section is also used on the page of a form session.
-import { h, formatDate } from '../../core/dom.js';
+import { h, s, formatDate } from '../../core/dom.js';
 import * as APL from '../../ui/apl/index.js';
 import { T } from '../strings.js';
 import { icons } from '../icons.js';
@@ -19,7 +19,22 @@ import {
   parseConditions,
   joinConditions,
 } from '../sessionTypes.js';
-import { scoreCounts, averageDelta, gradeDistribution, gradeInsight } from '../sessionInsights.js';
+import {
+  scoreCounts,
+  averageDelta,
+  gradeDistribution,
+  gradeInsight,
+  groupArrows,
+  filterArrows,
+  matchesFilter,
+  groupCentre,
+  centreDirection,
+  centreReading,
+  GROUP_FILTERS,
+  FILTER_LABELS,
+} from '../sessionInsights.js';
+import { isMultiSpot } from '../scoring.js';
+import { faceRings } from './face.js';
 import { whenCard, gearCard } from './common.js';
 
 // ---------------------------------------------------------------- state of the page (ui `ov`)
@@ -256,6 +271,88 @@ export function reviewSection(ctx, ss, { editing, onToggle = null }) {
   );
 }
 
+// ---------------------------------------------------------------- B4 the group
+
+const GROUP_BOX = 110; // viewBox half-size: the spot (radius 100) and arrows just off its edge
+
+/**
+ * All placed arrows of the session on one large face (the spots of a multi-spot sheet merged), the
+ * group centre in magenta, and filter chips: arrows outside the filter fade, and the centre and the
+ * reading follow the arrows shown.
+ */
+export function groupSection(ss, { filter = 'all', onFilter }) {
+  const { arrows, total } = groupArrows(ss.ends);
+  if (!arrows.length) return null;
+  const shown = filterArrows(arrows, filter);
+  const all = groupCentre(arrows);
+  const centre = groupCentre(shown);
+  const reading = centreReading(centre, all, filter, shown.length);
+  const u = (n) => n * 100;
+  const svg = s(
+    'svg',
+    {
+      viewBox: `${-GROUP_BOX} ${-GROUP_BOX} ${GROUP_BOX * 2} ${GROUP_BOX * 2}`,
+      role: 'img',
+      'aria-label': `All ${arrows.length} placed arrows on one ${isMultiSpot(ss.face) ? 'spot' : 'face'}; ${shown.length} shown${
+        centre ? `; group centre ${centreDirection(centre)}` : ''
+      }`,
+    },
+    faceRings(ss.face),
+    arrows.map((p) =>
+      s('circle', {
+        class: 'ov-arrow',
+        cx: u(p.x),
+        cy: u(p.y),
+        r: 4.2,
+        opacity: matchesFilter(p, filter) ? 1 : 0.12,
+      }),
+    ),
+    centre
+      ? s(
+          'g',
+          { class: 'ov-centre', transform: `translate(${u(centre.x)} ${u(centre.y)})` },
+          s('circle', { r: 7, fill: 'none', 'stroke-width': 2.4 }),
+          s('path', { d: 'M-12 0h24M0 -12v24', 'stroke-width': 2.2, 'stroke-linecap': 'round' }),
+        )
+      : null,
+  );
+  const unplaced = total - arrows.length;
+  return ovCard(
+    'group',
+    'Group',
+    [
+      h(
+        'div',
+        { class: 'ov-filters', role: 'group', 'aria-label': 'Show arrows' },
+        GROUP_FILTERS.map((f) =>
+          h(
+            'button',
+            {
+              type: 'button',
+              class: 'ov-filter',
+              'aria-pressed': String(f === filter),
+              onClick: () => f !== filter && onFilter(f),
+              dataset: { fk: `group-${f}` },
+            },
+            f === 'all' ? `All ${arrows.length}` : FILTER_LABELS[f],
+          ),
+        ),
+      ),
+      h('div', { class: 'ov-face' }, svg),
+      h(
+        'div',
+        { class: 'ov-legend', 'aria-hidden': 'true' },
+        h('span', null, h('span', { class: 'ov-legend-arrow' }), 'arrow'),
+        h('span', null, h('span', { class: 'ov-legend-centre' }), 'group centre'),
+        isMultiSpot(ss.face) ? h('span', null, 'spots of the sheet merged') : null,
+        unplaced ? h('span', null, `${unplaced} not placed`) : null,
+      ),
+      h('p', { class: 'ov-reading', 'aria-live': 'polite' }, reading),
+    ],
+    { accessory: h('span', { class: 'apl-cap' }, `${shown.length} of ${arrows.length} arrows`) },
+  );
+}
+
 // ---------------------------------------------------------------- B7 details and their sheets
 
 /** Competition details as chips and fields, saved as they change (placement too). */
@@ -383,7 +480,7 @@ function overlayFor(ctx, ss, { ov, set }) {
 
 /**
  * The overview of a finished scored session. `mode`: 'finished' (right after Finish) or 'history'.
- * `sections`: the group and the ends, drawn by the caller between the review and the details.
+ * `sections`: drawn by the caller between the group and the details.
  */
 export function renderOverview(ctx, ss, { mode = 'history', sections = [] } = {}) {
   const finished = mode === 'finished';
@@ -437,6 +534,7 @@ export function renderOverview(ctx, ss, { mode = 'history', sections = [] } = {}
     summaryCard(ctx, ss, st),
     gradesCard(ss),
     reviewSection(ctx, ss, { editing: editingReview, onToggle: finished ? null : () => set({ review: !ov.review }) }),
+    groupSection(ss, { filter: ov.filter || 'all', onFilter: (f) => set({ filter: f }) }),
     ...sections,
     finished ? null : detailsCard(ctx, ss, st, setupName, set),
   );

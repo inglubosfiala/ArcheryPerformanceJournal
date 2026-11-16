@@ -2459,3 +2459,88 @@ a.apl-sessionrow:hover {
 *::-webkit-scrollbar {
   display: none;
 }
+
+/* the group: all arrows on one face (sessionOverview.js) */
+.ov-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.ov-filter {
+  min-height: var(--tap-min);
+  padding: 0 14px;
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--border);
+  background: var(--surface-sunken);
+  color: var(--ink);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+}
+.ov-filter[aria-pressed='true'] {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--on-accent);
+}
+.ov-face {
+  width: 100%;
+  max-width: 360px;
+  align-self: center;
+}
+.ov-face svg {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+.ov-arrow {
+  fill: #14181c;
+  stroke: #ffffff;
+  stroke-width: 1.6;
+  transition: opacity 200ms;
+}
+.ov-centre {
+  stroke: var(--mark);
+  transition: transform 250ms ease-out;
+}
+@media (prefers-reduced-motion: reduce) {
+  .ov-arrow,
+  .ov-centre {
+    transition: none;
+  }
+}
+.ov-legend {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 14px;
+  font-size: 12px;
+  line-height: 16px;
+  color: var(--muted);
+}
+.ov-legend > span {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.ov-legend-arrow {
+  width: 12px;
+  height: 12px;
+  border-radius: 6px;
+  background: #14181c;
+  border: 2px solid #ffffff;
+  box-shadow: 0 0 0 1px var(--data-edge);
+  box-sizing: border-box;
+}
+.ov-legend-centre {
+  width: 14px;
+  height: 14px;
+  border-radius: 7px;
+  border: 3px solid var(--mark);
+  box-sizing: border-box;
+}
+.ov-reading {
+  margin: 0;
+  font-size: 14px;
+  line-height: 20px;
+  color: var(--ink-soft);
+}
