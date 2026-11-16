@@ -349,15 +349,19 @@ export function keyValues(setup, distance) {
   ];
 }
 
-/** One line about a setup for the list: "42 lb · brace 8.875 in · 70 m 5.8 · 0". */
-export function setupSummary(setup) {
+/**
+ * One line about a setup: "42 lb · brace 8.875 in · 70 m 5.8 · 0". The sight mark is the one for
+ * `distance` (metres) when the setup has it, else its longest distance.
+ */
+export function setupSummary(setup, distance = null) {
   const f = setup?.fields || {};
   const parts = [];
   if (shown(f, 'drawWeight')) parts.push(shown(f, 'drawWeight'));
   else if (String(f.riser || '').trim()) parts.push(String(f.riser).trim());
   if (shown(f, 'brace')) parts.push(`brace ${shown(f, 'brace')}`);
   const marks = sightMarks(f).filter(hasMark);
-  if (marks.length) parts.push(`${marks[marks.length - 1].distance} ${markText(marks[marks.length - 1])}`);
+  const mark = (distance != null && findSightMark(f, distance)) || marks[marks.length - 1];
+  if (mark) parts.push(`${mark.distance} ${markText(mark)}`);
   if (parts.length < 2) parts.push(`${filledCount(f)} of ${GEAR_KEYS.length} details`);
   return parts.join(' · ');
 }

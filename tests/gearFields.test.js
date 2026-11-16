@@ -221,6 +221,9 @@ describe('setup summaries', () => {
     ]);
     expect(setupSummary(s)).toBe('38 lb · brace 8.75 in · 18 m 5.2 · 1R');
     expect(setupSummary({ fields: { riser: 'Borrowed' } })).toBe('Borrowed · 1 of 25 details');
+    const two = { fields: { ...s.fields, sights: [...s.fields.sights, { id: 'n', distance: '70 m', elevation: '5.8', windage: '0', note: '' }] } };
+    expect(setupSummary(two)).toBe('38 lb · brace 8.75 in · 70 m 5.8 · 0'); // the longest distance
+    expect(setupSummary(two, 18)).toBe('38 lb · brace 8.75 in · 18 m 5.2 · 1R'); // the session's distance
   });
 
   it('suggests values from other setups, names new ones uniquely and counts sessions', () => {

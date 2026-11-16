@@ -180,6 +180,7 @@ function equipmentSection(ctx, { settings, setup, set }) {
       value: gearChoice,
       onChange: (id) => set({ gear: id }),
       setups,
+      distance: setup.distance ?? null,
     }),
   });
   return {

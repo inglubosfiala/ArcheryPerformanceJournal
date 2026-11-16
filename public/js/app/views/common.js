@@ -248,29 +248,33 @@ export function whenCard(ctx, ss) {
 }
 
 /** The line under an equipment choice (gearChoices option ids). */
-export function gearDetail(id, setups, activeId = null) {
+export function gearDetail(id, setups, activeId = null, distance = null) {
   if (id === 'none') return 'Log without a bow setup';
   if (id === 'recorded') return 'As saved with the session';
   const s = setups.find((x) => x.id === id);
   if (!s) return null;
-  return id === activeId ? `Active · ${setupSummary(s)}` : setupSummary(s);
+  return id === activeId ? `Active · ${setupSummary(s, distance)}` : setupSummary(s, distance);
 }
 
-/** Equipment choices (gearChoices output) as APL radio cards, ending with Add equipment. */
-export function gearCards(ctx, { options, value, onChange, setups, activeId }) {
+/**
+ * Equipment choices (gearChoices output) as APL radio cards: the setups (the active one first), "as
+ * recorded" for an edited session whose setup is gone, and none; then a link to the Gear tab. Each
+ * setup's line shows its sight mark for `distance` (the session's).
+ */
+export function gearCards(ctx, { options, value, onChange, setups, activeId, distance = null }) {
   return h(
     'div',
     { class: 'apl-list', role: 'group', 'aria-label': 'Equipment' },
     options.map(([id, name]) =>
       APL.SelectCard({
         title: name,
-        detail: gearDetail(id, setups, activeId),
+        detail: gearDetail(id, setups, activeId, distance),
         selected: id === value,
         onClick: () => id !== value && onChange(id),
         fk: `gear-${id}`,
       }),
     ),
-    APL.AddButton({ children: 'Add equipment', onClick: () => ctx.navigate('gear'), fk: 'gear-add' }),
+    APL.AddButton({ children: setups.length ? 'Manage setups' : 'Add equipment', onClick: () => ctx.navigate('gear'), fk: 'gear-add' }),
   );
 }
 
@@ -285,6 +289,6 @@ export function gearCard(ctx, ss, onChange) {
   const choices = gearChoices({ settings, setups, session: ss });
   return card(
     { class: 'gear-card' },
-    APL.Section({ label: 'Equipment', id: 'gear', children: gearCards(ctx, { ...choices, onChange, setups }) }),
+    APL.Section({ label: 'Equipment', id: 'gear', children: gearCards(ctx, { ...choices, onChange, setups, distance: ss.distance ?? null }) }),
   );
 }
