@@ -55,6 +55,15 @@ A mark from 1 to 5 on one arrow: M for the mental program, S for the shooting cy
 **Let-down**:
 A shot drawn and not released; a correct let-down is one that was the right decision.
 
+### Equipment
+
+**Gear setup**:
+The archer's equipment as configured: bow, arrows, string, tuning and accessories, together with its sight marks. The current setup is edited on the Gear tab; named copies of it are saved setups.
+_Avoid_: Snapshot (in conversation; the code calls a saved setup a gear snapshot)
+
+**Sight mark**:
+The sight setting (elevation, windage) for one distance. Sight marks belong to one gear setup: changing the bow changes the marks, so every setup has its own.
+
 ### Target
 
 **Face**:

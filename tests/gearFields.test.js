@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { gearChoices, gearForChoice } from '../public/js/app/gearFields.js';
+import { gearChoices, gearForChoice, sightMarks, findSightMark, sightErrors, hasGear } from '../public/js/app/gearFields.js';
 
 const snapshots = [
   { id: 's1', name: 'Indoor', fields: { riser: 'Hoyt', limbsLbs: '32' } },
@@ -36,5 +36,48 @@ describe('gearForChoice', () => {
     expect(gearForChoice('current', ctx)).toEqual({ gear: { riser: 'Own' }, gearSnapshotId: null });
     expect(gearForChoice('none', ctx)).toEqual({ gear: null, gearSnapshotId: null });
     expect(gearForChoice('recorded', ctx)).toBeNull();
+  });
+});
+
+describe('sight marks of a setup', () => {
+  const gear = {
+    riser: 'Hoyt',
+    sights: [
+      { id: 'a', distance: '18 m', elevation: '', windage: '', note: '' },
+      { id: 'b', distance: '70m', elevation: '5.2', windage: '', note: '' },
+    ],
+  };
+
+  it('shows the default distances until the setup has marks of its own', () => {
+    expect(sightMarks({}).map((m) => m.distance)).toEqual(['18 m', '30 m', '50 m', '60 m', '70 m', '90 m']);
+    expect(sightMarks(gear)).toBe(gear.sights);
+  });
+
+  it('finds the mark set for a distance', () => {
+    expect(findSightMark(gear, 70)?.id).toBe('b');
+    expect(findSightMark(gear, 18)).toBeNull(); // a distance without a mark
+    expect(findSightMark(null, 70)).toBeNull();
+  });
+
+  it('counts a setup with only sight marks as equipment', () => {
+    expect(hasGear({ sights: [gear.sights[1]] })).toBe(true);
+    expect(hasGear({ sights: [gear.sights[0]] })).toBe(false);
+    const r = gearChoices({ settings: { gear: { sights: [gear.sights[1]] }, activeSnapshotId: null }, snapshots: [] });
+    expect(r.value).toBe('current');
+  });
+
+  it('copies the marks into a session with its setup', () => {
+    const ctx = { settings: { gear, activeSnapshotId: null }, snapshots: [{ id: 's9', name: 'X', fields: gear }] };
+    const cur = gearForChoice('current', ctx);
+    expect(cur.gear).toEqual(gear);
+    expect(cur.gear.sights).not.toBe(gear.sights);
+    expect(gearForChoice('s9', ctx).gear.sights).toEqual(gear.sights);
+  });
+
+  it('validates the stored list', () => {
+    expect(sightErrors(undefined)).toEqual([]);
+    expect(sightErrors(gear.sights)).toEqual([]);
+    expect(sightErrors('x')).toHaveLength(1);
+    expect(sightErrors([{ id: 'a', distance: 1 }])).toHaveLength(1);
   });
 });

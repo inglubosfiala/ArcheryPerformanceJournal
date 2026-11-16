@@ -1,8 +1,9 @@
-// Gear tab: current equipment setup + saved setup snapshots (HANDOFF §7), drawn with the APL components.
+// Gear tab: the current equipment setup with its sight marks, and saved setup snapshots (HANDOFF §7).
+// Sight marks belong to the setup (1:1): saving, updating and loading a setup carries them along.
 import { h, formatDate, todayIso } from '../../core/dom.js';
 import * as APL from '../../ui/apl/index.js';
 import { confirmDialog } from './confirm.js';
-import { GEAR_GROUPS, GEAR_KEYS, filledCount } from '../gearFields.js';
+import { GEAR_GROUPS, GEAR_KEYS, filledCount, hasGear, isBlankMark, markCount, sightMarks } from '../gearFields.js';
 import { T } from '../strings.js';
 import { card } from './common.js';
 
@@ -18,6 +19,8 @@ export function renderGear(ctx) {
     if (ctx.saveSettings({ gear: next, activeSnapshotId: null })) counter.textContent = filled(next);
   };
 
+  const sights = sightsCard(ctx, gear);
+
   const snapshots = ctx.repo.list('gearSnapshots', { sort: (a, b) => b.createdAt.localeCompare(a.createdAt) });
   const nameField = APL.TextField({
     label: T.snapshotName,
@@ -30,7 +33,7 @@ export function renderGear(ctx) {
 
   const saveSnap = () => {
     const name = nameInput.value.trim() || `Setup ${snapshots.length + 1}`;
-    const saved = ctx.save('gearSnapshots', { name, date: todayIso(), fields: { ...ctx.repo.getSettings().gear } });
+    const saved = ctx.save('gearSnapshots', { name, date: todayIso(), fields: structuredClone(ctx.repo.getSettings().gear) });
     if (saved) {
       ctx.saveSettings({ activeSnapshotId: saved.id, loadedSnapshotId: saved.id });
       ctx.ui.quietSet({ snapName: '' });
@@ -43,7 +46,7 @@ export function renderGear(ctx) {
   const updateSnap = () => {
     const cur = ctx.repo.get('gearSnapshots', loaded.id);
     if (!cur) return;
-    const saved = ctx.save('gearSnapshots', { ...cur, date: todayIso(), fields: { ...ctx.repo.getSettings().gear } });
+    const saved = ctx.save('gearSnapshots', { ...cur, date: todayIso(), fields: structuredClone(ctx.repo.getSettings().gear) });
     if (saved) {
       ctx.saveSettings({ activeSnapshotId: saved.id, loadedSnapshotId: saved.id });
       ctx.toast(`"${saved.name}" updated`);
@@ -53,11 +56,11 @@ export function renderGear(ctx) {
 
   const load = async (sn) => {
     if (
-      filledCount(ctx.repo.getSettings().gear) &&
+      hasGear(ctx.repo.getSettings().gear) &&
       !(await confirmDialog({ title: 'Load this setup?', message: T.confirmLoadSnap(sn.name), confirmLabel: T.load }))
     )
       return;
-    if (ctx.saveSettings({ gear: { ...sn.fields }, activeSnapshotId: sn.id, loadedSnapshotId: sn.id })) ctx.rerender();
+    if (ctx.saveSettings({ gear: structuredClone(sn.fields), activeSnapshotId: sn.id, loadedSnapshotId: sn.id })) ctx.rerender();
   };
 
   const remove = async (sn) => {
@@ -103,6 +106,7 @@ export function renderGear(ctx) {
             }),
           ),
         ),
+        sights,
         card(
           { class: 'apl-card' },
           APL.Section({
@@ -130,7 +134,7 @@ export function renderGear(ctx) {
                         APL.SessionRow({
                           when: sn.name,
                           type: settings.activeSnapshotId === sn.id ? 'Current' : null,
-                          summary: `${formatDate(sn.date)} · ${filledCount(sn.fields)} fields`,
+                          summary: [formatDate(sn.date), `${filledCount(sn.fields)} fields`, sightSummary(sn.fields)].filter(Boolean).join(' · '),
                           actions: [
                             APL.Button({
                               children: T.load,
@@ -162,4 +166,87 @@ export function renderGear(ctx) {
       ),
     ),
   };
+}
+
+const sightSummary = (fields) => {
+  const n = markCount(fields);
+  return n ? `${n} sight ${n === 1 ? 'mark' : 'marks'}` : '';
+};
+
+/**
+ * The current setup's sight marks: distance, elevation, windage and note on one row. Editing them is
+ * editing the setup (it detaches it from the saved one it was loaded from, like any field).
+ */
+function sightsCard(ctx, gear) {
+  const ui = ctx.ui.get();
+  const keep = ui.newSightIds || [];
+  const focusId = ui.focusSight;
+  if (focusId) ctx.ui.quietSet({ focusSight: null });
+
+  // Empty rows are not kept, except ones added in this visit (dropping them is no change to the setup).
+  if (Array.isArray(gear.sights) && gear.sights.some((m) => isBlankMark(m) && !keep.includes(m.id))) {
+    gear.sights = gear.sights.filter((m) => !isBlankMark(m) || keep.includes(m.id));
+    ctx.saveSettings({ gear: { ...ctx.repo.getSettings().gear, sights: gear.sights } });
+  }
+  const marks = [...sightMarks(gear)].sort((a, b) => sortKey(a) - sortKey(b));
+
+  /** Store the setup's marks after `fn`; the default rows become stored ones on the first edit. */
+  const setMarks = (fn) => {
+    const cur = ctx.repo.getSettings().gear || {};
+    return ctx.saveSettings({ gear: { ...cur, sights: fn(sightMarks(cur).map((m) => ({ ...m }))) }, activeSnapshotId: null });
+  };
+  const onSight = (id, key) => (e) => setMarks((ms) => ms.map((m) => (m.id === id ? { ...m, [key]: e.target.value } : m)));
+
+  const addRow = () => {
+    const id = crypto.randomUUID();
+    if (setMarks((ms) => [...ms, { id, distance: '', elevation: '', windage: '', note: '' }])) {
+      ctx.ui.quietSet({ newSightIds: [...keep, id], focusSight: id });
+      ctx.rerender();
+    }
+  };
+
+  // one row per mark; the column header says what each field is, screen readers hear it per field
+  const markRow = (m, i) => {
+    const name = m.distance || `row ${i + 1}`;
+    const field = (key, label) =>
+      APL.TextField({ label, hideLabel: true, value: m[key], fk: `sight-${m.id}-${key}`, onInput: onSight(m.id, key) });
+    const row = h(
+      'div',
+      { class: 'sight-grid' },
+      field('distance', `Distance, row ${i + 1}`),
+      field('elevation', `Elevation for ${name}`),
+      field('windage', `Windage for ${name}`),
+      field('note', `Note for ${name}`),
+    );
+    if (focusId === m.id) queueMicrotask(() => row.querySelector('input')?.focus());
+    return row;
+  };
+
+  return card(
+    { class: 'apl-card' },
+    APL.Section({
+      label: T.sightMarks,
+      id: 'gear-sights',
+      children: h(
+        'div',
+        { class: 'sight-card' },
+        h(
+          'div',
+          { class: 'sight-grid sight-head', 'aria-hidden': 'true' },
+          h('span', null, 'Dist.'),
+          h('span', null, 'Elevation'),
+          h('span', null, 'Windage'),
+          h('span', null, 'Note'),
+        ),
+        marks.map(markRow),
+        APL.AddButton({ children: T.addDistance, onClick: addRow, fk: 'add-distance' }),
+        h('p', { class: 'apl-cap' }, 'Marks for this setup, saved with it. Clear every field of a row to remove it.'),
+      ),
+    }),
+  );
+}
+
+function sortKey(m) {
+  const n = parseInt(m.distance, 10);
+  return Number.isFinite(n) ? n : 9999;
 }

@@ -30,8 +30,7 @@ export function renderDashboard(ctx) {
             fk: 'hub-history',
           }),
           row({ href: '#/insights', icon: icons.insights(), title: 'Insights', detail: 'Trends, reviews, training load', fk: 'hub-insights' }),
-          row({ href: '#/gear', icon: icons.gear(), title: 'Equipment', detail: 'Bow setup and snapshots', fk: 'hub-gear' }),
-          row({ href: '#/sights', icon: icons.sights(), title: 'Sight marks', detail: 'Marks and competitions', fk: 'hub-sights' }),
+          row({ href: '#/gear', icon: icons.gear(), title: 'Equipment', detail: 'Bow setup, sight marks, snapshots', fk: 'hub-gear' }),
           row({
             onClick: () => ctx.ui.set({ guide: true }),
             icon: icons.help(),

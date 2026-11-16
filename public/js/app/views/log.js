@@ -25,6 +25,7 @@ import { drawArrowMarks, liveScan } from './liveScan.js';
 import { PREVIEW_MARGIN, spotsBox, resultOnCrop } from '../scanGeometry.js';
 import { PHOTO_MAX, canScan, createScan } from '../scan.js';
 import { loupeCorner, loupeBox } from '../loupePlacement.js';
+import { findSightMark } from '../gearFields.js';
 
 /**
  * The running session's questions to the archer, as dialogs (the `confirm` adapter of
@@ -133,7 +134,7 @@ function renderActive(ctx, session) {
   const editing = L.isEditing(session);
   const endNo = L.viewIndex(session) + 1;
   const totalEnds = session.ends.length + 1;
-  const sight = findSightMark(ctx.repo, session.distance);
+  const sight = sessionSightMark(ctx, session);
   const picked = current.arrows[cursor];
 
   const enter = (v, x, y, spot) => {
@@ -599,8 +600,13 @@ async function previewFound(canvas, found, { cancelLabel }) {
   );
 }
 
-function findSightMark(repo, distance) {
-  return repo.list('sightMarks').find((m) => parseInt(m.distance, 10) === distance) || null;
+/**
+ * The sight mark for the session's distance from its own equipment (the marks belong to the setup it
+ * was started with); a session recorded without marks falls back to the current Gear setup.
+ */
+function sessionSightMark(ctx, session) {
+  const gear = Array.isArray(session.gear?.sights) ? session.gear : ctx.repo.getSettings().gear;
+  return findSightMark(gear, session.distance);
 }
 
 // ---------------------------------------------------------------- target face

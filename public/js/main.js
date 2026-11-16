@@ -18,7 +18,7 @@ import { createRepository } from './storage/repository.js';
 import { createLocalStorageAdapter } from './storage/localStorageAdapter.js';
 import { migrations } from './storage/migrations.js';
 import { registerServiceWorker, requestPersistence } from './pwa/updates.js';
-import { collections, defaultSettings, DEFAULT_SIGHT_DISTANCES, SYNCED_SETTING_KEYS } from './app/collections.js';
+import { collections, defaultSettings, SYNCED_SETTING_KEYS } from './app/collections.js';
 import { createGoogleAuth } from './sync/googleAuth.js';
 import { createDriveStore } from './sync/driveStore.js';
 import { createSyncService } from './sync/syncService.js';
@@ -38,7 +38,6 @@ import { renderDashboard } from './app/views/dashboard.js';
 import { renderInsights } from './app/views/insights.js';
 import { renderHistory, askAboutFinishedSession } from './app/views/history.js';
 import { renderGear } from './app/views/gear.js';
-import { renderSights } from './app/views/sights.js';
 import { renderSettings } from './app/views/settings.js';
 
 const repo = createRepository({
@@ -75,7 +74,6 @@ const sync = createSyncController({
   // the status is shown only on Settings; avoid re-rendering (and disturbing typing) elsewhere
   onStatus: () => route.name === 'settings' && shell && renderNow(),
   onPulled: () => {
-    dedupeSeededSightMarks();
     if (shell) renderNow();
   },
 });
@@ -88,10 +86,9 @@ const TABS = [
   ['history', T.tabs.history, icons.history],
   ['insights', T.tabs.insights, icons.insights],
   ['gear', T.tabs.gear, icons.gear],
-  ['sights', T.tabs.sights, icons.sights],
   ['settings', T.tabs.settings, icons.settings],
 ];
-const VIEWS = { home: renderDashboard, insights: renderInsights, log: renderLog, new: renderNewSession, history: renderHistory, gear: renderGear, sights: renderSights, settings: renderSettings };
+const VIEWS = { home: renderDashboard, insights: renderInsights, log: renderLog, new: renderNewSession, history: renderHistory, gear: renderGear, settings: renderSettings };
 
 let route = { name: 'home', params: [] };
 let shell;
@@ -312,6 +309,11 @@ ctx.finished = createFinishedSessions({
 });
 
 const router = createRouter((r) => {
+  // sight marks moved into the Gear tab (they belong to a setup); old links land there
+  if (r.name === 'sights') {
+    location.replace('#/gear');
+    return;
+  }
   const changed = r.name !== route.name || r.params.join('/') !== route.params.join('/');
   route = r;
   if (changed) ui.quietSet({ newSightIds: [], importPreview: null });
@@ -338,28 +340,6 @@ function applyTheme() {
   document.querySelector('meta[name="theme-color"]')?.setAttribute('content', ground || '#0b0e10');
 }
 darkQuery.addEventListener('change', applyTheme);
-
-function seed() {
-  const s = repo.getSettings();
-  if (!s.sightsSeeded) {
-    if (!repo.list('sightMarks').length) {
-      // fixed ids, so the same default row on two devices is one record after sync
-      for (const d of DEFAULT_SIGHT_DISTANCES) repo.save('sightMarks', { id: `seed-${d}`, distance: `${d} m`, elevation: '', windage: '', note: '' });
-    }
-    repo.saveSettings({ sightsSeeded: true });
-  }
-}
-
-/** After a sync, drop untouched default sight rows whose distance another row already covers. */
-function dedupeSeededSightMarks() {
-  const marks = repo.list('sightMarks');
-  const empty = (m) => !(m.elevation.trim() || m.windage.trim() || m.note.trim());
-  for (const m of marks) {
-    if (!m.id.startsWith('seed-') || !empty(m)) continue;
-    const dist = parseInt(m.distance, 10);
-    if (marks.some((o) => o.id !== m.id && parseInt(o.distance, 10) === dist && !(o.id.startsWith('seed-') && empty(o)))) repo.remove('sightMarks', m.id);
-  }
-}
 
 /** Is Google reachable? navigator.onLine is often true on a dead mobile connection. */
 async function googleReachable(timeoutMs = 2500) {
@@ -437,7 +417,6 @@ async function boot() {
     fatal(e.message);
     return;
   }
-  seed();
   // sessions in Recently deleted for longer than TRASH_DAYS are removed for good
   try {
     repo.purgeTrash('sessions', TRASH_DAYS * 24 * 3600 * 1000);

@@ -11,6 +11,7 @@ import { VB, faceRings, faceSheet, faceViewBox } from './face.js';
 import { TYPE_LABELS, isScored, sessionType, formSummary, setupSummary } from '../sessionTypes.js';
 import { formSections } from './sessionForms.js';
 import { formatDuration } from '../sessionLogic.js';
+import { competitionLogCard } from './competitionLog.js';
 import { TRASH_DAYS } from '../../config.js';
 
 /** The finished session's questions to the archer (the `confirm` adapter of ctx.finished). */
@@ -124,6 +125,7 @@ function renderList(ctx) {
               fk: 'trash-link',
             })
           : null,
+        competitionLogCard(ctx),
       ),
     ),
   };

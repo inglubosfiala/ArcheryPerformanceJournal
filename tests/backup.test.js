@@ -43,3 +43,49 @@ describe('schema v2 (Drive sync)', () => {
     expect(out.collections.sessions).toEqual([{ id: 'a' }]);
   });
 });
+
+describe('schema v6 (sight marks belong to a gear setup)', () => {
+  const v5 = () => ({
+    app: 'archery-performance-journal',
+    schemaVersion: 5,
+    settings: { gear: { riser: 'Hoyt' }, sightsSeeded: true, accent: '#0B6E4F' },
+    collections: {
+      sessions: [{ id: 'x', gear: { riser: 'Hoyt' } }],
+      gearSnapshots: [
+        { id: 's1', name: 'Indoor', fields: { riser: 'Hoyt' } },
+        { id: 's2', deleted: true },
+      ],
+      sightMarks: [
+        { id: 'seed-70', distance: '70 m', elevation: '5.2', windage: '1R', note: '' },
+        { id: 'seed-18', distance: '18 m', elevation: '', windage: '', note: '' },
+        { id: 'blank', distance: '', elevation: '', windage: '', note: '' },
+        { id: 'gone', deleted: true },
+      ],
+    },
+  });
+
+  it('moves the marks into the current setup and every saved setup, dropping the collection', async () => {
+    const { migrations: real } = await import('../public/js/storage/migrations.js');
+    const out = migrate(v5(), 6, real);
+    const marks = [
+      { id: 'seed-18', distance: '18 m', elevation: '', windage: '', note: '' },
+      { id: 'seed-70', distance: '70 m', elevation: '5.2', windage: '1R', note: '' },
+    ];
+    expect(out.schemaVersion).toBe(6);
+    expect(out.collections.sightMarks).toBeUndefined();
+    expect(out.settings.sightsSeeded).toBeUndefined();
+    expect(out.settings.gear).toEqual({ riser: 'Hoyt', sights: marks });
+    expect(out.collections.gearSnapshots[0].fields).toEqual({ riser: 'Hoyt', sights: marks });
+    expect(out.collections.gearSnapshots[1]).toEqual({ id: 's2', deleted: true });
+    expect(out.collections.sessions).toEqual([{ id: 'x', gear: { riser: 'Hoyt' } }]);
+  });
+
+  it('leaves setups without marks when none were typed in', async () => {
+    const { migrations: real } = await import('../public/js/storage/migrations.js');
+    const doc = v5();
+    doc.collections.sightMarks = [{ id: 'blank', distance: '', elevation: '', windage: '', note: '' }];
+    const out = migrate(doc, 6, real);
+    expect(out.settings.gear).toEqual({ riser: 'Hoyt' });
+    expect(out.collections.gearSnapshots[0].fields).toEqual({ riser: 'Hoyt' });
+  });
+});
