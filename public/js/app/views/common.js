@@ -222,6 +222,9 @@ export function whenCard(ctx, ss) {
           timePicker({
             label: 'Start time',
             value: ss.time || '',
+            date: ss.date,
+            // a finished session: its timer is over, the hint only says how long ago it started
+            timer: false,
             clearable: true,
             fk: 'edit-time',
             hint: 'Start time',

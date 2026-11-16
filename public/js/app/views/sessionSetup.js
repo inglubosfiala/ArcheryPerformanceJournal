@@ -37,10 +37,13 @@ export function setupState(ctx) {
  * When: now by default; an earlier date / time logs the session afterwards (no running timer).
  * Fields left untouched follow the clock, so a draft kept open is not dated when it was opened.
  * `duration`: a scored session logged afterwards asks for its duration here.
+ * `timer`: Start starts the session timer from the picked time (scored, blank bale, gym); the form
+ * pages (SPT, mental, log afterwards) open their timer with the page, so the time picker's hint
+ * leaves the timer out there.
  * `startTime()` is the start time read when Start is tapped: the one picked, else the clock's (so a
  * page left open untouched does not start its timer minutes back).
  */
-export function whenSection(ctx, { setup, set, quiet }, { duration = false } = {}) {
+export function whenSection(ctx, { setup, set, quiet }, { duration = false, timer = true } = {}) {
   const when = setup.when || {};
   const whenDate = when.date || todayIso();
   const whenTime = when.time || hourMinute(new Date());
@@ -78,6 +81,8 @@ export function whenSection(ctx, { setup, set, quiet }, { duration = false } = {
         timePicker({
           label: 'Start time',
           value: whenTime,
+          date: whenDate,
+          timer,
           fk: 'when-time',
           hint: when.time ? 'Start time' : 'Now',
           onChange: (time) => time && setWhen({ time }),
@@ -137,7 +142,7 @@ export function equipmentSection(ctx, { settings, setup, set }, { kind = null, d
 export function renderFormSetup(ctx, type) {
   const st = setupState(ctx);
   const { setup, set, quiet } = st;
-  const { section: when, whenDate, whenTime, past } = whenSection(ctx, st);
+  const { section: when, whenDate, whenTime, past } = whenSection(ctx, st, { timer: false });
   // equipment is not asked for mental and SPT sessions: the bow's setup says nothing about them
   const noGear = type === 'mental' || type === 'strength';
   const equipment = noGear ? null : equipmentSection(ctx, st);
