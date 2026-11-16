@@ -37,6 +37,8 @@ export function setupState(ctx) {
  * When: now by default; an earlier date / time logs the session afterwards (no running timer).
  * Fields left untouched follow the clock, so a draft kept open is not dated when it was opened.
  * `duration`: a scored session logged afterwards asks for its duration here.
+ * `startTime()` is the start time read when Start is tapped: the one picked, else the clock's (so a
+ * page left open untouched does not start its timer minutes back).
  */
 export function whenSection(ctx, { setup, set, quiet }, { duration = false } = {}) {
   const when = setup.when || {};
@@ -99,7 +101,8 @@ export function whenSection(ctx, { setup, set, quiet }, { duration = false } = {
       past ? h('p', { class: 'apl-cap' }, 'Logged afterwards: no running timer.') : null,
     ],
   });
-  return { section, whenDate, whenTime, past };
+  const startTime = () => when.time || hourMinute(new Date());
+  return { section, whenDate, whenTime, past, startTime };
 }
 
 /**

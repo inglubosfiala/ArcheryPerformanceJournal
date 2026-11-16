@@ -11,7 +11,7 @@ import { setupState, whenSection } from './sessionSetup.js';
 export function renderGymSetup(ctx) {
   const st = setupState(ctx);
   const { setup, set } = st;
-  const { section: when, whenDate, whenTime, past } = whenSection(ctx, st);
+  const { section: when, whenDate, whenTime, past, startTime } = whenSection(ctx, st);
   const gym = setup.gym || {};
   const focus = gym.focus || [];
   const sessions = ctx.repo.list('sessions', { sort: newestFirst }).filter((s) => s.type === 'gym');
@@ -28,7 +28,7 @@ export function renderGymSetup(ctx) {
     if (!open) {
       ctx.openForms.start('gym', {
         fields: { focus: GYM_FOCUS.filter((f) => focus.includes(f)), exercises, note: '' },
-        when: { date: whenDate, time: whenTime, past },
+        when: { date: whenDate, time: past ? whenTime : startTime(), past },
       });
     }
     ctx.ui.quietSet({ setup: null });

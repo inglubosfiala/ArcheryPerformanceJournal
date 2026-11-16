@@ -7,6 +7,10 @@ import { createOpenFormSessions, isFormTimerLive, openFormTimer, FORM_TIMER_STAL
 
 const MIN = 60000;
 const START = Date.parse('2026-11-12T18:00:00Z');
+const pad = (n) => String(n).padStart(2, '0');
+// a picked start time is local: the date and HH:MM of a Date in the machine's zone
+const localDate = (d) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+const localTime = (d) => `${pad(d.getHours())}:${pad(d.getMinutes())}`;
 
 let clock;
 let repo;
@@ -357,6 +361,13 @@ describe('starting a blank bale session', () => {
     expect(forms.list().map((f) => f.type)).toEqual(['blank']);
   });
 
+  it('starts the timer at the start time picked a few minutes ago', () => {
+    const picked = new Date(START - 10 * MIN);
+    make().start('blank', { goal: 60, when: { date: localDate(picked), time: localTime(picked) } });
+    expect(timer('blank')).toEqual({ running: true, startedAt: iso(START - 10 * MIN), elapsedMs: 0, touchedAt: iso(START) });
+    expect(keptDraft('blank').meta.startedAt).toBe(iso(START - 10 * MIN));
+  });
+
   it('remembers the goal and the equipment as the last blank bale setup', () => {
     make().start('blank', { goal: 90, gear: 'none' });
     expect(repo.getSettings().lastSetup.blank).toEqual({ goal: 90, gear: 'none' });
@@ -416,6 +427,14 @@ describe('starting a gym session', () => {
     expect(keptDraft('gym')).toEqual({ ...GYM, meta: { startedAt: iso(START), ...NOW } });
     expect(forms.list().map((f) => f.type)).toEqual(['gym']);
     expect(repo.getSettings().lastSetup?.gym).toBeUndefined();
+  });
+
+  it('starts the timer at the start time picked a few minutes ago', () => {
+    const picked = new Date(START - 5 * MIN);
+    const when = { date: localDate(picked), time: localTime(picked) };
+    make().start('gym', { fields: GYM, when });
+    expect(timer('gym')).toMatchObject({ running: true, startedAt: iso(START - 5 * MIN), touchedAt: iso(START) });
+    expect(keptDraft('gym').meta).toEqual({ startedAt: iso(START - 5 * MIN), ...when });
   });
 
   it('keeps the timer paused at 0 for a session logged afterwards, and saves no minutes from it', async () => {
