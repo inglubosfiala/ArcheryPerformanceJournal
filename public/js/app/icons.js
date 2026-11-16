@@ -41,6 +41,7 @@ export const icons = {
   forward: () => icon(20, p('m9 18 6-6-6-6')),
   calendar: () => icon(18, s('rect', { x: 3, y: 5, width: 18, height: 16, rx: 2 }), p('M3 10h18'), p('M8 3v4M16 3v4')),
   erase: () => icon(22, p('M21 5H9l-6 7 6 7h12a1 1 0 0 0 1-1V6a1 1 0 0 0-1-1z'), p('M17 9l-5 6M12 9l5 6')),
+  gallery: () => icon(20, p('M5 4h14a1 1 0 0 1 1 1v14a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V5a1 1 0 0 1 1-1z'), c(9, 9, 1.5), p('M20 15l-5-5-11 11')),
   camera: () => icon(20, p('M4 8h3l2-3h6l2 3h3a1 1 0 0 1 1 1v9a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V9a1 1 0 0 1 1-1z'), c(12, 13, 3.5)),
   plus: () => icon(20, p('M12 5v14M5 12h14')),
   more: () => icon(22, c(5, 12, 1.2), c(12, 12, 1.2), c(19, 12, 1.2)),

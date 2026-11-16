@@ -1851,9 +1851,16 @@ button.arrow-count:hover {
 .live-actions {
   flex: none;
   display: grid;
-  grid-template-columns: 1fr 2fr;
-  gap: var(--space-3);
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1.3fr);
+  gap: var(--space-2);
   margin-top: auto;
+}
+/* three buttons on a 360px phone: less side padding, and the icons keep their size */
+.live-actions > button {
+  padding-inline: var(--space-2);
+}
+.live-actions svg {
+  flex: none;
 }
 
 /* Interval timer (tabataTimer.js): full screen, the whole screen takes the colour of the phase so it

@@ -78,7 +78,7 @@ export function drawArrowMarks(g, spots, arrows, labels, { hollow = false, activ
 /**
  * Open the live view. Resolves with
  *   { canvas, res }  the locked (or taken) frame and its detection result,
- *   { file }         a photo chosen instead (the Photo button), or
+ *   { file }         a photo chosen instead (taken with Photo, or picked with Gallery), or
  *   null             closed without a result.
  */
 export function liveScan({ face, maxArrows, spotHint = 0 }) {
@@ -98,18 +98,23 @@ export function liveScan({ face, maxArrows, spotHint = 0 }) {
     const status = h('p', { class: 'live-status', role: 'status', 'aria-live': 'polite' }, 'Starting the camera…');
     const bar = h('div', { class: 'live-progress-bar' });
     const progress = h('div', { class: 'live-progress', 'aria-hidden': 'true' }, bar);
-    const fileInput = h('input', {
-      type: 'file',
-      accept: 'image/*',
-      capture: 'environment',
-      class: 'sr-only',
-      tabindex: '-1',
-      'aria-hidden': 'true',
-      onChange: (e) => {
-        const file = e.target.files?.[0];
-        if (file) finish({ file });
-      },
-    });
+    // Photo opens the camera app; Gallery (no capture) opens the phone's photos, for a target
+    // photographed earlier
+    const fileInput = (capture) =>
+      h('input', {
+        type: 'file',
+        accept: 'image/*',
+        ...(capture ? { capture: 'environment' } : {}),
+        class: 'sr-only',
+        tabindex: '-1',
+        'aria-hidden': 'true',
+        onChange: (e) => {
+          const file = e.target.files?.[0];
+          if (file) finish({ file });
+        },
+      });
+    const cameraInput = fileInput(true);
+    const galleryInput = fileInput(false);
     const takeBtn = APL.Button({ children: 'Take now', disabled: true, onClick: () => take(), fk: 'live-take' });
     const dialog = h(
       'dialog',
@@ -129,12 +134,20 @@ export function liveScan({ face, maxArrows, spotHint = 0 }) {
           children: 'Photo',
           variant: 'secondary',
           leadingIcon: icons.camera(),
-          onClick: () => fileInput.click(),
+          onClick: () => cameraInput.click(),
           fk: 'live-photo',
+        }),
+        APL.Button({
+          children: 'Gallery',
+          variant: 'secondary',
+          leadingIcon: icons.gallery(),
+          onClick: () => galleryInput.click(),
+          fk: 'live-gallery',
         }),
         takeBtn,
       ),
-      fileInput,
+      cameraInput,
+      galleryInput,
     );
 
     // the frame being analysed, and a copy of the last analysed one (kept for the preview)
@@ -315,7 +328,7 @@ export function liveScan({ face, maxArrows, spotHint = 0 }) {
 
     const media = navigator.mediaDevices;
     if (!media?.getUserMedia) {
-      status.textContent = 'This browser has no camera access here. Use Photo instead.';
+      status.textContent = 'This browser has no camera access here. Use Photo or Gallery instead.';
       return;
     }
     media
@@ -332,7 +345,7 @@ export function liveScan({ face, maxArrows, spotHint = 0 }) {
         tick();
       })
       .catch(() => {
-        status.textContent = 'The camera is not available (permission refused or no camera). Use Photo instead.';
+        status.textContent = 'The camera is not available (permission refused or no camera). Use Photo or Gallery instead.';
       });
   });
 }
