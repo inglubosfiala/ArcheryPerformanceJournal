@@ -148,10 +148,6 @@ p {
   display: block;
 }
 
-.saved-end {
-  font-variant-numeric: tabular-nums;
-}
-
 .error {
   color: var(--danger);
 }
@@ -171,10 +167,6 @@ p {
   box-shadow: var(--shadow);
   color: inherit;
   text-decoration: none;
-}
-
-.card-list {
-  padding: 4px 14px;
 }
 
 /* ---------------------------------------------------------------- buttons */
@@ -388,56 +380,6 @@ textarea {
   padding: 0 10px;
   font-size: 15px;
   width: 100%;
-}
-
-.saved-ends {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-}
-
-.saved-end {
-  display: grid;
-  grid-template-columns: 34px minmax(0, 1fr) auto;
-  gap: 10px;
-  align-items: center;
-  padding: 10px 0;
-  border-bottom: 1px solid var(--subtle);
-}
-
-.saved-end:last-child {
-  border-bottom: 0;
-}
-
-.saved-end-no {
-  font-size: 12px;
-  font-weight: 700;
-  color: var(--muted);
-}
-
-.saved-end-arrows {
-  font-size: 14px;
-  font-weight: 600;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-/* an end's grades and let-downs: pairs set apart by space, no separators */
-.end-facts {
-  display: flex;
-  flex-wrap: wrap;
-  column-gap: 14px;
-}
-
-.saved-end-score {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-}
-
-.saved-end-score strong {
-  font-size: 18px;
 }
 
 /* ---------------------------------------------------------------- overlays */
@@ -664,29 +606,6 @@ textarea {
   font-size: 13px;
   font-weight: 500;
   font-family: var(--font-body);
-}
-
-button.saved-end {
-  width: 100%;
-  /* room inside the rounded row, so the end number clears the viewed row's accent bar */
-  padding-left: 14px;
-  padding-right: 12px;
-  border: 0;
-  background: transparent;
-  text-align: left;
-  color: inherit;
-  font: inherit;
-  cursor: pointer;
-  border-radius: 10px;
-}
-
-.saved-ends li:last-child .saved-end {
-  border-bottom: 0;
-}
-
-.saved-end.is-viewed {
-  box-shadow: inset 3px 0 0 var(--accent);
-  background: var(--ground);
 }
 
 /* ---------------------------------------------------------------- all cards edge to edge */
@@ -2297,23 +2216,129 @@ button.arrow-count:hover {
   color: var(--ink);
 }
 
-/* the session's total, just over the list of its ends (lines up with the ends' scores) */
-.ends-total {
+/* Total (below the end, reached by scrolling): the running total, then the ends, the one being
+   shot first with an accent edge */
+.score-total {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 14px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg, 16px);
+  background: var(--surface);
+}
+
+.score-total-head {
   display: flex;
   justify-content: space-between;
   align-items: baseline;
-  padding: 10px 0;
-  border-bottom: 1px solid var(--subtle);
+  padding-bottom: 6px;
+  border-bottom: 1px solid var(--border-soft);
+}
+
+.score-total-head h2 {
+  margin: 0;
   font: var(--type-label);
   letter-spacing: var(--type-label-tracking);
   text-transform: uppercase;
   color: var(--muted);
 }
 
-.ends-total strong {
-  font: var(--type-value-lg);
-  letter-spacing: 0;
+.score-total-head strong {
+  font-size: 26px;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+
+.total-ends {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.total-end {
+  width: 100%;
+  min-height: var(--tap-min);
+  display: grid;
+  grid-template-columns: 30px minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: center;
+  padding: 10px 12px;
+  border: 0;
+  border-left: 3px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface-sunken);
   color: var(--ink);
+  font: inherit;
+  text-align: left;
+}
+
+.total-end.is-current {
+  border-left-color: var(--accent-bright);
+}
+
+.total-end.is-viewed {
+  box-shadow: inset 0 0 0 1px var(--accent-bright);
+}
+
+.total-end-no {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--muted);
+}
+
+.total-end-body {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.total-end-arrows {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.total-end-arrows .score-chip {
+  min-width: 26px;
+  width: auto;
+  height: 22px;
+  padding: 0 4px;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.total-end-arrows .score-chip.z-empty {
+  background: var(--surface);
+  border-color: var(--border);
+  color: var(--muted);
+}
+
+.total-end-meta {
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.total-end-score {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  font-variant-numeric: tabular-nums;
+}
+
+.total-end-score strong {
+  font-size: 18px;
+  font-weight: 800;
+}
+
+.total-end-score span {
+  font-size: 11px;
+  color: var(--muted);
 }
 
 /* slot strip: one card per arrow, the current one outlined in accent */

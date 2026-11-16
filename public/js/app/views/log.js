@@ -11,12 +11,11 @@ import {
   suggestedSpot,
   faceLabel,
 } from '../scoring.js';
-import { sumArrows, computeStats, fmt } from '../stats.js';
-import { endSum, endRows, sessionCounts, scoringHint } from '../endSummary.js';
+import { fmt } from '../stats.js';
+import { endSum, endRows, sessionCounts, sessionTotal, scoringHint } from '../endSummary.js';
 import * as L from '../sessionLogic.js';
 import { T } from '../strings.js';
 import { icons } from '../icons.js';
-import { card } from './common.js';
 import { faceSheet, faceViewBox, VB } from './face.js';
 import { SESSION_TYPES, TYPE_LABELS, sessionType } from '../sessionTypes.js';
 import { renderFormSetup } from './sessionSetup.js';
@@ -170,9 +169,6 @@ function renderActive(ctx, session) {
   const enter = (v, x, y, spot) => {
     if (update(ctx, (cur) => L.enterScore(cur, v, x, y, spot))) announceArrow(ctx);
   };
-
-  // the session's total: every end, the one being shot included (also while an earlier one is open)
-  const total = [...session.ends, session.current].reduce((n, e) => n + sumArrows(e.arrows), 0);
 
   // session timer: tap to pause / resume
   // sessions started before the timer existed show it stopped at 0:00; one tap starts it
@@ -384,57 +380,52 @@ function renderActive(ctx, session) {
     };
   };
 
-  // --- the session's ends, newest first: the end being shot is listed from the moment it opens
-  // (even empty); every change to it is saved as it is made
-  let run = 0;
+  // --- Total (reached by scrolling): the session's running total, then its ends: the end being
+  // shot first (live, accent edge), then the earlier ones, newest first. Tapping one opens it.
   const shownIdx = L.viewIndex(session);
-  const rows = [...session.ends, session.current].map((e, i) => {
-    const sc = sumArrows(e.arrows);
-    run += sc;
-    const st = computeStats([e]);
-    return h(
+  const endCard = (r) =>
+    h(
       'li',
       null,
       h(
         'button',
         {
           type: 'button',
-          class: ['saved-end', i === shownIdx && 'is-viewed'],
-          'aria-label': `Open end ${i + 1}`,
-          'aria-current': i === shownIdx ? 'true' : null,
-          onClick: () => update(ctx, (c) => L.goToEnd(c, i)),
+          class: ['total-end', r.isCurrent && 'is-current', r.index === shownIdx && 'is-viewed'],
+          'aria-label': `${r.isCurrent ? 'End being shot' : 'Open end'} ${r.n}: ${r.sum} points, total ${r.run}`,
+          'aria-current': r.index === shownIdx ? 'true' : null,
+          onClick: () => update(ctx, (c) => L.goToEnd(c, r.index)),
+          dataset: { fk: `total-end-${r.n}` },
         },
-        h('span', { class: 'saved-end-no' }, `E${i + 1}`),
+        h('span', { class: 'total-end-no' }, `E${r.n}`),
         h(
-          'div',
-          { class: 'saved-end-body' },
+          'span',
+          { class: 'total-end-body' },
           h(
-            'div',
-            { class: 'saved-end-arrows' },
-            e.arrows.map((a) => (a.v == null ? '–' : String(a.v))).join('  '),
+            'span',
+            { class: 'total-end-arrows', 'aria-hidden': 'true' },
+            r.arrows.map((a) => h('span', { class: `score-chip z-${zoneOf(a.v)}` }, a.v == null ? '–' : String(a.v))),
           ),
           h(
-            'div',
-            { class: 'muted small end-facts' },
-            h('span', null, `Mental ${fmt(st.avgM)}`),
-            h('span', null, `Shooting ${fmt(st.avgS)}`),
-          ),
-          h(
-            'div',
-            { class: 'muted small end-facts' },
-            h('span', null, `Let-downs ${e.ld}`),
-            h('span', null, `Correct ${e.cld}`),
+            'span',
+            { class: 'total-end-meta' },
+            `M ${fmt(r.avgM)} · S ${fmt(r.avgS)} · let-downs ${r.ld}/${r.cld}${r.isCurrent ? ' · now' : ''}`,
           ),
         ),
-        h(
-          'div',
-          { class: 'saved-end-score' },
-          h('strong', null, String(sc)),
-          h('span', { class: 'muted xsmall' }, `Σ ${run}`),
-        ),
+        h('span', { class: 'total-end-score' }, h('strong', null, String(r.sum)), h('span', null, `Σ ${r.run}`)),
       ),
     );
-  });
+  const totalSection = h(
+    'section',
+    { class: 'score-total', 'aria-labelledby': 'score-total-title' },
+    h(
+      'div',
+      { class: 'score-total-head' },
+      h('h2', { id: 'score-total-title' }, T.total),
+      h('strong', null, String(sessionTotal(session))),
+    ),
+    h('ol', { class: 'total-ends' }, endRows(session).reverse().map(endCard)),
+  );
 
   return {
     content: h(
@@ -444,12 +435,7 @@ function renderActive(ctx, session) {
         'div',
         { class: 'apl-screen-body log-body' },
         h('section', { class: 'score-screen', 'aria-label': T.endN(endNo) }, header, strip, input, under, chips),
-        card(
-          { class: 'card-list', 'aria-label': T.ends },
-          // the session's total, just over its ends
-          h('div', { class: 'ends-total' }, h('span', null, T.total), h('strong', null, String(total))),
-          h('ol', { class: 'saved-ends', reversed: true }, rows.reverse()),
-        ),
+        totalSection,
       ),
       APL.BottomBar({ children: h('div', { class: 'score-actions' }, prevBtn, nextBtn, photoButton(ctx, session)) }),
     ),
