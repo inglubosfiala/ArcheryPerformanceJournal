@@ -56,6 +56,20 @@ const PATHS = {
     ['path', { d: 'M21 5H9l-6 7 6 7h12a1 1 0 0 0 1-1V6a1 1 0 0 0-1-1z' }],
     ['path', { d: 'M17 9l-5 6M12 9l5 6' }],
   ],
+  // the rows of the Settings overview
+  theme: [
+    ['circle', { cx: 12, cy: 12, r: 9 }],
+    ['path', { d: 'M12 3v18' }],
+    ['path', { d: 'M12 7h4M12 11h5M12 15h4' }],
+  ],
+  sync: [
+    ['path', { d: 'M4 9h13l-3-3' }],
+    ['path', { d: 'M20 15H7l3 3' }],
+  ],
+  info: [
+    ['circle', { cx: 12, cy: 12, r: 9 }],
+    ['path', { d: 'M12 11v6M12 7.5v.01' }],
+  ],
 };
 
 /** Inline 24-unit stroke icon, `currentColor`, hidden from assistive technology. */

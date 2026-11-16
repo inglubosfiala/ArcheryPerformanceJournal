@@ -1,5 +1,6 @@
-// Settings: theme, sync, backup / restore and storage diagnostics (ARCHITECTURE §6.6, §8), drawn with the
-// APL components. The page has no bottom bar, so no primary button: every action is a secondary one.
+// Settings (ARCHITECTURE §6.6, §8): an overview of grouped rows, each opening a page of its own
+// (#/settings/<page>), drawn with the APL components. The pages have no bottom bar, so no primary
+// button: every action is a secondary one.
 import { h } from '../../core/dom.js';
 import * as APL from '../../ui/apl/index.js';
 import { confirmDialog } from './confirm.js';
@@ -26,15 +27,110 @@ const sectionCard = (id, label, children) =>
   card({ class: 'apl-card' }, APL.Section({ label, id, children }));
 const caption = (text) => h('p', { class: 'apl-cap13' }, text);
 
-export function renderSettings(ctx) {
+const versionText = (ctx) => `Version ${APP_VERSION === '__APP_VERSION__' ? 'dev' : APP_VERSION} · ${ctx.env} environment`;
+const dateText = (iso) => (iso ? new Date(iso).toLocaleDateString('en-GB') : 'never');
+
+// The sub-pages, by the part after #/settings/. An unknown part shows the overview.
+const PAGES = {
+  appearance: { title: 'Appearance', render: (ctx) => [appearanceCard(ctx)] },
+  sync: { title: 'Sync & backup', render: (ctx) => [syncCard(ctx), backupCard(ctx)] },
+  app: { title: 'Storage & app', render: (ctx) => [aboutCard(ctx)] },
+};
+
+export function renderSettings(ctx, params = []) {
+  const page = PAGES[params[0]];
+  if (!page) return overview(ctx);
+  return {
+    content: h(
+      'div',
+      { class: 'apl-screen' },
+      APL.ScreenHeader({ title: page.title, onBack: () => ctx.navigate('settings'), backLabel: 'Back to settings' }),
+      h('div', { class: 'apl-screen-body history-body' }, page.render(ctx)),
+    ),
+  };
+}
+
+// ---------------------------------------------------------------- Overview
+
+/** One row of the overview: icon well, title, a one-line current value, chevron; a link to its page. */
+function settingsRow({ page, icon, title, sub, accent = false }) {
+  return h(
+    'a',
+    { class: 'set-row', href: `#/settings/${page}`, dataset: { fk: `settings-${page}` } },
+    h('span', { class: ['set-row-icon', accent && 'set-row-icon--accent'], 'aria-hidden': 'true' }, icon),
+    h('span', { class: 'set-row-text' }, h('span', { class: 'set-row-title' }, title), sub),
+    h('span', { class: 'set-row-chevron', 'aria-hidden': 'true' }, APL.Icon({ name: 'chevron', size: 18 })),
+  );
+}
+
+function settingsGroup(title, rows) {
+  const id = `set-group-${title.toLowerCase()}`;
+  return h(
+    'section',
+    { class: 'set-group', 'aria-labelledby': id },
+    h('h2', { class: 'apl-label', id }, title),
+    h('div', { class: 'set-list' }, rows),
+  );
+}
+
+const rowSub = (text) => h('span', { class: 'set-row-sub' }, text);
+
+function overview(ctx) {
+  const settings = ctx.repo.getSettings();
+  const meta = ctx.repo.getMeta();
+  const theme = THEMES.find((t) => t.value === (settings.theme || 'system'))?.label || 'System';
+  const synced = ctx.sync?.configured && ctx.sync.signedIn();
+
+  const storageSub = rowSub('Storage, version, updates');
+  storageInfo().then((i) => {
+    if (i.persisted != null) storageSub.textContent = `Persistent storage ${i.persisted ? 'granted' : 'not granted'} · updates`;
+  });
+
+  return {
+    content: h(
+      'div',
+      { class: 'apl-screen' },
+      APL.ScreenHeader({ title: 'Settings' }),
+      h(
+        'div',
+        { class: 'apl-screen-body history-body' },
+        settingsGroup('App', [
+          settingsRow({ page: 'appearance', icon: APL.Icon({ name: 'theme' }), title: 'Appearance', sub: rowSub(`Theme: ${theme}`) }),
+          settingsRow({
+            page: 'sync',
+            icon: APL.Icon({ name: 'sync' }),
+            title: 'Sync & backup',
+            sub: rowSub(`${synced ? 'Google Drive on' : 'Google Drive off'} · last backup ${dateText(meta.lastBackupAt)}`),
+          }),
+          settingsRow({ page: 'app', icon: APL.Icon({ name: 'info' }), title: 'Storage & app', sub: storageSub }),
+        ]),
+        supportCard(),
+        h('p', { class: 'apl-cap set-version' }, versionText(ctx)),
+      ),
+    ),
+  };
+}
+
+// ---------------------------------------------------------------- Appearance
+
+function appearanceCard(ctx) {
+  return sectionCard('set-theme', 'Appearance', [
+    APL.SegmentedControl({
+      label: 'Theme',
+      options: THEMES,
+      value: ctx.repo.getSettings().theme || 'system',
+      onChange: (theme) => ctx.saveSettings({ theme }) && ctx.rerender(),
+      fk: 'theme',
+    }),
+    caption('Light reads better outdoors in daylight. System follows the setting of this device.'),
+  ]);
+}
+
+// ---------------------------------------------------------------- Backup
+
+function backupCard(ctx) {
   const meta = ctx.repo.getMeta();
   const pending = ctx.ui.get().importPreview;
-
-  const storageLine = caption('Checking storage…');
-  storageInfo().then((i) => {
-    const kb = (n) => (n == null ? '?' : `${Math.round(n / 1024)} KB`);
-    storageLine.textContent = `Persistent storage: ${i.persisted == null ? 'unknown' : i.persisted ? 'granted' : 'not granted'} · Used ${kb(i.usage)}${i.quota ? ` of ${Math.round(i.quota / 1048576)} MB` : ''}`;
-  });
 
   const status = h('p', { class: 'apl-cap13 error', role: 'status' });
 
@@ -91,27 +187,6 @@ export function renderSettings(ctx) {
     ctx.toast('Last import undone.');
   };
 
-  const checkUpdate = async (e) => {
-    const btn = e.currentTarget;
-    btn.disabled = true;
-    btn.textContent = 'Checking…';
-    const result = await checkForUpdate().catch(() => 'offline');
-    if (result === 'updating') {
-      // the page reloads by itself as soon as the new version has taken over
-      btn.textContent = 'New version found. Reloading…';
-      return;
-    }
-    btn.disabled = false;
-    btn.textContent = 'Check for new version';
-    ctx.toast(
-      result === 'current'
-        ? 'You have the latest version.'
-        : result === 'offline'
-          ? 'Could not check for a new version. Are you online?'
-          : 'Updates are not available in this browser.',
-    );
-  };
-
   const fileInput = h('input', {
     type: 'file',
     accept: 'application/json,.json',
@@ -164,75 +239,82 @@ export function renderSettings(ctx) {
       )
     : null;
 
-  return {
-    content: h(
-      'div',
-      { class: 'apl-screen' },
-      APL.ScreenHeader({ title: 'Settings' }),
+  return sectionCard('set-backup', 'Backup', [
+    caption(
+      ctx.sync?.signedIn()
+        ? 'Your journal is synced to your Google Drive. A backup file is an extra copy you keep yourself.'
+        : 'All data stays on this device. Export a backup file regularly and keep it somewhere private (Drive, e-mail to yourself).',
+    ),
+    h(
+      'p',
+      { class: 'apl-cap13' },
+      'Last backup: ',
       h(
-        'div',
-        { class: 'apl-screen-body history-body' },
-        sectionCard('set-theme', 'Appearance', [
-          APL.SegmentedControl({
-            label: 'Theme',
-            options: THEMES,
-            value: ctx.repo.getSettings().theme || 'system',
-            onChange: (theme) => ctx.saveSettings({ theme }) && ctx.rerender(),
-            fk: 'theme',
-          }),
-          caption('Light reads better outdoors in daylight. System follows the setting of this device.'),
-        ]),
-        syncCard(ctx),
-        supportCard(),
-        sectionCard('set-backup', 'Backup', [
-          caption(
-            ctx.sync?.signedIn()
-              ? 'Your journal is synced to your Google Drive. A backup file is an extra copy you keep yourself.'
-              : 'All data stays on this device. Export a backup file regularly and keep it somewhere private (Drive, e-mail to yourself).',
-          ),
-          h(
-            'p',
-            { class: 'apl-cap13' },
-            'Last backup: ',
-            h(
-              'strong',
-              { class: 'apl-ink' },
-              meta.lastBackupAt ? new Date(meta.lastBackupAt).toLocaleString('en-GB') : 'never',
-            ),
-          ),
-          h(
-            'div',
-            { class: 'apl-grid-2' },
-            APL.Button({ children: 'Export backup', variant: 'secondary', onClick: doExport, fk: 'export' }),
-            APL.Button({
-              children: 'Import…',
-              variant: 'secondary',
-              onClick: () => fileInput.click(),
-              fk: 'import',
-            }),
-          ),
-          fileInput,
-          importPreview,
-          ctx.repo.hasUndoImport()
-            ? h('button', { type: 'button', class: 'btn btn-text', onClick: undoImport }, 'Undo last import')
-            : null,
-          status,
-        ]),
-        sectionCard('set-about', 'Storage and app', [
-          storageLine,
-          caption(
-            `Version ${APP_VERSION === '__APP_VERSION__' ? 'dev' : APP_VERSION} · ${ctx.env} environment`,
-          ),
-          APL.Button({
-            children: 'Check for new version',
-            variant: 'secondary',
-            onClick: checkUpdate,
-            fk: 'check-update',
-          }),
-        ]),
+        'strong',
+        { class: 'apl-ink' },
+        meta.lastBackupAt ? new Date(meta.lastBackupAt).toLocaleString('en-GB') : 'never',
       ),
     ),
+    h(
+      'div',
+      { class: 'apl-grid-2' },
+      APL.Button({ children: 'Export backup', variant: 'secondary', onClick: doExport, fk: 'export' }),
+      APL.Button({
+        children: 'Import…',
+        variant: 'secondary',
+        onClick: () => fileInput.click(),
+        fk: 'import',
+      }),
+    ),
+    fileInput,
+    importPreview,
+    ctx.repo.hasUndoImport()
+      ? h('button', { type: 'button', class: 'btn btn-text', onClick: undoImport }, 'Undo last import')
+      : null,
+    status,
+  ]);
+}
+
+// ---------------------------------------------------------------- Storage and app
+
+function aboutCard(ctx) {
+  const storageLine = caption('Checking storage…');
+  storageInfo().then((i) => {
+    const kb = (n) => (n == null ? '?' : `${Math.round(n / 1024)} KB`);
+    storageLine.textContent = `Persistent storage: ${i.persisted == null ? 'unknown' : i.persisted ? 'granted' : 'not granted'} · Used ${kb(i.usage)}${i.quota ? ` of ${Math.round(i.quota / 1048576)} MB` : ''}`;
+  });
+
+  const checkUpdate = async (e) => {
+    const btn = e.currentTarget;
+    btn.disabled = true;
+    btn.textContent = 'Checking…';
+    const result = await checkForUpdate().catch(() => 'offline');
+    if (result === 'updating') {
+      // the page reloads by itself as soon as the new version has taken over
+      btn.textContent = 'New version found. Reloading…';
+      return;
+    }
+    btn.disabled = false;
+    btn.textContent = 'Check for new version';
+    ctx.toast(
+      result === 'current'
+        ? 'You have the latest version.'
+        : result === 'offline'
+          ? 'Could not check for a new version. Are you online?'
+          : 'Updates are not available in this browser.',
+    );
   };
+
+  return sectionCard('set-about', 'Storage and app', [
+    storageLine,
+    caption(versionText(ctx)),
+    APL.Button({
+      children: 'Check for new version',
+      variant: 'secondary',
+      onClick: checkUpdate,
+      fk: 'check-update',
+    }),
+  ]);
 }
 
 // ---------------------------------------------------------------- Support
