@@ -3,13 +3,16 @@
 // phase (amber: get ready, green: hold, dark: rest) so it can be read from the corner of the eye at
 // full draw. It beeps and buzzes at every change and on the last three seconds of a phase, so it can
 // be followed without looking (the toggle at the top silences both), and keeps the screen awake
-// while it is open. Nothing is stored but the sound choice: closing it returns to the session form.
+// while it is open. Nothing is stored but the sound choice. When the drill ends it shows Done for a
+// moment (the finish beeps play) and closes by itself, back to the session form.
 import { h, s } from '../../core/dom.js';
 import * as APL from '../../ui/apl/index.js';
 import { tabataPlan, tabataAt, tabataStartOf, tabataClock } from '../tabata.js';
 import { hourMinute } from '../sessionTypes.js';
 
 const PHASE_NAMES = { prepare: 'Get ready', work: 'Hold', rest: 'Rest', setRest: 'Rest between sets' };
+
+const AUTO_CLOSE_MS = 1200; // Done stays this long (the finish beeps take ~0.6 s), then the timer closes
 
 const RING_R = 132;
 const RING_C = 2 * Math.PI * RING_R; // the ring's length: its dash offset empties it
@@ -97,6 +100,7 @@ export function tabataTimer({ title, work, rest, reps, sets }) {
     let frame = 0;
     let shown = { index: -1, sec: -1, done: false };
     let wakeLock = null;
+    let autoClose = 0;
     let soundOn = readSound();
 
     // --- sound: short beeps from an oscillator (no audio files). Created here, inside the tap
@@ -277,6 +281,7 @@ export function tabataTimer({ title, work, rest, reps, sets }) {
           beep(880, 180);
           setTimeout(() => beep(1175, 420), 200);
           buzz([120, 80, 300]);
+          autoClose = setTimeout(() => finish(true), AUTO_CLOSE_MS);
         }
         return;
       }
@@ -347,6 +352,7 @@ export function tabataTimer({ title, work, rest, reps, sets }) {
       else if (at.done || at.phase.sec * 1000 - at.leftMs < 1500) index -= 1;
       elapsed = tabataStartOf(plan, index);
       if (shown.done) {
+        clearTimeout(autoClose); // back from Done: the timer stays open
         running = true;
         dialog.classList.remove('is-paused');
       }
@@ -370,6 +376,7 @@ export function tabataTimer({ title, work, rest, reps, sets }) {
       if (closed) return;
       closed = true;
       clearTimeout(frame);
+      clearTimeout(autoClose);
       document.removeEventListener('visibilitychange', onVisible);
       wakeLock?.release?.().catch(() => {});
       audio?.close?.().catch(() => {});

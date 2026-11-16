@@ -865,28 +865,24 @@ body {
   align-self: center;
   min-height: var(--tap-min);
 }
-/* a done drill folded to one line */
+/* a done drill: one read-only line, with only its remove button */
 .drill-done {
   display: flex;
   align-items: center;
   gap: var(--space-3);
   width: 100%;
   min-height: 64px;
-  padding: 0 var(--space-4);
+  padding: 0 8px 0 var(--space-4);
   border-radius: var(--radius-xl);
   border: 1px solid var(--border);
   background: var(--surface);
   color: var(--ink);
-  text-align: left;
-  font-family: inherit;
-  cursor: pointer;
 }
 .drill-done-text {
   flex: 1;
 }
-.drill-done > svg {
+.drill-done .apl-iconbtn {
   color: var(--muted);
-  flex-shrink: 0;
 }
 /* "Add a drill": compact dashed chips that wrap */
 .drill-add {

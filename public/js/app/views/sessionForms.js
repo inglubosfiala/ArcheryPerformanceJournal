@@ -23,6 +23,7 @@ import {
 } from '../drillView.js';
 import { tabataTimer } from './tabataTimer.js';
 import { stepperTile } from './common.js';
+import { confirmDialog } from './confirm.js';
 import * as APL from '../../ui/apl/index.js';
 
 /** Empty strength / mental session fields. */
@@ -36,18 +37,23 @@ export function emptyForm(type) {
 
 // --------------------------------------------------------------------------- SPT drills
 
-// Done drills the archer opened again (tapped the one-line card). Held by the drill object itself:
-// a drill keeps its object until it changes, and a change to its numbers clears `done` anyway.
-const expandedDone = new WeakSet();
-
-/** Whether a drill is drawn as its full card (not the one-line card of a done drill). */
-const isOpen = (d) => !d.done || expandedDone.has(d);
-
 /**
  * Whether the drills show a primary "Start timer" button: then the page's own Save button steps
- * down to the secondary style, so there are never two green buttons on screen.
+ * down to the secondary style, so there are never two green buttons on screen. A done drill is a
+ * read-only line: it has no timer to start again.
  */
-export const showsStartTimer = (drills = []) => drills.some((d) => hasHold(d) && isOpen(d));
+export const showsStartTimer = (drills = []) => drills.some((d) => hasHold(d) && !d.done);
+
+/** Remove drill `i` after a yes. */
+async function removeDrill(i, name, change) {
+  const ok = await confirmDialog({
+    title: `Remove ${name}?`,
+    message: 'The drill and its numbers are taken out of this session.',
+    confirmLabel: 'Remove',
+    danger: true,
+  });
+  if (ok) change((c) => ({ drills: (c.drills || []).filter((_, j) => j !== i) }));
+}
 
 const DRILL_FIELDS = [
   ['sets', 'Sets', ''],
@@ -73,7 +79,7 @@ function drillsSection(drills, change) {
       h(
         'div',
         { class: 'drill-list' },
-        drills.map((d, i) => (isOpen(d) ? drillCard(d, i, setDrill, change) : doneCard(d, i, change))),
+        drills.map((d, i) => (d.done ? doneCard(d, i, change) : drillCard(d, i, setDrill, change))),
       ),
       h(
         'div',
@@ -108,21 +114,12 @@ function withPatch(d, patch) {
   return next;
 }
 
-/** A done drill, folded to one line; tapping it opens the full card. */
+/** A done drill: one read-only line (nothing to change, no timer to run again); it can only be removed. */
 function doneCard(d, i, change) {
   const name = drillLabel(d.kind);
   return h(
-    'button',
-    {
-      type: 'button',
-      class: 'drill-done',
-      'aria-label': `${name}, ${drillSummary(d)}, done. Show the drill`,
-      dataset: { fk: `drill-${i}-open` },
-      onClick: () => {
-        expandedDone.add(d);
-        change(() => ({}));
-      },
-    },
+    'section',
+    { class: 'drill-done', 'aria-label': `${name}, done` },
     h('span', { class: 'drill-well drill-well--done' }, drillIcon(d)),
     h(
       'span',
@@ -130,7 +127,12 @@ function doneCard(d, i, change) {
       h('span', { class: 'apl-t' }, name),
       h('span', { class: 'apl-cap13' }, `${drillSummary(d, { short: true })} · done`),
     ),
-    APL.Icon({ name: 'chevron', size: 18 }),
+    APL.IconButton({
+      icon: 'close',
+      label: `Remove ${name}`,
+      onClick: () => removeDrill(i, name, change),
+      fk: `drill-${i}-remove`,
+    }),
   );
 }
 
@@ -180,7 +182,7 @@ function drillCard(d, i, setDrill, change) {
   startBtn?.append(startText);
 
   function refresh() {
-    summary.textContent = cur.done ? `${drillSummary(cur)} · done` : drillSummary(cur);
+    summary.textContent = drillSummary(cur);
     if (!hold) return;
     const on = presetOf(cur);
     presetBtns.forEach((b, k) => b.setAttribute('aria-pressed', String(SPT_PRESETS[k] === on)));
@@ -221,7 +223,7 @@ function drillCard(d, i, setDrill, change) {
       APL.IconButton({
         icon: 'close',
         label: `Remove ${name}`,
-        onClick: () => change((c) => ({ drills: (c.drills || []).filter((_, j) => j !== i) })),
+        onClick: () => removeDrill(i, name, change),
         fk: `drill-${i}-remove`,
       }),
     ),
@@ -236,9 +238,9 @@ function drillCard(d, i, setDrill, change) {
             type: 'button',
             class: 'btn btn-text drill-mark',
             dataset: { fk: `drill-${i}-done` },
-            onClick: () => setDrill(i, { done: !cur.done }),
+            onClick: () => setDrill(i, { done: true }),
           },
-          cur.done ? 'Mark not done' : 'Mark done',
+          'Mark done',
         ),
   );
 }
