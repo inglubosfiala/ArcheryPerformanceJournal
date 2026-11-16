@@ -2323,24 +2323,68 @@ button.arrow-count:hover {
   gap: var(--space-2);
 }
 
+/* a tile: the slot itself (chip + "M1 S2", selects the arrow) and, on the selected scored arrow,
+   the × that clears it (a 32px dot in a 44px hit area) */
 .slot-card {
   display: flex;
   align-items: center;
-  gap: var(--space-2);
   min-width: 0;
-  min-height: 52px;
-  padding: 0 10px;
+  min-height: 48px;
   border: 1px solid var(--border);
   border-radius: var(--radius-md);
   background: var(--surface);
   color: var(--ink);
-  font: inherit;
-  text-align: left;
 }
 
 .slot-card.is-active {
   border-color: var(--accent-bright);
   box-shadow: inset 0 0 0 1px var(--accent-bright);
+}
+
+.slot-pick {
+  flex: 1;
+  min-width: 0;
+  align-self: stretch;
+  min-height: var(--tap-min);
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: 0 0 0 8px;
+  border: 0;
+  border-radius: inherit;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+}
+
+.slot-clear {
+  flex: none;
+  width: var(--tap-min);
+  height: var(--tap-min);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--danger);
+}
+
+.slot-clear-dot {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: color-mix(in srgb, var(--danger) 14%, var(--surface));
+}
+
+.slot-clear-dot svg {
+  width: 14px;
+  height: 14px;
+  stroke-width: 3;
 }
 
 .slot-card .score-chip {
@@ -2356,33 +2400,22 @@ button.arrow-count:hover {
   color: var(--muted);
 }
 
-.slot-card-text {
-  display: flex;
-  flex-direction: column;
-  min-width: 0;
-  line-height: 1.25;
-}
-
 .slot-card-grades {
-  display: flex;
-  gap: 6px;
-  font-size: 13px;
+  min-width: 0;
+  overflow: hidden;
+  font-size: 12px;
   font-weight: 600;
   color: var(--ink-soft);
   white-space: nowrap;
 }
 
-/* more than six arrows: smaller cards, the chip over the grades */
-.slot-strip.is-compact .slot-card {
+/* more than six arrows: smaller tiles, the chip over the grades */
+.slot-strip.is-compact .slot-pick {
   flex-direction: column;
   justify-content: center;
   gap: 2px;
   min-height: 56px;
   padding: 4px 0;
-}
-
-.slot-strip.is-compact .slot-card-text {
-  align-items: center;
 }
 
 .slot-strip.is-compact .slot-card-grades {
@@ -2492,28 +2525,6 @@ button.arrow-count:hover {
 /* the chosen grade: a 3px ring (the others dim) */
 .score-under .grade-panel .apl-key[aria-pressed='true'] {
   box-shadow: 0 0 0 3px var(--ink);
-}
-
-/* the row under the slot strip: Clear arrow n under the rightmost card. It keeps its height when
-   empty, so the face stays put. */
-.strip-tools {
-  display: flex;
-  justify-content: flex-end;
-  min-height: var(--tap-min);
-}
-
-/* Clear arrow n: a destructive control, so danger outline and text */
-.score-clear {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  min-height: var(--tap-min);
-  padding: 0 14px;
-  border: 1px solid var(--danger);
-  border-radius: var(--radius-md);
-  background: transparent;
-  color: var(--danger);
-  font: var(--type-body-strong);
 }
 
 /* bottom bar: Previous / Next end, and Scan (the most used: accent outline) */

@@ -233,26 +233,38 @@ function renderActive(ctx, session) {
     },
     current.arrows.map((a, i) => {
       const active = i === cursor;
-      // only the grades already given ("M1", "M1 S2"); nothing while neither is set
-      const grades = [a.m != null && `M${a.m}`, a.s != null && `S${a.s}`].filter(Boolean);
+      // "M1 S2" once the arrow has a score or a grade ("–" for a grade not given yet)
+      const grades = a.v != null || a.m != null || a.s != null ? `M${a.m ?? '–'} S${a.s ?? '–'}` : '';
       return h(
-        'button',
-        {
-          type: 'button',
-          class: ['slot-card', active && 'is-active', active && editing && 'is-moving'],
-          'aria-label': `${T.arrowN(i + 1)}${a.v == null ? ', empty' : `, ${a.v}`}${a.m ? `, M${a.m}` : ''}${a.s ? `, S${a.s}` : ''}${active ? ', selected' : ''}`,
-          'aria-pressed': String(active),
-          dataset: { fk: `slot-${i}` },
-          onClick: () => update(ctx, (cur) => L.selectArrow(cur, i)),
-        },
-        h('span', { class: `score-chip z-${zoneOf(a.v)}`, 'aria-hidden': 'true' }, a.v == null ? String(i + 1) : String(a.v)),
+        'div',
+        { class: ['slot-card', active && 'is-active', active && editing && 'is-moving'] },
         h(
-          'span',
-          { class: 'slot-card-text', 'aria-hidden': 'true' },
-          grades.length
-            ? h('span', { class: 'slot-card-grades' }, grades.map((g) => h('span', null, g)))
-            : null,
+          'button',
+          {
+            type: 'button',
+            class: 'slot-pick',
+            'aria-label': `${T.arrowN(i + 1)}${a.v == null ? ', empty' : `, ${a.v}`}${a.m ? `, M${a.m}` : ''}${a.s ? `, S${a.s}` : ''}${active ? ', selected' : ''}`,
+            'aria-pressed': String(active),
+            dataset: { fk: `slot-${i}` },
+            onClick: () => update(ctx, (cur) => L.selectArrow(cur, i)),
+          },
+          h('span', { class: `score-chip z-${zoneOf(a.v)}`, 'aria-hidden': 'true' }, a.v == null ? String(i + 1) : String(a.v)),
+          grades ? h('span', { class: 'slot-card-grades', 'aria-hidden': 'true' }, grades) : null,
         ),
+        // only the selected, scored arrow: × empties its score, position and grades (today's Clear)
+        active && a.v != null
+          ? h(
+              'button',
+              {
+                type: 'button',
+                class: 'slot-clear',
+                'aria-label': T.clearArrow(i + 1),
+                onClick: () => update(ctx, L.clearArrow),
+                dataset: { fk: 'clear-arrow' },
+              },
+              h('span', { class: 'slot-clear-dot', 'aria-hidden': 'true' }, icons.close()),
+            )
+          : null,
       );
     }),
   );
@@ -291,29 +303,6 @@ function renderActive(ctx, session) {
           { class: 'score-under' },
           gradePanel(session, { onGrade: (kind, g) => update(ctx, (c) => L.gradeArrow(c, kind, g)) }),
         );
-
-  // --- under the slot strip, at the right: Clear for a scored selected arrow (empties its score,
-  // position and grades; its slot is filled next). The row keeps its height without the button, so
-  // the face does not move when it appears.
-  const stripTools = h(
-    'div',
-    { class: 'strip-tools' },
-    picked.v != null
-      ? h(
-          'button',
-          {
-            type: 'button',
-            class: 'score-clear',
-            // the button says just "Clear"; screen readers hear which arrow
-            'aria-label': T.clearArrow(cursor + 1),
-            onClick: () => update(ctx, L.clearArrow),
-            dataset: { fk: 'clear-arrow' },
-          },
-          icons.clear(),
-          T.clear,
-        )
-      : null,
-  );
 
   // --- bottom bar, in thumb reach: Previous / Next end, and Scan (the most used) at the end.
   // There is no Save end step (every change is saved as it is made): Next opens the next end, and
@@ -425,7 +414,7 @@ function renderActive(ctx, session) {
       h(
         'div',
         { class: 'apl-screen-body log-body' },
-        h('section', { class: 'score-screen', 'aria-label': T.endN(endNo) }, header, strip, stripTools, input, under),
+        h('section', { class: 'score-screen', 'aria-label': T.endN(endNo) }, header, strip, input, under),
         details,
         card(
           { class: 'card-list', 'aria-label': T.ends },
