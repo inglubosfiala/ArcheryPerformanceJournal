@@ -47,6 +47,7 @@ const SHELL = [
   './js/pwa/updates.js',
   './js/app/collections.js',
   './js/app/lastSetup.js',
+  './js/app/sessionInsights.js',
   './js/app/gearFields.js',
   './js/app/icons.js',
   './js/app/scoring.js',
