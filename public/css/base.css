@@ -2078,16 +2078,223 @@ button.arrow-count:hover {
   gap: var(--space-2);
 }
 
-.score-head-text {
+/* "End n · 27 ▾" over "18 m · 40 cm triple · sight 5 / 0": opens the ends so far */
+.score-endbtn {
   flex: 1;
   min-width: 0;
+  min-height: var(--tap-min);
   display: flex;
   flex-direction: column;
+  justify-content: center;
+  align-items: flex-start;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--ink);
+  font: inherit;
+  text-align: left;
 }
 
 .score-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
   margin: 0;
-  font: var(--type-screen-title);
+  font-size: 18px;
+  font-weight: 700;
+  line-height: 1.25;
+}
+
+.score-title .end-of {
+  margin-left: -6px;
+}
+
+.score-endbtn-sum {
+  color: var(--muted);
+  font-weight: 600;
+}
+
+.score-endbtn-caret {
+  display: flex;
+  color: var(--muted);
+  transform: rotate(90deg);
+}
+
+.score-endbtn-sub {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+/* Finish: outlined, next to the timer; opens the End the session sheet */
+.score-finish {
+  flex: none;
+  height: var(--tap-min);
+  padding: 0 14px;
+  border: 1px solid var(--accent-bright);
+  border-radius: var(--radius-pill);
+  background: transparent;
+  color: var(--accent-bright);
+  font: var(--type-body-strong);
+}
+
+/* the ends so far: drops from the top of the screen */
+.apl-dialog--sheet.score-drop {
+  margin-bottom: auto;
+  border-width: 0 0 1px;
+  border-radius: 0 0 var(--radius-xl) var(--radius-xl);
+  padding: var(--space-3) var(--space-5) var(--space-4);
+  animation: score-drop-in 160ms ease-out;
+}
+
+@keyframes score-drop-in {
+  from {
+    transform: translateY(-24px);
+    opacity: 0.6;
+  }
+}
+
+.score-drop .apl-dialog-title {
+  font-size: 18px;
+}
+
+.score-drop-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.score-drop-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: var(--tap-min);
+  border-top: 1px solid var(--border-soft);
+  font-size: 15px;
+}
+
+.score-drop-no {
+  width: 28px;
+  color: var(--muted);
+}
+
+.score-drop-arrows {
+  flex: 1;
+  min-width: 0;
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.score-drop-grades {
+  font-size: 13px;
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+.score-drop-sum {
+  width: 32px;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.score-drop-row.is-current .score-drop-no {
+  color: var(--accent-bright);
+  font-weight: 700;
+}
+
+/* the Finish sheet and the Discard confirmation */
+.score-sheet {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.score-sheet-summary {
+  margin: 0 0 4px;
+  font-size: 14px;
+  color: var(--muted);
+}
+
+.score-danger-btn,
+.score-text-btn {
+  min-height: 52px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  border-radius: var(--radius-xl);
+  font: var(--type-body-strong);
+}
+
+.score-danger-btn {
+  border: 1px solid color-mix(in srgb, var(--danger) 45%, var(--surface));
+  background: color-mix(in srgb, var(--danger) 12%, var(--surface));
+  color: var(--danger);
+}
+
+.score-text-btn {
+  border: 0;
+  background: transparent;
+  color: var(--ink);
+}
+
+.score-discard-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.score-discard-well {
+  flex: none;
+  width: 44px;
+  height: 44px;
+  border-radius: var(--radius-md);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: color-mix(in srgb, var(--danger) 12%, var(--surface));
+  color: var(--danger);
+}
+
+.score-facts {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.score-fact {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 10px 0;
+  border-radius: var(--radius-md);
+  background: var(--surface-sunken);
+}
+
+.score-fact strong {
+  font-size: 20px;
+  font-variant-numeric: tabular-nums;
+}
+
+.score-fact span {
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.score-discard-desc {
+  margin: 0;
+  font-size: 15px;
+  line-height: 22px;
+  color: var(--ink-soft);
+}
+
+.score-discard-desc strong {
+  color: var(--ink);
 }
 
 /* the session's total, just over the list of its ends (lines up with the ends' scores) */

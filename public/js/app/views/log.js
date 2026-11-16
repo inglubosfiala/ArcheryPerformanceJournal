@@ -9,8 +9,10 @@ import {
   spotCentres,
   zoneOf,
   suggestedSpot,
+  faceLabel,
 } from '../scoring.js';
 import { sumArrows, computeStats, fmt } from '../stats.js';
+import { endSum, endRows, sessionCounts } from '../endSummary.js';
 import * as L from '../sessionLogic.js';
 import { T } from '../strings.js';
 import { icons } from '../icons.js';
@@ -30,11 +32,21 @@ import { PHOTO_MAX, canScan, createScan } from '../scan.js';
 import { loupeCorner, loupeBox } from '../loupePlacement.js';
 import { activeSetup, findSightMark } from '../gearFields.js';
 
+// 'finish' or 'discard' while the scoring screen calls running.finish() / discard() after its own
+// sheet got the archer's yes (see askAboutRunningSession)
+let answeredOnPage = null;
+
 /**
  * The running session's questions to the archer, as dialogs (the `confirm` adapter of
  * runningSession.js).
  */
 export function askAboutRunningSession(q) {
+  // Finish and Discard are asked on the scoring screen's own sheets before it calls
+  // running.finish() / discard(); that answer is not asked a second time
+  if (answeredOnPage && answeredOnPage === q.kind) {
+    answeredOnPage = null;
+    return Promise.resolve(true);
+  }
   if (q.kind === 'replace') {
     return confirmDialog({
       title: 'A session is in progress',
@@ -168,21 +180,44 @@ function renderActive(ctx, session) {
     update(ctx, (c) => (c.timer?.running ? L.pauseTimer(c) : L.resumeTimer(c))),
   );
 
-  // --- top: the end, the session's total, distance and face, and the timer
+  // the sheet open over the page: 'ends' (ends so far), 'finish', 'discard' or 'details'
+  const { sheet, setSheet } = scoreSheet(ctx, session);
+
+  // --- top: "End n · its score ▾" (opens the ends so far), distance · face · sight mark, the timer
+  // and Finish
+  const shownSum = endSum(current);
+  const sightText = sight && (sight.elevation || sight.windage) ? [sight.elevation, sight.windage].filter(Boolean).join(' / ') : null;
+  const subtitle = [`${session.distance} m`, faceLabel(session.face), sightText && `sight ${sightText}`].filter(Boolean).join(' · ');
   const header = h(
     'header',
     { class: 'score-head' },
     h(
-      'div',
-      { class: 'score-head-text' },
+      'button',
+      {
+        type: 'button',
+        class: 'score-endbtn',
+        'aria-haspopup': 'dialog',
+        'aria-expanded': String(sheet === 'ends'),
+        'aria-label': `${T.endN(endNo)}${viewing ? T.endOf(totalEnds) : ''}, ${shownSum} points, ${subtitle}. ${T.endsSoFar}`,
+        onClick: () => setSheet('ends'),
+        dataset: { fk: 'ends-menu' },
+      },
       h(
-        'h2',
-        { class: 'score-title' },
+        'span',
+        { class: 'score-title', 'aria-hidden': 'true' },
         T.endN(endNo),
-        viewing ? h('span', { class: 'end-of muted' }, T.endOf(totalEnds)) : null,
+        viewing ? h('span', { class: 'end-of' }, T.endOf(totalEnds)) : null,
+        h('span', { class: 'score-endbtn-sum' }, `· ${shownSum}`),
+        h('span', { class: 'score-endbtn-caret' }, icons.chevron()),
       ),
+      h('span', { class: 'score-endbtn-sub', 'aria-hidden': 'true' }, subtitle),
     ),
     timerBtn,
+    h(
+      'button',
+      { type: 'button', class: 'score-finish', 'aria-haspopup': 'dialog', onClick: () => setSheet('finish'), dataset: { fk: 'finish-open' } },
+      T.finishShort,
+    ),
   );
 
   // --- slot strip: one card per slot; tapping one makes it the selected arrow
@@ -318,18 +353,6 @@ function renderActive(ctx, session) {
       }),
     });
 
-  const canFinish = L.canFinish(session);
-  // Finish asks OK / Cancel first; the timer is paused meanwhile and runs on if it is cancelled
-  const finish = async () => {
-    const res = await ctx.running.finish();
-    // the overview opens with the review to write
-    if (res.status === 'finished') ctx.navigate(`history/${encodeURIComponent(res.session.id)}/review`, { replace: true });
-  };
-  const discard = async () => {
-    const res = await ctx.running.discard();
-    if (res.status === 'discarded') ctx.navigate('home', { replace: true });
-  };
-
   const details = card(
     { class: 'end-details' },
     h('div', { class: 'apl-grid-2' }, stepper('ld', T.letDowns), stepper('cld', T.correctLetDowns)),
@@ -341,7 +364,6 @@ function renderActive(ctx, session) {
       fk: 'note',
       onInput: (e) => update(ctx, (c) => L.setNote(c, e.target.value), { rerender: false }),
     }),
-    APL.Button({ children: T.finish, variant: 'secondary', disabled: !canFinish, onClick: finish, fk: 'finish' }),
   );
 
   // --- the session's ends, newest first: the end being shot is listed from the moment it opens
@@ -396,16 +418,6 @@ function renderActive(ctx, session) {
     );
   });
 
-  // the sight mark for this distance, when one is saved
-  const pills =
-    sight && (sight.elevation || sight.windage)
-      ? h(
-          'div',
-          { class: 'end-sight' },
-          APL.Badge({ children: `Sight ${[sight.elevation, sight.windage].filter(Boolean).join(' / ')}`, tone: 'neutral' }),
-        )
-      : null;
-
   return {
     content: h(
       'div',
@@ -414,7 +426,6 @@ function renderActive(ctx, session) {
         'div',
         { class: 'apl-screen-body log-body' },
         h('section', { class: 'score-screen', 'aria-label': T.endN(endNo) }, header, strip, stripTools, input, under),
-        pills,
         details,
         card(
           { class: 'card-list', 'aria-label': T.ends },
@@ -422,9 +433,189 @@ function renderActive(ctx, session) {
           h('div', { class: 'ends-total' }, h('span', null, T.total), h('strong', null, String(total))),
           h('ol', { class: 'saved-ends', reversed: true }, rows.reverse()),
         ),
-        h('button', { type: 'button', class: 'btn btn-text danger apl-discard', onClick: discard }, T.discardSession),
       ),
       APL.BottomBar({ children: h('div', { class: 'score-actions' }, prevBtn, nextBtn, photoButton(ctx, session)) }),
+    ),
+    overlay: scoreOverlay(ctx, session, { sheet, setSheet }),
+  };
+}
+
+// ---------------------------------------------------------------- sheets over the scoring screen
+
+/** The sheet open over the scoring screen (ui state `score`, kept per session). */
+function scoreSheet(ctx, session) {
+  const cur = ctx.ui.get().score;
+  const sheet = cur?.id === session.id ? cur.sheet : null;
+  return { sheet, setSheet: (next) => ctx.ui.set({ score: { id: session.id, sheet: next } }) };
+}
+
+/** Finish (after the Finish sheet's yes): the overview opens with the review to write. */
+async function finishFromPage(ctx) {
+  ctx.ui.quietSet({ score: null });
+  answeredOnPage = 'finish';
+  try {
+    const res = await ctx.running.finish();
+    if (res.status === 'finished') ctx.navigate(`history/${encodeURIComponent(res.session.id)}/review`, { replace: true });
+    else ctx.rerender();
+  } finally {
+    answeredOnPage = null;
+  }
+}
+
+/** Discard (after the Discard confirmation's yes): the session is deleted, the Dashboard opens. */
+async function discardFromPage(ctx) {
+  ctx.ui.quietSet({ score: null });
+  answeredOnPage = 'discard';
+  try {
+    const res = await ctx.running.discard();
+    if (res.status === 'discarded') ctx.navigate('home', { replace: true });
+    else ctx.rerender();
+  } finally {
+    answeredOnPage = null;
+  }
+}
+
+function scoreOverlay(ctx, session, { sheet, setSheet }) {
+  const close = () => setSheet(null);
+  if (sheet === 'ends') return endsPanel(session, close);
+  if (sheet === 'finish') return finishSheet(ctx, session, { close, setSheet });
+  if (sheet === 'discard') return discardSheet(ctx, session, close);
+  return null;
+}
+
+const arrowText = (v) => (v == null ? '–' : String(v));
+const avgText = (m, s) => `M${fmt(m)} S${fmt(s)}`;
+
+/** "Ends so far": drops from the header, one row per end with its scores, grades and sum. */
+function endsPanel(session, close) {
+  const rows = endRows(session);
+  const total = rows.length ? rows[rows.length - 1].run : 0;
+  const counted = sessionCounts(session).ends;
+  const title = `${T.total} ${total} · ${counted} ${counted === 1 ? 'end' : 'ends'}`;
+  return {
+    onClose: close,
+    returnFk: 'ends-menu',
+    node: h(
+      'section',
+      { class: 'apl apl-dialog apl-dialog--sheet score-drop', role: 'dialog', 'aria-modal': 'true', 'aria-labelledby': 'score-drop-title' },
+      h(
+        'div',
+        { class: 'apl-dialog-sheethead' },
+        h('h2', { class: 'apl-dialog-title', id: 'score-drop-title' }, title),
+        h('button', { type: 'button', class: 'apl-iconbtn', 'aria-label': 'Close', onClick: close, dataset: { autofocus: '' } }, icons.close()),
+      ),
+      h(
+        'ol',
+        { class: 'score-drop-list' },
+        rows.map((r) =>
+          h(
+            'li',
+            { class: ['score-drop-row', r.isCurrent && 'is-current'] },
+            h('span', { class: 'score-drop-no' }, `E${r.n}`),
+            h('span', { class: 'score-drop-arrows' }, r.arrows.map((a) => arrowText(a.v)).join(' ')),
+            h('span', { class: 'score-drop-grades' }, avgText(r.avgM, r.avgS)),
+            h('strong', { class: 'score-drop-sum' }, String(r.sum)),
+          ),
+        ),
+      ),
+    ),
+  };
+}
+
+/** "End the session": Finish and save · Discard session… · Keep shooting. */
+function finishSheet(ctx, session, { close, setSheet }) {
+  const c = sessionCounts(session);
+  const clock = L.formatClock(L.timerElapsed(session.timer || { running: false, elapsedMs: 0 }));
+  const summary = [
+    `${c.ends} ${c.ends === 1 ? 'end' : 'ends'}`,
+    `${c.arrows} ${c.arrows === 1 ? 'arrow' : 'arrows'}`,
+    `total ${c.total}`,
+    clock,
+  ].join(' · ');
+  return {
+    onClose: close,
+    returnFk: 'finish-open',
+    node: APL.Dialog({
+      sheet: true,
+      title: T.endSession,
+      idPrefix: 'score-finish',
+      onClose: close,
+      closeLabel: T.keepShooting,
+      children: h(
+        'div',
+        { class: 'score-sheet' },
+        h('p', { class: 'score-sheet-summary' }, summary),
+        APL.Button({
+          children: T.finishAndSave,
+          leadingIcon: icons.check(),
+          disabled: !L.canFinish(session),
+          onClick: () => finishFromPage(ctx),
+          fk: 'finish',
+        }),
+        h(
+          'button',
+          { type: 'button', class: 'score-danger-btn', onClick: () => setSheet('discard'), dataset: { fk: 'discard-open' } },
+          icons.trash(),
+          T.discardEllipsis,
+        ),
+        h('button', { type: 'button', class: 'score-text-btn', onClick: close, dataset: { fk: 'keep-shooting' } }, T.keepShooting),
+      ),
+    }),
+  };
+}
+
+/** Discard confirmation: what is lost, Keep shooting first (also Esc and the scrim). */
+function discardSheet(ctx, session, close) {
+  const c = sessionCounts(session);
+  const clock = L.formatClock(L.timerElapsed(session.timer || { running: false, elapsedMs: 0 }));
+  const fact = (value, label) => h('span', { class: 'score-fact' }, h('strong', null, value), h('span', null, label));
+  return {
+    onClose: close,
+    returnFk: 'finish-open',
+    node: h(
+      'section',
+      {
+        class: 'apl apl-dialog apl-dialog--sheet',
+        role: 'alertdialog',
+        'aria-modal': 'true',
+        'aria-labelledby': 'score-discard-title',
+        'aria-describedby': 'score-discard-desc',
+      },
+      h(
+        'div',
+        { class: 'score-discard-head' },
+        h('span', { class: 'score-discard-well', 'aria-hidden': 'true' }, icons.trash()),
+        h('h2', { class: 'apl-dialog-title', id: 'score-discard-title' }, T.discardTitle),
+      ),
+      h(
+        'div',
+        { class: 'score-facts' },
+        fact(String(c.ends), c.ends === 1 ? 'end' : 'ends'),
+        fact(String(c.arrows), c.arrows === 1 ? 'arrow' : 'arrows'),
+        fact(clock, 'shot'),
+      ),
+      h('p', { class: 'score-discard-desc', id: 'score-discard-desc' }, T.discardLoss, h('strong', null, T.cannotBeUndone), '.'),
+      h(
+        'div',
+        { class: 'score-sheet' },
+        h(
+          'button',
+          { type: 'button', class: 'apl apl-btn', onClick: close, dataset: { autofocus: '', fk: 'keep-shooting' } },
+          T.keepShooting,
+        ),
+        APL.Button({
+          children: T.finishInstead,
+          variant: 'secondary',
+          disabled: !L.canFinish(session),
+          onClick: () => finishFromPage(ctx),
+          fk: 'finish-instead',
+        }),
+        h(
+          'button',
+          { type: 'button', class: 'score-danger-btn', onClick: () => discardFromPage(ctx), dataset: { fk: 'discard' } },
+          T.discardSession,
+        ),
+      ),
     ),
   };
 }

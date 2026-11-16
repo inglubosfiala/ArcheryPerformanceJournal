@@ -857,10 +857,6 @@
   gap: var(--space-3);
 }
 
-.end-sight {
-  display: flex;
-}
-
 .end-details {
   display: flex;
   flex-direction: column;
