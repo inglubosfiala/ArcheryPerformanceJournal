@@ -382,12 +382,14 @@ export function AddButton({ children, onClick, fk }) {
 export const FACE_NAMES = {
   full: 'Full face',
   six: '10–6 rings',
+  ring6: '10–5 rings',
   triple: 'Triple vertical',
   vegas: 'Vegas 3-spot',
 };
 export const FACE_HINTS = {
   full: 'All 10 rings',
   six: 'Rings 6–10 only',
+  ring6: 'WA 6-ring face: rings 5–10',
   triple: 'Three 10–6 spots, one arrow each',
   vegas: 'Triangle of three 10–6 spots',
 };
@@ -414,6 +416,15 @@ export function TargetFace({ kind = 'full', size = 84 }) {
       ['red', 39],
       ['red', 29],
       ['gold', 19],
+      ['gold', 9],
+    ].map(([c, r]) => s('circle', { class: `${c} sep`, cx: 50, cy: 50, r }));
+  } else if (kind === 'ring6') {
+    kids = [
+      ['blue', 49],
+      ['blue', 41],
+      ['red', 33],
+      ['red', 25],
+      ['gold', 17],
       ['gold', 9],
     ].map(([c, r]) => s('circle', { class: `${c} sep`, cx: 50, cy: 50, r }));
   } else if (kind === 'triple') {

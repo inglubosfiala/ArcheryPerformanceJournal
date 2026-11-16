@@ -1,9 +1,9 @@
 // Scoring rules (HANDOFF §5). Pure functions, unit-tested.
+//
+// Every face is data (FACES below): its printed rings, its spots and how it is scored. Everything
+// else (ring edges, scoring zones, keypad, colours, labels) is derived from that one entry.
 
-export const DISTANCES = [7, 18, 25, 30, 50, 60, 70];
-export const FACE_IDS = ['40s', '40t', '40v', '40', '60s', '60', '80s', '80', '122'];
-/** Faces offered for a new session: every size also as its reduced 10–6 face where that exists. */
-export const SETUP_FACES = ['40t', '40v', '40s', '40', '60s', '60', '80s', '80', '122'];
+export const DISTANCES = [7, 18, 25, 30, 40, 50, 60, 70, 90];
 export const ARROWS_PER_END_MIN = 1;
 export const ARROWS_PER_END_MAX = 12;
 export const DEFAULT_ARROWS_PER_END = 3;
@@ -11,46 +11,105 @@ export const isValidArrowsPerEnd = (n) => Number.isInteger(n) && n >= ARROWS_PER
 export const ARROW_VALUES = ['X', 10, 9, 8, 7, 6, 5, 4, 3, 2, 1, 'M'];
 export const GRADES = [1, 2, 3, 4, 5];
 
+/**
+ * Three-spot sheets: spot centres in face units (one spot's radius = 100). Triple: three spots in a
+ * column, top to bottom. Vegas: a triangle, top then bottom left, bottom right. Centres are 1.1 spot
+ * diameters apart (22 cm on the 40 cm sheet, whose spots are 20 cm across; the 60 cm sheet scales).
+ */
+const TRIPLE = [
+  [0, -220],
+  [0, 0],
+  [0, 220],
+];
+const VEGAS = [
+  [0, -127],
+  [-110, 63],
+  [110, 63],
+];
+
+/**
+ * The faces, by id. `low`: the lowest printed ring (1 on a full face, 6 on a 10–6 spot, 5 on the WA
+ * 6-ring face); the printed rings 10…low are of equal width and fill the face's radius, and the X
+ * ring is half a ring wide. `spots`: the spot centres of a multi-spot sheet. `compound`: scored with
+ * the WA compound inner 10 (WA Book 2 7.2.2.3: only the X ring scores 10, the rest of the 10 ring
+ * scores 9, and there is no X). `setup`: offered for a new session; the others stay valid for the
+ * sessions that have them.
+ */
+const PLAIN_FACES = {
+  40: { size: 40, low: 1, setup: true },
+  '40s': { size: 40, low: 6, setup: true },
+  '40t': { size: 40, low: 6, spots: TRIPLE, setup: true },
+  '40v': { size: 40, low: 6, spots: VEGAS, setup: true },
+  60: { size: 60, low: 1, setup: true },
+  '60s': { size: 60, low: 6, setup: true },
+  '60t': { size: 60, low: 6, spots: TRIPLE, setup: true },
+  '60v': { size: 60, low: 6, spots: VEGAS, setup: true },
+  80: { size: 80, low: 1, setup: true },
+  // the WA 80 cm 6-ring face (rings 10 to 5), used for the 50 m compound round
+  '80r': { size: 80, low: 5, setup: true },
+  // the centre of the 80 cm face printed out to the 6 ring: not a WA face, kept for older sessions
+  '80s': { size: 80, low: 6 },
+  122: { size: 122, low: 1, setup: true },
+};
+
+/** The indoor faces also come in a compound version (WA "-C" faces): the same id with a 'c'. */
+const COMPOUND_OF = ['40', '40s', '40t', '40v', '60', '60s', '60t', '60v'];
+
+export const FACES = {
+  ...PLAIN_FACES,
+  ...Object.fromEntries(COMPOUND_OF.map((id) => [`${id}c`, { ...PLAIN_FACES[id], compound: true }])),
+};
+
+export const FACE_IDS = Object.keys(FACES);
+/** Faces offered for a new session. */
+export const SETUP_FACES = FACE_IDS.filter((id) => FACES[id].setup);
+
+/** A face no longer offered, and the one a new session gets instead. */
+export const REPLACED_FACES = { '80s': '80r' };
+
+const faceOf = (face) => FACES[face] || FACES['122'];
+
+/** Whether a face is scored with the WA compound inner 10. */
+export const isCompoundFace = (face) => !!faceOf(face).compound;
+
+/** The compound or the standard version of a face; the face itself when that version does not exist. */
+export function withCompound(face, compound) {
+  const plain = String(face).replace(/c$/, '');
+  const id = compound ? `${plain}c` : plain;
+  return id in FACES ? id : face;
+}
+
 /** Smart defaults: picking a distance suggests the usual face (arrows per end stay as set). */
 export const DISTANCE_DEFAULTS = {
   7: { face: '80' },
   18: { face: '40t' },
   25: { face: '60' },
   30: { face: '80' },
+  40: { face: '122' },
   50: { face: '122' },
   60: { face: '122' },
   70: { face: '122' },
+  90: { face: '122' },
 };
 
-// '60s' / '80s': the reduced face (the centre of the 60 / 80 cm face, printed out to the 6 ring only)
-const FACE_LABELS = { '40s': '40 cm 10–6', '40t': '40 cm triple', '40v': '40 cm Vegas', '60s': '60 cm 10–6', '80s': '80 cm 10–6' };
+const KIND_LABELS = { 1: '', 6: ' 10–6', 5: ' 10–5' };
 
 export function faceLabel(face) {
-  return FACE_LABELS[face] || `${face} cm`;
+  const f = FACES[face];
+  if (!f) return `${face} cm`;
+  const kind = f.spots === TRIPLE ? ' triple' : f.spots === VEGAS ? ' Vegas' : KIND_LABELS[f.low];
+  return `${f.size} cm${kind}${f.compound ? ' · compound' : ''}`;
 }
 
-/** Faces scored 10–6: the indoor 40 cm spot (single or three on one sheet) and the reduced 60 / 80 cm faces. */
+/** Faces printed only to an inner ring (10–6 spots, the 6-ring face): scored from 10 to their lowest ring. */
 export function isSpotFace(face) {
-  return face === '40s' || face === '40t' || face === '40v' || face === '60s' || face === '80s';
+  return faceOf(face).low > 1;
 }
 
-/**
- * Three-spot indoor sheets (WA 40 cm): spot centres in face units (one spot's radius = 100).
- * Triple: three spots in a column, top to bottom. Vegas: a triangle, top then bottom left, bottom right.
- * Centres are 22 cm apart (spots are 20 cm across).
- */
-export const SPOT_CENTRES = {
-  '40t': [
-    [0, -220],
-    [0, 0],
-    [0, 220],
-  ],
-  '40v': [
-    [0, -127],
-    [-110, 63],
-    [110, 63],
-  ],
-};
+/** Number of printed scoring rings of a face (10 to its lowest ring). */
+const ringCount = (face) => 11 - faceOf(face).low;
+
+export const SPOT_CENTRES = Object.fromEntries(FACE_IDS.filter((id) => FACES[id].spots).map((id) => [id, FACES[id].spots]));
 
 export function isMultiSpot(face) {
   return face in SPOT_CENTRES;
@@ -110,32 +169,36 @@ export function isValidArrowValue(v) {
 }
 
 /**
- * The scoring rings of a face, in its radius: the X ring's edge, and how many scoring rings of equal
- * width (the 10 ring first) fill the radius. A 10–6 face has five (10 to 6), a full face ten.
+ * The printed rings of a face as fractions of its radius, the X ring first and the face's edge (1)
+ * last: printed ring k (k ≥ 1) is the 10 − (k − 1) ring.
  */
-function ringRule(face) {
-  return isSpotFace(face) ? { x: 0.1, perRadius: 5 } : { x: 0.05, perRadius: 10 };
+export function ringEdges(face) {
+  const n = ringCount(face);
+  return [1 / (2 * n), ...Array.from({ length: n }, (_, k) => (k + 1) / n)];
 }
 
 /**
- * The edges of a face's scoring rings as fractions of its radius, the X ring first and the face's
- * edge (1) last: ring k (k ≥ 1) scores 10 − (k − 1) inside its edge.
+ * How a face is scored: zones from the centre out, each with its outer edge (a fraction of the radius)
+ * and its value. The innermost zone includes its edge line; the others score the lower (outer) ring on
+ * a line. Standard: X, 10, 9 … the lowest ring. Compound: the X ring scores 10, the rest of the 10 ring
+ * and the 9 ring score 9, then as printed.
  */
-export function ringEdges(face) {
-  const { x, perRadius } = ringRule(face);
-  return [x, ...Array.from({ length: perRadius }, (_, k) => (k + 1) / perRadius)];
+export function scoringZones(face) {
+  const [xEdge, ...edges] = ringEdges(face);
+  const printed = edges.map((edge, k) => ({ edge, value: 10 - k }));
+  if (!isCompoundFace(face)) return [{ edge: xEdge, value: 'X' }, ...printed];
+  return [{ edge: xEdge, value: 10 }, ...printed.slice(1)];
 }
 
 /**
  * Score a tap given its position normalised to the face radius (x, y in [-1, 1], centre 0,0).
- * A tap exactly on a ring line scores the lower ring.
+ * A tap exactly on a ring line scores the lower ring (the X line counts as the X).
  */
 export function scoreFromPoint(x, y, face) {
-  const { x: xRing, perRadius } = ringRule(face);
-  const d = Math.hypot(x, y);
-  if (d <= xRing) return 'X';
-  if (d < 1) return 10 - Math.floor(round9(d * perRadius));
-  return 'M';
+  const d = round9(Math.hypot(x, y));
+  const [inner, ...rest] = scoringZones(face);
+  if (d <= round9(inner.edge)) return inner.value;
+  return rest.find((z) => d < round9(z.edge))?.value ?? 'M';
 }
 
 // Guard against float noise such as 0.3 * 10 = 3.0000000000000004 or 0.7 * 10 = 6.999999999999999.
@@ -143,9 +206,14 @@ function round9(n) {
   return Math.round(n * 1e9) / 1e9;
 }
 
-/** Keys shown on the keypad for a face. */
+/** Keys shown on the keypad for a face: its zone values, best first, and the miss. */
 export function keypadValues(face) {
-  return isSpotFace(face) ? ['X', 10, 9, 8, 7, 6, 'M'] : ARROW_VALUES;
+  return [...scoringZones(face).map((z) => z.value), 'M'];
+}
+
+/** The quick keypad of the Log: the best six values of the face and the miss. */
+export function quickKeys(face) {
+  return [...keypadValues(face).filter((k) => k !== 'M').slice(0, 6), 'M'];
 }
 
 /** WA zone name for a value, used as a CSS class suffix. */
@@ -157,4 +225,20 @@ export function zoneOf(v) {
   if (v === 4 || v === 3) return 'black';
   if (v === 2 || v === 1) return 'white';
   return 'miss';
+}
+
+/**
+ * The printed colour bands of a face from the centre out: each colour's outer edge (a fraction of the
+ * radius). A full face: gold 0.2, red 0.4, blue 0.6, black 0.8, white 1; a 10–6 spot: gold 0.4, red
+ * 0.8, blue 1.
+ */
+export function colourBands(face) {
+  const [, ...edges] = ringEdges(face);
+  const bands = [];
+  edges.forEach((edge, k) => {
+    const zone = zoneOf(10 - k);
+    if (bands.length && bands[bands.length - 1].zone === zone) bands[bands.length - 1].edge = edge;
+    else bands.push({ zone, edge });
+  });
+  return bands;
 }

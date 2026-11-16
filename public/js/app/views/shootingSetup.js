@@ -6,12 +6,23 @@ import * as APL from '../../ui/apl/index.js';
 import { T } from '../strings.js';
 import { icons } from '../icons.js';
 import { lastSetupOf, rememberSetup, SHOOTING_KINDS, ARROW_GOALS } from '../lastSetup.js';
-import { DISTANCES, DISTANCE_DEFAULTS, SETUP_FACES, ARROWS_PER_END_MIN, ARROWS_PER_END_MAX } from '../scoring.js';
+import {
+  DISTANCES,
+  DISTANCE_DEFAULTS,
+  SETUP_FACES,
+  REPLACED_FACES,
+  ARROWS_PER_END_MIN,
+  ARROWS_PER_END_MAX,
+  withCompound,
+} from '../scoring.js';
 import {
   TYPE_LABELS,
   setupSummary,
   emptyCompetition,
   ROUNDS,
+  roundByName,
+  roundTotals,
+  roundSetup,
   CONDITIONS,
   parseConditions,
   joinConditions,
@@ -19,7 +30,7 @@ import {
 } from '../sessionTypes.js';
 import { setupState, whenSection, equipmentSection } from './sessionSetup.js';
 import { emptyForm, formSections } from './sessionForms.js';
-import { faceParts, faceId, FACE_SIZES, kindsForSize, faceForSize } from './setupFaces.js';
+import { faceParts, FACE_SIZES, kindsForSize, faceForSize, faceForKind, hasCompound } from './setupFaces.js';
 
 const ARROW_PRESETS = [3, 6, 9, 12];
 const arrowsText = (n) => `${n} ${n === 1 ? 'arrow' : 'arrows'}/end`;
@@ -155,10 +166,11 @@ export function renderTypeChoice(ctx) {
 function fromLast(settings, kind) {
   const last = lastSetupOf(settings, kind);
   if (kind === 'blank') return { goal: last.goal };
-  // a face no longer offered (the single 40 cm 10–6 spot) falls back to the triple
+  // a face no longer offered takes its replacement (the 80 cm 10–6 → the WA 6-ring face), else the triple
+  const face = REPLACED_FACES[last.face] || last.face;
   const fields = {
     distance: last.distance,
-    face: SETUP_FACES.includes(last.face) ? last.face : '40t',
+    face: SETUP_FACES.includes(face) ? face : '40t',
     arrowsPerEnd: last.arrowsPerEnd,
     grading: last.grading,
   };
@@ -212,6 +224,13 @@ function kindTabs(ctx, kind) {
   );
 }
 
+/** "72 arrows · max 720", and the distances of a round shot at several. */
+function roundHint(round) {
+  const { arrows, max } = roundTotals(round);
+  const distances = round.passes.length > 1 ? round.passes.map((p) => `${p.distance} m`).join(' + ') : '';
+  return [distances, `${arrows} arrows`, `max ${max}`].filter(Boolean).join(' · ');
+}
+
 /** Competition: the event, the round (chips or Other) and the conditions (chips, plus older text). */
 function competitionSection(fields, { setKind, quietKind }) {
   const comp = fields.competition;
@@ -239,10 +258,15 @@ function competitionSection(fields, { setKind, quietKind }) {
         onChange: (r) => {
           if (r === roundValue) setComp({ round: '', otherRound: false });
           else if (r === 'Other') setComp({ round: '', otherRound: true });
-          else setComp({ round: r, otherRound: false });
+          else {
+            // a WA round also sets its (first) distance, face and arrows per end
+            const round = roundByName(r);
+            setKind({ competition: { ...comp, round: r, otherRound: false }, ...(round ? roundSetup(round, fields.face) : {}) });
+          }
         },
         fk: 'comp-round',
       }),
+      roundByName(comp.round) ? h('p', { class: 'apl-cap' }, roundHint(roundByName(comp.round))) : null,
       comp.otherRound
         ? APL.TextField({
             label: 'Other round',
@@ -277,8 +301,10 @@ function competitionSection(fields, { setKind, quietKind }) {
 
 /** Distance, face and arrows per end of a scored kind (its grading is under When). */
 function scoredSections(fields, setKind) {
-  const { size, kind } = faceParts(fields.face) || faceParts('40t');
-  const suggested = DISTANCE_DEFAULTS[fields.distance]?.face === fields.face;
+  const { size, kind, compound } = faceParts(fields.face) || faceParts('40t');
+  // the usual face of a distance, scored the way the archer scores now (compound keeps the inner 10)
+  const usualFace = (d) => DISTANCE_DEFAULTS[d] && withCompound(DISTANCE_DEFAULTS[d].face, compound);
+  const suggested = usualFace(fields.distance) === fields.face;
   return [
     APL.Section({
       label: T.distance,
@@ -288,7 +314,7 @@ function scoredSections(fields, setKind) {
         value: fields.distance,
         options: DISTANCES.map((d) => ({ value: d, label: `${d} m` })),
         // picking a distance suggests its usual face
-        onChange: (d) => setKind({ distance: d, ...DISTANCE_DEFAULTS[d] }),
+        onChange: (d) => setKind({ distance: d, ...(usualFace(d) ? { face: usualFace(d) } : {}) }),
         fk: 'dist',
       }),
     }),
@@ -310,8 +336,21 @@ function scoredSections(fields, setKind) {
               label: 'Face type',
               value: kind,
               options: kindsForSize(size).map((k) => ({ value: k, label: APL.FACE_NAMES[k] })),
-              onChange: (k) => setKind({ face: faceId(size, k) }),
+              onChange: (k) => setKind({ face: faceForKind(k, fields.face) }),
               fk: 'face-kind',
+            })
+          : null,
+        // indoor faces: standard scoring or the compound inner 10 (only the X ring scores 10)
+        hasCompound(size, kind)
+          ? APL.OptionPills({
+              label: 'Scoring',
+              value: compound ? 'compound' : 'standard',
+              options: [
+                { value: 'standard', label: 'Standard' },
+                { value: 'compound', label: 'Compound inner 10' },
+              ],
+              onChange: (v) => setKind({ face: withCompound(fields.face, v === 'compound') }),
+              fk: 'face-scoring',
             })
           : null,
       ],

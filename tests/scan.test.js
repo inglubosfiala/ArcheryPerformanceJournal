@@ -6,7 +6,7 @@ import * as L from '../public/js/app/sessionLogic.js';
 import { createRunningSession } from '../public/js/app/runningSession.js';
 import { canScan, createScan, createSteadyReading, nextLook, LOCK_MS, LOCK_FRAMES } from '../public/js/app/scan.js';
 import { pictureFromFace } from '../public/js/app/scanGeometry.js';
-import { FACE_IDS, ringEdges, scoreFromPoint } from '../public/js/app/scoring.js';
+import { FACE_IDS, ringEdges, scoreFromPoint, scoringZones } from '../public/js/app/scoring.js';
 
 const spot = (cx, cy, r) => ({ outer: { cx, cy, rx: r, ry: r, angle: 0 } });
 
@@ -335,16 +335,16 @@ describe('the found arrows', () => {
     for (const face of FACE_IDS) {
       const edges = ringEdges(face);
       expect(edges.at(-1)).toBe(1);
-      edges.forEach((edge, k) => {
-        const inner = k ? edges[k - 1] : 0;
-        const want = k === 0 ? 'X' : 10 - (k - 1);
-        expect(scoreFromPoint((inner + edge) / 2, 0, face)).toBe(want);
-        // on a ring's edge: the lower ring
-        if (k > 0) expect(scoreFromPoint(0, edge, face)).toBe(k === edges.length - 1 ? 'M' : want - 1);
+      // every scoring zone ends on a printed ring line
+      const zones = scoringZones(face);
+      for (const z of zones) expect(edges).toContain(z.edge);
+      zones.forEach((z, k) => {
+        const inner = k ? zones[k - 1].edge : 0;
+        expect(scoreFromPoint((inner + z.edge) / 2, 0, face)).toBe(z.value);
+        // on a zone's outer edge: the next zone out (the X line counts as the X)
+        if (k > 0) expect(scoreFromPoint(0, z.edge, face)).toBe(zones[k + 1]?.value ?? 'M');
       });
       expect(scoreFromPoint(1.01, 0, face)).toBe('M');
-      // the lowest ring of the face is what the face is scored down to
-      expect(10 - (edges.length - 2)).toBe(face === '122' || face === '80' || face === '60' || face === '40' ? 1 : 6);
     }
   });
 });

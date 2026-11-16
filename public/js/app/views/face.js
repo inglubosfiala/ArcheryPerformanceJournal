@@ -1,30 +1,30 @@
 // Target face drawing shared by the Log tab and the session detail (SVG, face radius = 100 units).
 import { s } from '../../core/dom.js';
-import { isSpotFace, isMultiSpot, spotCentres } from '../scoring.js';
+import { isSpotFace, isMultiSpot, spotCentres, ringEdges, zoneOf } from '../scoring.js';
 
 export const VB = 101; // viewBox half-size; the face radius is 100
 
+const FILL = { gold: '#FFE11A', red: '#D22B2B', blue: '#00A2E8', black: '#1A1A1A', white: '#FFFFFF' };
+
 export function faceRings(face) {
   const ring = (r, fill, stroke, sw = 0.6) => s('circle', { r, fill, stroke, 'stroke-width': sw });
-  if (isSpotFace(face)) {
-    return [
-      ring(100, '#00A2E8', '#14181C', 0.8),
-      ring(80, '#D22B2B', '#14181C', 0.8),
-      ring(60, '#D22B2B', '#14181C', 0.8),
-      ring(40, '#FFE11A', '#14181C', 0.8),
-      ring(20, '#FFE11A', '#14181C', 0.8),
-      ring(10, 'none', '#14181C', 0.6),
-      s('path', { d: 'M-2 0h4M0 -2v4', stroke: '#14181C', 'stroke-width': 0.6 }),
-    ];
-  }
-  const colours = ['#FFFFFF', '#FFFFFF', '#1A1A1A', '#1A1A1A', '#00A2E8', '#00A2E8', '#D22B2B', '#D22B2B', '#FFE11A', '#FFE11A'];
+  const [xEdge, ...edges] = ringEdges(face);
+  // a spot is drawn with bolder lines, its rings being wider
+  const spot = isSpotFace(face);
+  const rings = edges
+    .map((edge, k) => {
+      const fill = FILL[zoneOf(10 - k)];
+      const stroke = fill === FILL.black ? '#FFFFFF' : '#14181C';
+      return ring(edge * 100, fill, stroke, spot ? 0.8 : 0.6);
+    })
+    .reverse();
+  const m = spot ? 2 : 1.5;
   return [
-    ...colours.map((fill, i) => ring(100 - i * 10, fill, fill === '#1A1A1A' ? '#FFFFFF' : '#14181C')),
-    ring(5, 'none', '#14181C', 0.5),
-    s('path', { d: 'M-1.5 0h3M0 -1.5v3', stroke: '#14181C', 'stroke-width': 0.5 }),
+    ...rings,
+    ring(xEdge * 100, 'none', '#14181C', spot ? 0.6 : 0.5),
+    s('path', { d: `M-${m} 0h${2 * m}M0 -${m}v${2 * m}`, stroke: '#14181C', 'stroke-width': spot ? 0.6 : 0.5 }),
   ];
 }
-
 
 /** The whole sheet: one face, or three spots for the triple and Vegas faces. */
 export function faceSheet(face) {

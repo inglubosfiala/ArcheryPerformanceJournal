@@ -7,7 +7,7 @@
 //    the colour the ring there should have. Pixels that do not match (nocks, fletchings, shafts,
 //    holes) are grouped into blobs; the biggest blobs are the arrows, at their centroids.
 // The result is approximate by design: the archer moves any arrow that landed in the wrong place.
-import { isSpotFace, isMultiSpot, spotCentres } from './scoring.js';
+import { isSpotFace, isMultiSpot, spotCentres, colourBands } from './scoring.js';
 
 /** Colour class of one pixel: 'gold' | 'red' | 'blue' | 'black' | 'white' | 'other'. */
 export function colourClass(r, g, b) {
@@ -31,18 +31,16 @@ export function colourClass(r, g, b) {
 
 /**
  * Radius of the gold and red together (rings 10 to 7 on a 10–6 spot, 10 to 7 on a full face) in face
- * units: 0.8 on spots, 0.4 on full faces. This filled disc is what a spot is measured by: it is big,
+ * units: 0.8 on spots, 2/3 on the 6-ring face, 0.4 on full faces. This filled disc is what a spot is measured by: it is big,
  * so a shaft or a few holes across it barely move its centre or size.
  */
-const coreRadius = (face) => (isSpotFace(face) ? 0.8 : 0.4);
+const coreRadius = (face) => colourBands(face).find((b) => b.zone === 'red').edge;
 
 /** The colour a face should have at distance `d` from its centre (radius 1), or null near a ring edge. */
 export function expectedColour(d, face, margin = 0.05) {
-  const edges = isSpotFace(face) ? [0.4, 0.8, 1] : [0.2, 0.4, 0.6, 0.8, 1];
-  if (edges.some((e) => Math.abs(d - e) < margin)) return null;
-  const zones = isSpotFace(face) ? ['gold', 'red', 'blue'] : ['gold', 'red', 'blue', 'black', 'white'];
-  const i = edges.findIndex((e) => d < e);
-  return i < 0 ? null : zones[i];
+  const bands = colourBands(face);
+  if (bands.some((b) => Math.abs(d - b.edge) < margin)) return null;
+  return bands.find((b) => d < b.edge)?.zone ?? null;
 }
 
 /** Connected components (8-neighbour) of a mask; returns [{ area, sx, sy, px: [indices] }]. */

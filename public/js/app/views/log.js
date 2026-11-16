@@ -9,6 +9,7 @@ import {
   spotCentres,
   zoneOf,
   suggestedSpot,
+  quickKeys,
 } from '../scoring.js';
 import { fmt } from '../stats.js';
 import { endRows, sessionCounts, sessionTotal, isEndComplete } from '../endSummary.js';
@@ -294,7 +295,7 @@ function renderActive(ctx, session) {
     { class: 'score-under' },
     APL.ScoreKeypad({
       label: 'Score without position',
-      keys: ['X', 10, 9, 8, 7, 6, 'M'].map((k) => ({
+      keys: quickKeys(session.face).map((k) => ({
         value: k,
         zone: zoneOf(k),
         ariaLabel: `Score ${k === 'M' ? 'miss' : k}`,

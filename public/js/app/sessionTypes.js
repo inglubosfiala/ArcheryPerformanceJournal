@@ -1,5 +1,5 @@
 // Session types (training, blank bale, competition, strength, mental, gym) and the fields of the non-scored ones.
-import { faceLabel } from './scoring.js';
+import { faceLabel, withCompound, isCompoundFace } from './scoring.js';
 import { gymSummary } from './gym.js';
 
 export const SESSION_TYPES = ['training', 'blank', 'competition', 'strength', 'mental', 'manual', 'gym'];
@@ -117,8 +117,69 @@ export const emptyReview = () => ({ good: '', workOn: '', how: '' });
 /** A competition session's details (placement is usually known only after the event). */
 export const emptyCompetition = () => ({ event: '', round: '', conditions: '', placement: '' });
 
+/**
+ * World Archery target rounds (WA Book 2 4.5.1, Book 6 48.1): each a list of passes, one per distance,
+ * with its face, arrows and the usual arrows per end. A session is shot at one distance, so picking a
+ * round fills in its first pass. 1440: the men's distances; the others shoot 70/60/50/30 m or
+ * 60/50/40/30 m.
+ */
+export const WA_ROUNDS = [
+  { name: 'WA 18 m', passes: [{ distance: 18, face: '40t', arrows: 60, arrowsPerEnd: 3 }] },
+  { name: 'WA 25 m', passes: [{ distance: 25, face: '60', arrows: 60, arrowsPerEnd: 3 }] },
+  {
+    name: 'WA 25 + 18 m',
+    passes: [
+      { distance: 25, face: '60', arrows: 60, arrowsPerEnd: 3 },
+      { distance: 18, face: '40t', arrows: 60, arrowsPerEnd: 3 },
+    ],
+  },
+  { name: 'WA 70 m', passes: [{ distance: 70, face: '122', arrows: 72, arrowsPerEnd: 6 }] },
+  { name: 'WA 60 m', passes: [{ distance: 60, face: '122', arrows: 72, arrowsPerEnd: 6 }] },
+  { name: 'WA 50 m compound', passes: [{ distance: 50, face: '80r', arrows: 72, arrowsPerEnd: 6 }] },
+  { name: 'WA 50 m barebow', passes: [{ distance: 50, face: '122', arrows: 72, arrowsPerEnd: 6 }] },
+  { name: 'WA 40 m', passes: [{ distance: 40, face: '122', arrows: 72, arrowsPerEnd: 6 }] },
+  {
+    name: 'WA 1440',
+    passes: [
+      { distance: 90, face: '122', arrows: 36, arrowsPerEnd: 6 },
+      { distance: 70, face: '122', arrows: 36, arrowsPerEnd: 6 },
+      { distance: 50, face: '80', arrows: 36, arrowsPerEnd: 3 },
+      { distance: 30, face: '80', arrows: 36, arrowsPerEnd: 3 },
+    ],
+  },
+  {
+    name: 'WA 900',
+    passes: [
+      { distance: 60, face: '122', arrows: 30, arrowsPerEnd: 6 },
+      { distance: 50, face: '122', arrows: 30, arrowsPerEnd: 6 },
+      { distance: 40, face: '122', arrows: 30, arrowsPerEnd: 6 },
+    ],
+  },
+];
+
 /** Rounds offered as chips; any other round is typed in ("Other"). */
-export const ROUNDS = ['WA 18 m', 'WA 25 m', 'WA 70 m'];
+export const ROUNDS = WA_ROUNDS.map((r) => r.name);
+
+export const roundByName = (name) => WA_ROUNDS.find((r) => r.name === name) || null;
+
+/** Arrows and the highest score of a round (every arrow scores at most 10). */
+export function roundTotals(round) {
+  const arrows = round.passes.reduce((t, p) => t + p.arrows, 0);
+  return { arrows, max: arrows * 10 };
+}
+
+/**
+ * The setup a round suggests: its first pass's distance, face and arrows per end. A compound archer
+ * (the current face scored with the inner 10) keeps compound scoring where the face has it.
+ */
+export function roundSetup(round, currentFace) {
+  const [first] = round.passes;
+  return {
+    distance: first.distance,
+    face: withCompound(first.face, isCompoundFace(currentFace)),
+    arrowsPerEnd: first.arrowsPerEnd,
+  };
+}
 /** Conditions offered as chips; stored in the competition's `conditions` text, comma-joined. */
 export const CONDITIONS = ['Hall', 'Sun', 'Wind', 'Rain', 'Cold', 'Low light'];
 

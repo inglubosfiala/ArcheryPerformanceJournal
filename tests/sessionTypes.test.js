@@ -2,8 +2,20 @@ import { describe, it, expect } from 'vitest';
 import { collections } from '../public/js/app/collections.js';
 import { migrate, migrations } from '../public/js/storage/migrations.js';
 import * as L from '../public/js/app/sessionLogic.js';
-import { isScored, isGraded, formSummary, setupSummary, emptyDrill, newestFirst } from '../public/js/app/sessionTypes.js';
-import { faceLabel } from '../public/js/app/scoring.js';
+import {
+  isScored,
+  isGraded,
+  formSummary,
+  setupSummary,
+  emptyDrill,
+  newestFirst,
+  ROUNDS,
+  WA_ROUNDS,
+  roundByName,
+  roundTotals,
+  roundSetup,
+} from '../public/js/app/sessionTypes.js';
+import { faceLabel, FACE_IDS, DISTANCES } from '../public/js/app/scoring.js';
 
 const validate = (r) => collections.sessions.validate({ id: 'a', ...r });
 const strength = (extra = {}) => ({
@@ -178,5 +190,31 @@ describe('M / S grading of a scored session', () => {
   });
   it('rejects a grading value that is not a yes / no', () => {
     expect(validate({ ...L.createSession(base), grading: 'off' })).toContain('invalid grading choice');
+  });
+});
+
+describe('World Archery rounds', () => {
+  it('offers every WA round as a chip, keeping the names stored by earlier sessions', () => {
+    expect(ROUNDS).toEqual(WA_ROUNDS.map((r) => r.name));
+    for (const name of ['WA 18 m', 'WA 25 m', 'WA 70 m']) expect(ROUNDS).toContain(name);
+    for (const r of WA_ROUNDS) for (const p of r.passes) {
+      expect(FACE_IDS).toContain(p.face);
+      expect(DISTANCES).toContain(p.distance);
+    }
+  });
+
+  it('knows the arrows and the highest score of a round', () => {
+    expect(roundTotals(roundByName('WA 70 m'))).toEqual({ arrows: 72, max: 720 });
+    expect(roundTotals(roundByName('WA 18 m'))).toEqual({ arrows: 60, max: 600 });
+    expect(roundTotals(roundByName('WA 1440'))).toEqual({ arrows: 144, max: 1440 });
+    expect(roundTotals(roundByName('WA 900'))).toEqual({ arrows: 90, max: 900 });
+    expect(roundByName('Indoor 2 × 30')).toBeNull();
+  });
+
+  it('suggests the first pass, keeping compound scoring where the face has it', () => {
+    expect(roundSetup(roundByName('WA 18 m'), '40t')).toEqual({ distance: 18, face: '40t', arrowsPerEnd: 3 });
+    expect(roundSetup(roundByName('WA 18 m'), '60c')).toEqual({ distance: 18, face: '40tc', arrowsPerEnd: 3 });
+    expect(roundSetup(roundByName('WA 50 m compound'), '40tc')).toEqual({ distance: 50, face: '80r', arrowsPerEnd: 6 });
+    expect(roundSetup(roundByName('WA 1440'), '122')).toEqual({ distance: 90, face: '122', arrowsPerEnd: 6 });
   });
 });

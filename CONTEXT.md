@@ -108,7 +108,14 @@ The sight setting (elevation, windage) for one distance. Sight marks belong to o
 ### Target
 
 **Face**:
-The target face shot at, by size and layout.
+The target face shot at, by size, layout and scoring. Each face is one entry of data (its printed rings, its spots, whether it is a **compound face**); its rings, keypad and colours all follow from it.
+
+**Compound face**:
+An indoor 40 or 60 cm face scored with the WA compound inner 10: only the X ring scores 10, the rest of the 10 ring scores 9, and there is no X. Chosen on the Shooting page as the face's scoring.
+_Avoid_: Bow type (the app has none; the scoring belongs to the face)
+
+**Round**:
+A competition's format. The WA rounds are data (their distances, faces and arrows); picking one fills in the session's distance, face and arrows per end from its first distance. Any other round is typed in.
 
 **Spot**:
 One of the small faces on a triple or Vegas sheet.
