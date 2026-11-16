@@ -17,7 +17,6 @@ import {
   presetOf,
   presetFields,
   drillSummary,
-  drillTimeline,
   drillDuration,
   stepValue,
   clampValue,
@@ -135,7 +134,7 @@ function doneCard(d, i, change) {
   );
 }
 
-/** The full card of drill `i`: header with summary, presets, −/+ tiles, timeline and its action. */
+/** The full card of drill `i`: header with summary, presets, −/+ tiles and its action. */
 function drillCard(d, i, setDrill, change) {
   const name = drillLabel(d.kind);
   const hold = hasHold(d);
@@ -160,7 +159,6 @@ function drillCard(d, i, setDrill, change) {
         ),
       )
     : [];
-  const bar = h('div', { class: 'drill-timeline-bar', 'aria-hidden': 'true' });
   const startBtn = hold
     ? APL.Button({
         children: '',
@@ -186,11 +184,6 @@ function drillCard(d, i, setDrill, change) {
     if (!hold) return;
     const on = presetOf(cur);
     presetBtns.forEach((b, k) => b.setAttribute('aria-pressed', String(SPT_PRESETS[k] === on)));
-    bar.replaceChildren(
-      ...drillTimeline(cur).map((seg) =>
-        h('span', { class: `drill-seg drill-seg--${seg.kind}`, style: { flexGrow: String(seg.w) } }),
-      ),
-    );
     startText.textContent = `Start timer · ${drillDuration(cur)}`;
   }
   function update(patch) {
@@ -234,20 +227,6 @@ function drillCard(d, i, setDrill, change) {
     ),
     hold ? h('div', { class: 'drill-presets', role: 'group', 'aria-label': 'Presets' }, presetBtns) : null,
     h('div', { class: 'drill-tiles' }, Object.values(tiles)),
-    hold
-      ? h(
-          'div',
-          { class: 'drill-timeline' },
-          bar,
-          h(
-            'div',
-            { class: 'drill-legend', 'aria-hidden': 'true' },
-            h('span', null, h('i', { class: 'drill-seg--hold' }), 'Hold'),
-            h('span', null, h('i', { class: 'drill-seg--rest' }), 'Rest'),
-            h('span', null, 'One set shown'),
-          ),
-        )
-      : null,
     // a drill without a hold has no timer to finish it: it is marked done by hand
     hold
       ? startBtn

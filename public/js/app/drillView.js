@@ -1,10 +1,9 @@
 // What an SPT drill card shows, worked out from the drill alone: the preset it matches, its summary
-// line, the hold / rest rhythm of one set, how long its interval timer runs, and the next value of
-// a −/+ tile. Pure: no DOM.
+// line, how long its interval timer runs, and the next value of a −/+ tile. Pure: no DOM.
 import { DRILLS, DRILL_LIMITS, SPT_PRESETS } from './sessionTypes.js';
 import { tabataPlan, tabataClock } from './tabata.js';
 
-/** Whether a drill has a hold time (and so a rest, a timeline and an interval timer). */
+/** Whether a drill has a hold time (and so a rest and an interval timer). */
 export const hasHold = (drill) => !!DRILLS.find((d) => d.id === drill?.kind)?.hold;
 
 /** The preset whose numbers the drill has (rest = hold), or null. */
@@ -41,23 +40,6 @@ export function drillSummary(drill, { short = false } = {}) {
   }
   if (short && sets > 1) return `${lead}${reps}`;
   return `${lead}${plural(reps, 'draw', 'draws')}`;
-}
-
-/**
- * The hold / rest rhythm of one set, as segments in order: [{ kind: 'hold' | 'rest', w }] with
- * `w` in seconds (widths proportional). No rest after the last hold. Empty for a drill without a hold.
- */
-export function drillTimeline(drill) {
-  if (!hasHold(drill)) return [];
-  const reps = Math.max(1, drill.reps || 1);
-  const hold = Math.max(1, drill.holdSec || 1);
-  const rest = drill.restSec || 0;
-  const out = [];
-  for (let i = 0; i < reps; i++) {
-    out.push({ kind: 'hold', w: hold });
-    if (rest > 0 && i < reps - 1) out.push({ kind: 'rest', w: rest });
-  }
-  return out;
 }
 
 /** The plan the interval timer runs for a drill (prepare and set rests included). */

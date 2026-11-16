@@ -3,7 +3,6 @@ import {
   presetOf,
   presetFields,
   drillSummary,
-  drillTimeline,
   drillDuration,
   stepValue,
   clampValue,
@@ -39,21 +38,6 @@ describe('SPT drill card helpers', () => {
     expect(drillSummary({ kind: 'draw', sets: 3, reps: 12 })).toBe('3 sets × 12 draws');
     expect(drillSummary({ kind: 'band', sets: 1, reps: 1 })).toBe('1 draw');
     expect(drillSummary({ kind: 'draw', sets: 3, reps: 12 }, { short: true })).toBe('3 sets × 12');
-  });
-
-  it('lays out the hold / rest rhythm of one set', () => {
-    expect(drillTimeline(spt(2, 3, 10, 5))).toEqual([
-      { kind: 'hold', w: 10 },
-      { kind: 'rest', w: 5 },
-      { kind: 'hold', w: 10 },
-      { kind: 'rest', w: 5 },
-      { kind: 'hold', w: 10 },
-    ]);
-    expect(drillTimeline(spt(1, 2, 10, 0))).toEqual([
-      { kind: 'hold', w: 10 },
-      { kind: 'hold', w: 10 },
-    ]);
-    expect(drillTimeline({ kind: 'draw', sets: 1, reps: 10 })).toEqual([]);
   });
 
   it('tells how long the timer runs, prepare and set rests included', () => {
