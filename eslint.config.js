@@ -2,7 +2,7 @@ import js from '@eslint/js';
 import globals from 'globals';
 
 export default [
-  { ignores: ['node_modules/', 'coverage/', 'archery-journal-handoff/', 'design/'] },
+  { ignores: ['node_modules/', 'coverage/', 'archery-journal-handoff/', 'design/', 'Claude outputs/'] },
   js.configs.recommended,
   {
     files: ['public/**/*.js'],

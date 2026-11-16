@@ -1,0 +1,649 @@
+{
+ "face": "40t",
+ "LINE_MM": 5,
+ "OFF_MM": 15,
+ "photos": {
+  "AA_10_9_10": {
+   "error": null,
+   "partial": false,
+   "spots": 3,
+   "found": 3,
+   "ms": 1012
+  },
+  "AB_8_8_10": {
+   "error": null,
+   "partial": false,
+   "spots": 3,
+   "found": 3,
+   "ms": 636
+  },
+  "AC_9_10_7": {
+   "error": null,
+   "partial": false,
+   "spots": 3,
+   "found": 3,
+   "ms": 708
+  },
+  "AD_9_7_10": {
+   "error": null,
+   "partial": false,
+   "spots": 3,
+   "found": 3,
+   "ms": 825
+  },
+  "AE_9_10_10": {
+   "error": null,
+   "partial": false,
+   "spots": 3,
+   "found": 3,
+   "ms": 562
+  },
+  "AF_10_8_9": {
+   "error": null,
+   "partial": false,
+   "spots": 3,
+   "found": 3,
+   "ms": 756
+  },
+  "AG_9_10_10": {
+   "error": null,
+   "partial": false,
+   "spots": 3,
+   "found": 3,
+   "ms": 539
+  },
+  "AH_9_10_10": {
+   "error": null,
+   "partial": false,
+   "spots": 3,
+   "found": 3,
+   "ms": 552
+  },
+  "AI_10_10_10": {
+   "error": null,
+   "partial": false,
+   "spots": 3,
+   "found": 3,
+   "ms": 653
+  },
+  "AJ_10_10_8": {
+   "error": null,
+   "partial": false,
+   "spots": 3,
+   "found": 3,
+   "ms": 773
+  },
+  "AK_9_8_9": {
+   "error": null,
+   "partial": false,
+   "spots": 3,
+   "found": 3,
+   "ms": 588
+  },
+  "AL_10_10_7": {
+   "error": null,
+   "partial": false,
+   "spots": 3,
+   "found": 3,
+   "ms": 725
+  },
+  "AM_10_10_9": {
+   "error": null,
+   "partial": false,
+   "spots": 3,
+   "found": 3,
+   "ms": 562
+  },
+  "AN_10_10_9": {
+   "error": null,
+   "partial": false,
+   "spots": 3,
+   "found": 3,
+   "ms": 965
+  },
+  "AO_9_10_10": {
+   "error": null,
+   "partial": false,
+   "spots": 3,
+   "found": 3,
+   "ms": 653
+  },
+  "AP_8_9_9": {
+   "error": null,
+   "partial": false,
+   "spots": 3,
+   "found": 3,
+   "ms": 482
+  }
+ },
+ "rows": [
+  {
+   "photo": "AA_10_9_10",
+   "spot": 0,
+   "truth": 10,
+   "read": 10,
+   "cls": "right",
+   "d": 0.163,
+   "shiftMm": 0,
+   "lineMm": 3.7,
+   "kind": "shaft"
+  },
+  {
+   "photo": "AA_10_9_10",
+   "spot": 1,
+   "truth": 9,
+   "read": 8,
+   "cls": "line",
+   "d": 0.42,
+   "shiftMm": 2,
+   "lineMm": 2,
+   "kind": "shaft"
+  },
+  {
+   "photo": "AA_10_9_10",
+   "spot": 2,
+   "truth": 10,
+   "read": 10,
+   "cls": "right",
+   "d": 0.1591,
+   "shiftMm": 0,
+   "lineMm": 4.1,
+   "kind": "shaft"
+  },
+  {
+   "photo": "AB_8_8_10",
+   "spot": 0,
+   "truth": 8,
+   "read": 8,
+   "cls": "right",
+   "d": 0.4085,
+   "shiftMm": 0,
+   "lineMm": 0.9,
+   "kind": "shaft"
+  },
+  {
+   "photo": "AB_8_8_10",
+   "spot": 1,
+   "truth": 8,
+   "read": 8,
+   "cls": "right",
+   "d": 0.4827,
+   "shiftMm": 0,
+   "lineMm": 8.3,
+   "kind": "shaft"
+  },
+  {
+   "photo": "AB_8_8_10",
+   "spot": 2,
+   "truth": 10,
+   "read": 10,
+   "cls": "right",
+   "d": 0.1095,
+   "shiftMm": 0,
+   "lineMm": 9,
+   "kind": "shaft"
+  },
+  {
+   "photo": "AC_9_10_7",
+   "spot": 0,
+   "truth": 9,
+   "read": 9,
+   "cls": "right",
+   "d": 0.253,
+   "shiftMm": 0,
+   "lineMm": 5.3,
+   "kind": "shaft"
+  },
+  {
+   "photo": "AC_9_10_7",
+   "spot": 1,
+   "truth": 10,
+   "read": 10,
+   "cls": "right",
+   "d": 0.1114,
+   "shiftMm": 0,
+   "lineMm": 8.9,
+   "kind": "shaft"
+  },
+  {
+   "photo": "AC_9_10_7",
+   "spot": 2,
+   "truth": 7,
+   "read": 6,
+   "cls": "line",
+   "d": 0.8235,
+   "shiftMm": 2.3,
+   "lineMm": 2.3,
+   "kind": "shaft"
+  },
+  {
+   "photo": "AD_9_7_10",
+   "spot": 0,
+   "truth": 9,
+   "read": 9,
+   "cls": "right",
+   "d": 0.2799,
+   "shiftMm": 0,
+   "lineMm": 8,
+   "kind": "shaft"
+  },
+  {
+   "photo": "AD_9_7_10",
+   "spot": 1,
+   "truth": 7,
+   "read": 10,
+   "cls": "lost",
+   "d": 0.1855,
+   "shiftMm": 41.5,
+   "lineMm": 1.5,
+   "kind": "shaft"
+  },
+  {
+   "photo": "AD_9_7_10",
+   "spot": 2,
+   "truth": 10,
+   "read": 10,
+   "cls": "right",
+   "d": 0.1436,
+   "shiftMm": 0,
+   "lineMm": 5.6,
+   "kind": "shaft"
+  },
+  {
+   "photo": "AE_9_10_10",
+   "spot": 0,
+   "truth": 9,
+   "read": 9,
+   "cls": "right",
+   "d": 0.3596,
+   "shiftMm": 0,
+   "lineMm": 4,
+   "kind": "shaft"
+  },
+  {
+   "photo": "AE_9_10_10",
+   "spot": 1,
+   "truth": 10,
+   "read": 9,
+   "cls": "off",
+   "d": 0.2942,
+   "shiftMm": 9.4,
+   "lineMm": 9.4,
+   "kind": "shaft"
+  },
+  {
+   "photo": "AE_9_10_10",
+   "spot": 2,
+   "truth": 10,
+   "read": 10,
+   "cls": "right",
+   "d": 0.1437,
+   "shiftMm": 0,
+   "lineMm": 5.6,
+   "kind": "shaft"
+  },
+  {
+   "photo": "AF_10_8_9",
+   "spot": 0,
+   "truth": 10,
+   "read": 10,
+   "cls": "right",
+   "d": 0.1895,
+   "shiftMm": 0,
+   "lineMm": 1.1,
+   "kind": "shaft"
+  },
+  {
+   "photo": "AF_10_8_9",
+   "spot": 1,
+   "truth": 8,
+   "read": 9,
+   "cls": "line",
+   "d": 0.3967,
+   "shiftMm": 0.3,
+   "lineMm": 0.3,
+   "kind": "shaft"
+  },
+  {
+   "photo": "AF_10_8_9",
+   "spot": 2,
+   "truth": 9,
+   "read": 8,
+   "cls": "line",
+   "d": 0.4193,
+   "shiftMm": 1.9,
+   "lineMm": 1.9,
+   "kind": "shaft"
+  },
+  {
+   "photo": "AG_9_10_10",
+   "spot": 0,
+   "truth": 9,
+   "read": 8,
+   "cls": "line",
+   "d": 0.4324,
+   "shiftMm": 3.2,
+   "lineMm": 3.2,
+   "kind": "shaft"
+  },
+  {
+   "photo": "AG_9_10_10",
+   "spot": 1,
+   "truth": 10,
+   "read": "X",
+   "cls": "right",
+   "d": 0.0932,
+   "shiftMm": 0,
+   "lineMm": 10.7,
+   "kind": "shaft"
+  },
+  {
+   "photo": "AG_9_10_10",
+   "spot": 2,
+   "truth": 10,
+   "read": 10,
+   "cls": "right",
+   "d": 0.1703,
+   "shiftMm": 0,
+   "lineMm": 3,
+   "kind": "shaft"
+  },
+  {
+   "photo": "AH_9_10_10",
+   "spot": 0,
+   "truth": 9,
+   "read": 10,
+   "cls": "line",
+   "d": 0.1866,
+   "shiftMm": 1.3,
+   "lineMm": 1.3,
+   "kind": "shaft"
+  },
+  {
+   "photo": "AH_9_10_10",
+   "spot": 1,
+   "truth": 10,
+   "read": "X",
+   "cls": "right",
+   "d": 0.0402,
+   "shiftMm": 0,
+   "lineMm": 16,
+   "kind": "shaft"
+  },
+  {
+   "photo": "AH_9_10_10",
+   "spot": 2,
+   "truth": 10,
+   "read": "X",
+   "cls": "right",
+   "d": 0.0608,
+   "shiftMm": 0,
+   "lineMm": 13.9,
+   "kind": "shaft"
+  },
+  {
+   "photo": "AI_10_10_10",
+   "spot": 0,
+   "truth": 10,
+   "read": "X",
+   "cls": "right",
+   "d": 0.0729,
+   "shiftMm": 0,
+   "lineMm": 12.7,
+   "kind": "shaft"
+  },
+  {
+   "photo": "AI_10_10_10",
+   "spot": 1,
+   "truth": 10,
+   "read": "X",
+   "cls": "right",
+   "d": 0.0797,
+   "shiftMm": 0,
+   "lineMm": 12,
+   "kind": "shaft"
+  },
+  {
+   "photo": "AI_10_10_10",
+   "spot": 2,
+   "truth": 10,
+   "read": "X",
+   "cls": "right",
+   "d": 0.099,
+   "shiftMm": 0,
+   "lineMm": 10.1,
+   "kind": "shaft"
+  },
+  {
+   "photo": "AJ_10_10_8",
+   "spot": 0,
+   "truth": 10,
+   "read": 10,
+   "cls": "right",
+   "d": 0.1434,
+   "shiftMm": 0,
+   "lineMm": 5.7,
+   "kind": "shaft"
+  },
+  {
+   "photo": "AJ_10_10_8",
+   "spot": 1,
+   "truth": 10,
+   "read": "X",
+   "cls": "right",
+   "d": 0.0805,
+   "shiftMm": 0,
+   "lineMm": 12,
+   "kind": "shaft"
+  },
+  {
+   "photo": "AJ_10_10_8",
+   "spot": 2,
+   "truth": 8,
+   "read": 10,
+   "cls": "lost",
+   "d": 0.1992,
+   "shiftMm": 20.1,
+   "lineMm": 0.1,
+   "kind": "shaft"
+  },
+  {
+   "photo": "AK_9_8_9",
+   "spot": 0,
+   "truth": 9,
+   "read": 9,
+   "cls": "right",
+   "d": 0.3302,
+   "shiftMm": 0,
+   "lineMm": 7,
+   "kind": "shaft"
+  },
+  {
+   "photo": "AK_9_8_9",
+   "spot": 1,
+   "truth": 8,
+   "read": 8,
+   "cls": "right",
+   "d": 0.413,
+   "shiftMm": 0,
+   "lineMm": 1.3,
+   "kind": "shaft"
+  },
+  {
+   "photo": "AK_9_8_9",
+   "spot": 2,
+   "truth": 9,
+   "read": 9,
+   "cls": "right",
+   "d": 0.3532,
+   "shiftMm": 0,
+   "lineMm": 4.7,
+   "kind": "shaft"
+  },
+  {
+   "photo": "AL_10_10_7",
+   "spot": 0,
+   "truth": 10,
+   "read": 10,
+   "cls": "right",
+   "d": 0.1315,
+   "shiftMm": 0,
+   "lineMm": 6.8,
+   "kind": "shaft"
+  },
+  {
+   "photo": "AL_10_10_7",
+   "spot": 1,
+   "truth": 10,
+   "read": 10,
+   "cls": "right",
+   "d": 0.1948,
+   "shiftMm": 0,
+   "lineMm": 0.5,
+   "kind": "shaft"
+  },
+  {
+   "photo": "AL_10_10_7",
+   "spot": 2,
+   "truth": 7,
+   "read": 7,
+   "cls": "right",
+   "d": 0.657,
+   "shiftMm": 0,
+   "lineMm": 5.7,
+   "kind": "shaft"
+  },
+  {
+   "photo": "AM_10_10_9",
+   "spot": 0,
+   "truth": 10,
+   "read": 9,
+   "cls": "line",
+   "d": 0.2223,
+   "shiftMm": 2.2,
+   "lineMm": 2.2,
+   "kind": "shaft"
+  },
+  {
+   "photo": "AM_10_10_9",
+   "spot": 1,
+   "truth": 10,
+   "read": "X",
+   "cls": "right",
+   "d": 0.0998,
+   "shiftMm": 0,
+   "lineMm": 10,
+   "kind": "shaft"
+  },
+  {
+   "photo": "AM_10_10_9",
+   "spot": 2,
+   "truth": 9,
+   "read": 9,
+   "cls": "right",
+   "d": 0.3867,
+   "shiftMm": 0,
+   "lineMm": 1.3,
+   "kind": "shaft"
+  },
+  {
+   "photo": "AN_10_10_9",
+   "spot": 0,
+   "truth": 10,
+   "read": 10,
+   "cls": "right",
+   "d": 0.187,
+   "shiftMm": 0,
+   "lineMm": 1.3,
+   "kind": "shaft"
+  },
+  {
+   "photo": "AN_10_10_9",
+   "spot": 1,
+   "truth": 10,
+   "read": "X",
+   "cls": "right",
+   "d": 0.0503,
+   "shiftMm": 0,
+   "lineMm": 15,
+   "kind": "shaft"
+  },
+  {
+   "photo": "AN_10_10_9",
+   "spot": 2,
+   "truth": 9,
+   "read": 9,
+   "cls": "right",
+   "d": 0.27,
+   "shiftMm": 0,
+   "lineMm": 7,
+   "kind": "shaft"
+  },
+  {
+   "photo": "AO_9_10_10",
+   "spot": 0,
+   "truth": 9,
+   "read": 8,
+   "cls": "line",
+   "d": 0.4227,
+   "shiftMm": 2.3,
+   "lineMm": 2.3,
+   "kind": "shaft"
+  },
+  {
+   "photo": "AO_9_10_10",
+   "spot": 1,
+   "truth": 10,
+   "read": 10,
+   "cls": "right",
+   "d": 0.151,
+   "shiftMm": 0,
+   "lineMm": 4.9,
+   "kind": "shaft"
+  },
+  {
+   "photo": "AO_9_10_10",
+   "spot": 2,
+   "truth": 10,
+   "read": 10,
+   "cls": "right",
+   "d": 0.1749,
+   "shiftMm": 0,
+   "lineMm": 2.5,
+   "kind": "shaft"
+  },
+  {
+   "photo": "AP_8_9_9",
+   "spot": 0,
+   "truth": 8,
+   "read": 9,
+   "cls": "line",
+   "d": 0.3969,
+   "shiftMm": 0.3,
+   "lineMm": 0.3,
+   "kind": "shaft"
+  },
+  {
+   "photo": "AP_8_9_9",
+   "spot": 1,
+   "truth": 9,
+   "read": 8,
+   "cls": "line",
+   "d": 0.4043,
+   "shiftMm": 0.4,
+   "lineMm": 0.4,
+   "kind": "shaft"
+  },
+  {
+   "photo": "AP_8_9_9",
+   "spot": 2,
+   "truth": 9,
+   "read": 9,
+   "cls": "right",
+   "d": 0.2275,
+   "shiftMm": 0,
+   "lineMm": 2.8,
+   "kind": "shaft"
+  }
+ ]
+}
