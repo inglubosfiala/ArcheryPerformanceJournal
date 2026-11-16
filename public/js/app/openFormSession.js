@@ -1,8 +1,8 @@
-// Open form sessions: blank bale / strength / mental sessions that were opened (SPT, mental) or
-// started (blank bale, from the Shooting page's Start) and not yet saved or discarded. Each has a
-// session timer and a kept draft, both stored in this device's settings (not synced), so they survive
-// leaving the page or the app being closed. A manual session is typed in afterwards: it has no timer
-// and no kept draft, it is only saved through here.
+// Open form sessions: blank bale / strength / gym / mental sessions that were opened (SPT, mental)
+// or started (blank bale from the Shooting page's Start, gym from the Gym setup's) and not yet saved
+// or discarded. Each has a session timer and a kept draft, both stored in this device's settings (not
+// synced), so they survive leaving the page or the app being closed. A manual session is typed in
+// afterwards: it has no timer and no kept draft, it is only saved through here.
 //
 // This module owns that whole life: opening or starting (the timer starts, a kept draft is taken
 // back), keeping the draft, the timer button, saving, discarding and listing what is open. It asks

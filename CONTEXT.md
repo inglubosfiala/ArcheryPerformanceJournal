@@ -10,10 +10,23 @@ A personal journal of archery training: sessions logged arrow by arrow, graded o
 One training or competition occasion recorded in the journal.
 
 **Session type**:
-The kind of session: training, blank bale, competition, strength, mental or manual. On the New session page training, competition and blank bale are the three kinds of **Shooting**; strength is shown as SPT, and manual as **Log afterwards**.
+The kind of session: training, blank bale, competition, strength, gym, mental or manual. On the New session page training, competition and blank bale are the three kinds of **Shooting**; strength (shown as SPT) and gym are the two kinds of **Strength**, and manual is **Log afterwards**.
 
 **Shooting**:
 Training, competition or blank bale: the session types where arrows are shot at the target or the bale. They share one setup page, switched between the three; every field starts from the **last setup** of that kind.
+
+**Strength**:
+SPT or gym: the choice behind the Strength card of the New session page. SPT is the session type `strength` (bow-specific drills with the interval timer); a gym session is the type `gym`.
+_Avoid_: Strength for SPT alone (the type's id stays `strength`)
+
+**Gym session**:
+A strength workout away from the bow: a focus (any of full body, upper body, lower body, core, cardio, mobility, shoulder prehab), its **exercises** and a note; a note alone is enough. Picked on its setup page, where the exercises are filled in from the last gym session with a shared focus; nothing starts until Start, which starts its timer. It counts in training load by its minutes, never by arrows.
+
+**Exercise**:
+One movement done in a gym session (face pulls, a plank…), counted in reps or held for seconds, with its **sets**. "Last time" is what the same exercise was in the latest gym session that had it.
+
+**Set**:
+One round of an exercise: its reps (or seconds), its weight in kg (0 = body weight, shown BW) and whether it is done. Only done sets count in the session's number of sets.
 
 **Last setup**:
 The setup of the last session of one kind of shooting (distance, face, arrows per end and equipment; a competition's round and conditions; a blank bale's arrow goal), kept on the device and written when a session of that kind starts.
@@ -30,10 +43,10 @@ A training or competition session, logged arrow by arrow.
 _Avoid_: Arrow session
 
 **Form session**:
-A blank bale, strength, mental or manual session, recorded on a form instead of arrow by arrow.
+A blank bale, strength, gym, mental or manual session, recorded on a form instead of arrow by arrow.
 
 **Open form session**:
-A form session that has been opened and not yet saved or discarded; its timer and draft are kept on the device. SPT and mental sessions open with their form; a blank bale session opens only when Start is tapped on its setup.
+A form session that has been opened and not yet saved or discarded; its timer and draft are kept on the device. SPT and mental sessions open with their form; a blank bale or gym session opens only when Start is tapped on its setup.
 
 **Running session**:
 The one scored session in progress. Only one runs at a time; it ends by being finished or discarded.

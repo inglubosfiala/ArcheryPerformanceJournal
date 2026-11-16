@@ -1,4 +1,4 @@
-// Forms of the non-scored session types (blank bale, SPT, mental, manual), drawn with the APL
+// Forms of the non-scored session types (blank bale, SPT, gym, mental, manual), drawn with the APL
 // components. The same fields are used to create a session (New session page) and to edit a saved
 // one (History detail).
 import { h } from '../../core/dom.js';

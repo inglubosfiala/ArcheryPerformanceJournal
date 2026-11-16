@@ -188,8 +188,8 @@ function renderOverlay(overlay, focusKey = null) {
 }
 
 /**
- * A strip per session still running (a scored session, or an open blank bale / strength / mental
- * one), on every page except that session's own, so it can always be reopened.
+ * A strip per session still running (a scored session, or an open blank bale / strength / gym /
+ * mental one), on every page except that session's own, so it can always be reopened.
  */
 function renderRunning() {
   const items = [];
@@ -313,7 +313,7 @@ ctx.running = createRunningSession({
   requestSync: () => ctx.sync.now(), // a finished session goes to Drive right away (no-op when sync is off)
   onChange: () => ctx.rerender(),
 });
-// the open form sessions (blank bale / strength / mental): timer, kept draft, saving and discarding
+// the open form sessions (blank bale / strength / gym / mental): timer, kept draft, saving and discarding
 ctx.openForms = createOpenFormSessions({
   repo,
   save: ctx.save,
