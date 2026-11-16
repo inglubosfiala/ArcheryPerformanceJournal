@@ -48,8 +48,12 @@ export function formatDate(isoDate, opts = { day: 'numeric', month: 'short', yea
   return new Date(y, m - 1, d).toLocaleDateString('en-GB', opts);
 }
 
-export function todayIso() {
-  const d = new Date();
+/** Local YYYY-MM-DD of a Date. */
+export function isoDate(d) {
   const p = (n) => String(n).padStart(2, '0');
   return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
+}
+
+export function todayIso() {
+  return isoDate(new Date());
 }

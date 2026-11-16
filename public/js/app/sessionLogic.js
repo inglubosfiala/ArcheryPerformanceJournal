@@ -249,6 +249,26 @@ export function rescoreArrow(arrow, v, face) {
   return { arrow: { ...rest, v, x: null, y: null }, dropped: true };
 }
 
+/**
+ * A saved end as changed on the Edit end sheet (`draft`: same arrows, new scores, grades, let-downs).
+ * Each arrow whose score changed is rescored against the saved one (rescoreArrow), so a position
+ * that no longer matches its new score goes. Returns the end to store and the arrows (1-based)
+ * whose position was dropped.
+ */
+export function rescoreEnd(saved, draft, face) {
+  const dropped = [];
+  const arrows = draft.arrows.map((a, i) => {
+    const was = saved.arrows[i];
+    if (!was || a.v == null || a.v === was.v) return a;
+    // the saved position decides; the draft's grades stay
+    const { spot: _spot, ...graded } = a;
+    const res = rescoreArrow({ ...graded, v: was.v, x: was.x, y: was.y, ...(was.spot != null ? { spot: was.spot } : {}) }, a.v, face);
+    if (res.dropped) dropped.push(i + 1);
+    return res.arrow;
+  });
+  return { end: { ...draft, arrows }, dropped };
+}
+
 /** Clear the last scored arrow in the shown end. */
 export function undo(session) {
   const arrows = shownEnd(session).arrows;

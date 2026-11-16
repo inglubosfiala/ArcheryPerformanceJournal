@@ -375,3 +375,37 @@ describe('changing the score of a saved arrow (Edit end)', () => {
     });
   });
 });
+
+describe('saving an edited end', () => {
+  const saved = {
+    arrows: [
+      { v: 9, m: 1, s: 1, x: 0.25, y: 0, spot: 0 },
+      { v: 10, m: 1, s: 1, x: 0.15, y: 0, spot: 1 },
+      { v: 8, m: 2, s: 2, x: null, y: null },
+    ],
+    ld: 0,
+    cld: 0,
+    note: '',
+  };
+
+  it('drops only the positions that no longer match their new score, keeping the draft grades and let-downs', () => {
+    const draft = structuredClone(saved);
+    draft.arrows[0].v = 7; // another ring: position goes
+    draft.arrows[0].m = 3;
+    draft.arrows[1].s = 4; // grade only: position stays
+    draft.arrows[2].v = 'M'; // no position to drop
+    draft.ld = 2;
+    const { end, dropped } = L.rescoreEnd(saved, draft, '40t');
+    expect(dropped).toEqual([1]);
+    expect(end.arrows[0]).toEqual({ v: 7, m: 3, s: 1, x: null, y: null });
+    expect(end.arrows[1]).toEqual({ v: 10, m: 1, s: 4, x: 0.15, y: 0, spot: 1 });
+    expect(end.arrows[2]).toEqual({ v: 'M', m: 2, s: 2, x: null, y: null });
+    expect(end.ld).toBe(2);
+  });
+
+  it('keeps the position when the score changes back within its ring', () => {
+    const draft = structuredClone(saved);
+    draft.arrows[0].v = 9;
+    expect(L.rescoreEnd(saved, draft, '40t').dropped).toEqual([]);
+  });
+});

@@ -1,16 +1,13 @@
 // The running blank bale session (#/blank): started from the Shooting page, counted with +1 / +3 / +6
 // while you shoot, finished or discarded here. The open form session (openFormSession.js) owns the
 // timer, the kept draft, saving and discarding; this page draws them and forwards the taps.
-import { h } from '../../core/dom.js';
+import { h, isoDate } from '../../core/dom.js';
 import * as APL from '../../ui/apl/index.js';
 import { hourMinute } from '../sessionTypes.js';
 import { timerElapsed } from '../sessionLogic.js';
 import { activeSetup, gearForChoice } from '../gearFields.js';
 import { sessionTimer } from './timer.js';
 
-const p2 = (n) => String(n).padStart(2, '0');
-/** Local YYYY-MM-DD of a Date. */
-const localDate = (d) => `${d.getFullYear()}-${p2(d.getMonth() + 1)}-${p2(d.getDate())}`;
 
 /** Arrows per minute over the time on the timer; null before the first minute or the first arrow. */
 export function arrowPace(arrows, elapsedMs) {
@@ -55,7 +52,7 @@ export function renderBlankRunning(ctx, open) {
   const finish = async () => {
     const res = await ctx.openForms.save('blank', {
       fields: current(),
-      date: localDate(startedAt),
+      date: isoDate(startedAt),
       time: hourMinute(startedAt),
       gear: gearForChoice(gearChoice, { setups }) || { gear: null, gearSnapshotId: null },
     });

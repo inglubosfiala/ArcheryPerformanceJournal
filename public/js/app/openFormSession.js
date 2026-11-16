@@ -9,7 +9,8 @@
 // the archer through the `confirm` adapter and never touches the DOM, so the same code runs in the
 // app and in tests. The page keeps only its own state (the draft being typed) and where to go next.
 //
-// save / discard report what happened as `{ status }`:
+// start / save / discard report what happened as `{ status }`:
+//   'started' · 'open' (start: one was open already and goes on as it is)
 //   'saved' (with `session`) · 'discarded' · 'cancelled' (the archer said no)
 //   'failed' (the save was refused; the guarded save has told the archer)
 

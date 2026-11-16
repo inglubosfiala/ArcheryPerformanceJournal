@@ -5,7 +5,7 @@ import { h } from '../../core/dom.js';
 import * as APL from '../../ui/apl/index.js';
 import { T } from '../strings.js';
 import { icons } from '../icons.js';
-import { lastSetupOf, SHOOTING_KINDS, ARROW_GOALS } from '../lastSetup.js';
+import { lastSetupOf, rememberSetup, SHOOTING_KINDS, ARROW_GOALS } from '../lastSetup.js';
 import { DISTANCES, DISTANCE_DEFAULTS, SETUP_FACES, ARROWS_PER_END_MIN, ARROWS_PER_END_MAX } from '../scoring.js';
 import {
   TYPE_LABELS,
@@ -15,6 +15,7 @@ import {
   CONDITIONS,
   parseConditions,
   joinConditions,
+  toggleCondition,
 } from '../sessionTypes.js';
 import { setupState, whenSection, equipmentSection } from './sessionSetup.js';
 import { emptyForm, formSections } from './sessionForms.js';
@@ -135,7 +136,10 @@ function kindTabs(ctx, kind) {
     if (!step) return;
     e.preventDefault();
     const n = SHOOTING_KINDS.length;
-    go(SHOOTING_KINDS[(SHOOTING_KINDS.indexOf(kind) + step + n) % n]);
+    const next = SHOOTING_KINDS[(SHOOTING_KINDS.indexOf(kind) + step + n) % n];
+    // the new tab takes the focus first, so it keeps it when the page is drawn again
+    e.currentTarget.querySelector(`[data-fk="kind-${next}"]`)?.focus();
+    go(next);
   };
   return h(
     'div',
@@ -212,7 +216,7 @@ function competitionSection(fields, { setKind, quietKind }) {
         value: chips,
         options: CONDITIONS.map((c) => ({ value: c, label: c })),
         onChange: (c) =>
-          setComp({ conditions: joinConditions(chips.includes(c) ? chips.filter((x) => x !== c) : [...chips, c], rest) }),
+          setComp({ conditions: toggleCondition(comp.conditions, c) }),
         fk: 'comp-cond',
       }),
       // conditions typed before the chips existed stay editable as text
@@ -393,6 +397,8 @@ export function renderShootingSetup(ctx, kind) {
       gear: equipment.chosenGear(),
     });
     if (res.status !== 'saved') return;
+    // remembered as the last blank bale setup, as a started one is (openForms.start)
+    ctx.saveSettings(rememberSetup(settings, 'blank', { goal: fields.goal ?? null, gear: equipment.choice }));
     ctx.ui.quietSet({ setup: null });
     ctx.navigate(`history/${res.session.id}`, { replace: true });
   };

@@ -18,6 +18,7 @@ import {
   CONDITIONS,
   parseConditions,
   joinConditions,
+  toggleCondition,
 } from '../sessionTypes.js';
 import {
   scoreCounts,
@@ -35,7 +36,7 @@ import {
 } from '../sessionInsights.js';
 import { isMultiSpot, keypadValues, zoneOf } from '../scoring.js';
 import { sumArrows } from '../stats.js';
-import { rescoreArrow } from '../sessionLogic.js';
+import { rescoreEnd } from '../sessionLogic.js';
 import { faceRings } from './face.js';
 import { whenCard, gearCard } from './common.js';
 
@@ -444,17 +445,8 @@ function endSheet(ctx, ss, { ov, set }) {
     });
 
   const save = () => {
-    const dropped = [];
-    const arrows = draft.arrows.map((a, i) => {
-      const was = saved.arrows[i];
-      if (a.v == null || a.v === was.v) return a;
-      // the saved position decides, the draft's grades stay
-      const { spot: _spot, ...graded } = a;
-      const res = rescoreArrow({ ...graded, v: was.v, x: was.x, y: was.y, ...(was.spot != null ? { spot: was.spot } : {}) }, a.v, ss.face);
-      if (res.dropped) dropped.push(i + 1);
-      return res.arrow;
-    });
-    if (ctx.finished.setEnd(ss.id, index, { ...draft, arrows }).status === 'failed') return;
+    const { end, dropped } = rescoreEnd(saved, draft, ss.face);
+    if (ctx.finished.setEnd(ss.id, index, end).status === 'failed') return;
     close();
     const n = dropped.length;
     ctx.toast(
@@ -594,7 +586,7 @@ function competitionEditor(ctx, ss, { ov, set }) {
       multiple: true,
       value: chips,
       options: CONDITIONS.map((c) => ({ value: c, label: c })),
-      onChange: (c) => save('conditions', joinConditions(chips.includes(c) ? chips.filter((x) => x !== c) : [...chips, c], rest)),
+      onChange: (c) => save('conditions', toggleCondition(comp.conditions, c)),
       fk: 'comp-cond',
     }),
     APL.TextField({

@@ -114,6 +114,12 @@ export function parseConditions(text) {
   return { chips: CONDITIONS.filter((c) => chips.includes(c)), rest: rest.join(', ') };
 }
 
+/** A conditions text with one chip's condition turned on or off; the typed rest is kept. */
+export function toggleCondition(text, condition) {
+  const { chips, rest } = parseConditions(text);
+  return joinConditions(chips.includes(condition) ? chips.filter((c) => c !== condition) : [...chips, condition], rest);
+}
+
 /** Chips and the typed rest back into one conditions text ("Hall, Wind, dusty"). */
 export function joinConditions(chips, rest = '') {
   return [...CONDITIONS.filter((c) => chips.includes(c)), String(rest || '').trim()].filter(Boolean).join(', ');

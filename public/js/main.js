@@ -143,7 +143,7 @@ function renderNow({ scrollTop = false } = {}) {
   // overlays: the grading sheet comes from the view; the guide is global
   const st = ui.get();
   const overlay = st.guide ? { ...guideSheet(() => ui.set({ guide: false })), key: 'guide' } : result.overlay ? { ...result.overlay, key: 'view' } : null;
-  renderOverlay(overlay);
+  renderOverlay(overlay, focusKey);
 
   if (!overlay && focusKey) {
     const el = shell.main.querySelector(`[data-fk="${CSS.escape(focusKey)}"]`);
@@ -151,7 +151,7 @@ function renderNow({ scrollTop = false } = {}) {
   }
 }
 
-function renderOverlay(overlay) {
+function renderOverlay(overlay, focusKey = null) {
   const opened = overlay && lastOverlayKey !== overlay.key;
   const returnFocus = !overlay && lastOverlayKey;
   const returnFk = lastReturnFk;
@@ -174,6 +174,14 @@ function renderOverlay(overlay) {
   shell.overlay.className = 'overlay-root open';
   const backdrop = h('div', { class: 'backdrop', onClick: () => overlayClose?.() });
   shell.overlay.replaceChildren(backdrop, overlay.node);
+  if (!opened && !overlay.node.contains(document.activeElement)) {
+    // the same sheet drawn again (a key tapped in it): focus stays on the control that was used
+    const same = focusKey && overlay.node.querySelector(`[data-fk="${CSS.escape(focusKey)}"]`);
+    if (same) {
+      same.focus({ preventScroll: true });
+      return;
+    }
+  }
   const first = overlay.node.querySelector('[data-autofocus]') || overlay.node.querySelector('button');
   if (first && (opened || !overlay.node.contains(document.activeElement))) first.focus({ preventScroll: true });
 }

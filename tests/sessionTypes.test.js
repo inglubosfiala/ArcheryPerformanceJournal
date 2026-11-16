@@ -153,3 +153,12 @@ describe('competition conditions as chips', () => {
     expect(joinConditions(chips, rest)).toBe(text);
   });
 });
+
+describe('toggling one condition chip', () => {
+  it('turns a condition on or off and keeps the typed rest', async () => {
+    const { toggleCondition } = await import('../public/js/app/sessionTypes.js');
+    expect(toggleCondition('Hall, dusty', 'Wind')).toBe('Hall, Wind, dusty');
+    expect(toggleCondition('Hall, Wind, dusty', 'Hall')).toBe('Wind, dusty');
+    expect(toggleCondition('', 'Low light')).toBe('Low light');
+  });
+});
