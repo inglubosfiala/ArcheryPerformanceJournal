@@ -158,6 +158,31 @@ export function Chip({ children, selected = false, numeric = false, onClick, fk 
   );
 }
 
+/**
+ * A yes / no setting as one full-width row: the title and its line on the left, an on / off switch on
+ * the right. The whole row is the switch (role="switch", aria-checked carries the state).
+ */
+export function Switch({ title, detail = null, checked = false, onChange, fk }) {
+  return h(
+    'button',
+    {
+      type: 'button',
+      role: 'switch',
+      class: ['apl', 'apl-switch'],
+      'aria-checked': String(!!checked),
+      onClick: () => onChange?.(!checked),
+      dataset: fkData(fk),
+    },
+    h(
+      'span',
+      { class: 'apl-switch-text' },
+      h('span', { class: 'apl-switch-title' }, title),
+      detail ? h('span', { class: 'apl-switch-detail' }, detail) : null,
+    ),
+    h('span', { class: 'apl-switch-track', 'aria-hidden': 'true' }, h('span', { class: 'apl-switch-thumb' })),
+  );
+}
+
 /** Single-choice grid of Chips. `fk` is a prefix: each chip gets `${fk}-${value}`. */
 export function ChipGrid({ label, options, value, onChange, columns = 4, numeric = false, fk }) {
   return h(

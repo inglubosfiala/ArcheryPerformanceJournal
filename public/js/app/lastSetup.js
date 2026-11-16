@@ -10,9 +10,9 @@ export const SHOOTING_KINDS = ['training', 'competition', 'blank'];
 export const ARROW_GOALS = [30, 60, 90, 120];
 export const ARROW_GOAL_MAX = 10000;
 
-const scoredDefault = () => ({ distance: 18, face: '40t', arrowsPerEnd: DEFAULT_ARROWS_PER_END, gear: null });
+const scoredDefault = () => ({ distance: 18, face: '40t', arrowsPerEnd: DEFAULT_ARROWS_PER_END, grading: true, gear: null });
 
-/** A fresh device: 18 m on the triple, 3 arrows; equipment = the active setup (gear null). */
+/** A fresh device: 18 m on the triple, 3 arrows, M / S grading on; equipment = the active setup (gear null). */
 export const defaultLastSetup = () => ({
   training: scoredDefault(),
   competition: { ...scoredDefault(), round: '', conditions: '' },
@@ -31,6 +31,7 @@ function scored(v, base) {
     distance,
     face,
     arrowsPerEnd: isValidArrowsPerEnd(o.arrowsPerEnd) ? o.arrowsPerEnd : base.arrowsPerEnd,
+    grading: typeof o.grading === 'boolean' ? o.grading : base.grading,
     gear: isStr(o.gear) ? o.gear : null,
     ...('round' in base ? { round: isStr(o.round) ? o.round : '', conditions: isStr(o.conditions) ? o.conditions : '' } : {}),
   };

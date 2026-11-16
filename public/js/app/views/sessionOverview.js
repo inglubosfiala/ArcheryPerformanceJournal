@@ -13,6 +13,7 @@ import { formatDuration } from '../sessionLogic.js';
 import {
   TYPE_LABELS,
   sessionType,
+  isGraded,
   emptyReview,
   ROUNDS,
   CONDITIONS,
@@ -503,7 +504,9 @@ function endSheet(ctx, ss, { ov, set }) {
                 dataset: { fk: `tile-${i}` },
               },
               chip(a.v, 'ov-tile-chip'),
-              h('span', { class: 'ov-tile-grades', 'aria-hidden': 'true' }, h('span', null, `M${a.m ?? '–'}`), h('span', null, `S${a.s ?? '–'}`)),
+              isGraded(ss)
+                ? h('span', { class: 'ov-tile-grades', 'aria-hidden': 'true' }, h('span', null, `M${a.m ?? '–'}`), h('span', null, `S${a.s ?? '–'}`))
+                : null,
             ),
           ),
         ),
@@ -516,22 +519,26 @@ function endSheet(ctx, ss, { ov, set }) {
             fk: `endkey${r}`,
           }),
         ),
-        APL.GradeKeys({
-          label: `Mental program for arrow ${sel + 1}`,
-          rowLabel: 'M',
-          value: cur.m,
-          keyLabel: (g) => `Mental grade ${g}`,
-          onChange: (g) => setGrade('m', g),
-          fk: 'end-grade-m',
-        }),
-        APL.GradeKeys({
-          label: `Shooting cycle for arrow ${sel + 1}`,
-          rowLabel: 'S',
-          value: cur.s,
-          keyLabel: (g) => `Shooting-cycle grade ${g}`,
-          onChange: (g) => setGrade('s', g),
-          fk: 'end-grade-s',
-        }),
+        ...(isGraded(ss)
+          ? [
+            APL.GradeKeys({
+              label: `Mental program for arrow ${sel + 1}`,
+              rowLabel: 'M',
+              value: cur.m,
+              keyLabel: (g) => `Mental grade ${g}`,
+              onChange: (g) => setGrade('m', g),
+              fk: 'end-grade-m',
+            }),
+            APL.GradeKeys({
+              label: `Shooting cycle for arrow ${sel + 1}`,
+              rowLabel: 'S',
+              value: cur.s,
+              keyLabel: (g) => `Shooting-cycle grade ${g}`,
+              onChange: (g) => setGrade('s', g),
+              fk: 'end-grade-s',
+            }),
+            ]
+          : []),
         h('div', { class: 'ov-lds' }, stepper('ld', T.letDowns), stepper('cld', 'Correct')),
         ss.ends.length > 1
           ? h('button', { type: 'button', class: 'btn btn-text danger ov-delete-end', onClick: del, dataset: { fk: 'end-delete' } }, 'Delete end')
@@ -727,7 +734,7 @@ export function renderOverview(ctx, ss, { mode = 'history', sections = [] } = {}
         )
       : null,
     summaryCard(ctx, ss, st),
-    gradesCard(ss),
+    isGraded(ss) ? gradesCard(ss) : null,
     reviewSection(ctx, ss, { editing: editingReview, onToggle: finished ? null : () => set({ review: !ov.review }) }),
     groupSection(ss, { filter: ov.filter || 'all', onFilter: (f) => set({ filter: f }) }),
     endsSection(ss, {

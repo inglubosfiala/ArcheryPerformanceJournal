@@ -17,7 +17,7 @@ import * as L from '../sessionLogic.js';
 import { T } from '../strings.js';
 import { icons } from '../icons.js';
 import { faceSheet, faceViewBox, VB } from './face.js';
-import { SESSION_TYPES, TYPE_LABELS, sessionType } from '../sessionTypes.js';
+import { SESSION_TYPES, TYPE_LABELS, sessionType, isGraded } from '../sessionTypes.js';
 import { renderFormSetup } from './sessionSetup.js';
 import { renderTypeChoice, renderShootingSetup } from './shootingSetup.js';
 import { renderBlankRunning } from './blankBale.js';
@@ -217,6 +217,7 @@ function renderActive(ctx, session) {
   );
 
   // --- slot strip: one card per slot; tapping one makes it the selected arrow
+  const graded = isGraded(session);
   const compact = current.arrows.length > 6;
   const cols = compact ? 4 : current.arrows.length === 4 ? 2 : Math.min(3, current.arrows.length);
   const strip = h(
@@ -229,8 +230,9 @@ function renderActive(ctx, session) {
     },
     current.arrows.map((a, i) => {
       const active = i === cursor;
-      // "M1 S2" once the arrow has a score or a grade ("–" for a grade not given yet)
-      const grades = a.v != null || a.m != null || a.s != null ? `M${a.m ?? '–'} S${a.s ?? '–'}` : '';
+      // "M1 S2" once the arrow has a score or a grade ("–" for a grade not given yet); none when
+      // the session is scored without grading
+      const grades = graded && (a.v != null || a.m != null || a.s != null) ? `M${a.m ?? '–'} S${a.s ?? '–'}` : '';
       return h(
         'div',
         { class: ['slot-card', active && 'is-active', active && editing && 'is-moving'] },
@@ -274,8 +276,8 @@ function renderActive(ctx, session) {
     },
   });
 
-  // --- under the face, always both: the score keypad (a score without a position, today's entry)
-  // and the selected arrow's M / S grades
+  // --- under the face: the score keypad (a score without a position, today's entry) and, when the
+  // session is graded, the selected arrow's M / S grades
   const under = h(
     'div',
     { class: 'score-under' },
@@ -290,7 +292,7 @@ function renderActive(ctx, session) {
       onKey: (k) => enter(k, null, null),
       fk: 'quick',
     }),
-    gradePanel(session, { onGrade: (kind, g) => update(ctx, (c) => L.gradeArrow(c, kind, g)) }),
+    graded ? gradePanel(session, { onGrade: (kind, g) => update(ctx, (c) => L.gradeArrow(c, kind, g)) }) : null,
   );
 
   // --- the end's let-downs and note (one sheet), and what to do next
@@ -417,7 +419,7 @@ function renderActive(ctx, session) {
           h(
             'span',
             { class: 'total-end-meta' },
-            `M ${fmt(r.avgM)} · S ${fmt(r.avgS)} · let-downs ${r.ld}/${r.cld}${r.isCurrent ? ' · now' : ''}`,
+            [graded && `M ${fmt(r.avgM)} · S ${fmt(r.avgS)}`, `let-downs ${r.ld}/${r.cld}`, r.isCurrent && 'now'].filter(Boolean).join(' · '),
           ),
         ),
         h('span', { class: 'total-end-score' }, h('strong', null, String(r.sum)), h('span', null, `Σ ${r.run}`)),
@@ -524,7 +526,7 @@ function endsPanel(session, close) {
             { class: ['score-drop-row', r.isCurrent && 'is-current'] },
             h('span', { class: 'score-drop-no' }, `E${r.n}`),
             h('span', { class: 'score-drop-arrows' }, r.arrows.map((a) => arrowText(a.v)).join(' ')),
-            h('span', { class: 'score-drop-grades' }, avgText(r.avgM, r.avgS)),
+            isGraded(session) ? h('span', { class: 'score-drop-grades' }, avgText(r.avgM, r.avgS)) : null,
             h('strong', { class: 'score-drop-sum' }, String(r.sum)),
           ),
         ),

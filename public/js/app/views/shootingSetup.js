@@ -118,6 +118,7 @@ function fromLast(settings, kind) {
     distance: last.distance,
     face: SETUP_FACES.includes(last.face) ? last.face : '40t',
     arrowsPerEnd: last.arrowsPerEnd,
+    grading: last.grading,
   };
   if (kind !== 'competition') return fields;
   // the event is new every time; the round and the conditions are usually the same as last time
@@ -294,6 +295,17 @@ function scoredSections(fields, setKind) {
         fk: 'n-chip',
       }),
     }),
+    APL.Section({
+      label: 'Grading',
+      id: 'setup-grading',
+      children: APL.Switch({
+        title: 'Mental grading',
+        detail: 'Grade each arrow on the mental program (M) and the shooting cycle (S)',
+        checked: fields.grading !== false,
+        onChange: (on) => setKind({ grading: on }),
+        fk: 'grading',
+      }),
+    }),
   ];
 }
 
@@ -356,7 +368,7 @@ export function renderShootingSetup(ctx, kind) {
   const equipment = equipmentSection(ctx, st, { kind, distance: blank ? null : fields.distance });
 
   const startScored = async () => {
-    const { distance, face, arrowsPerEnd, competition: comp } = fields;
+    const { distance, face, arrowsPerEnd, grading, competition: comp } = fields;
     // only one session runs at a time: the running-session module asks about the one in progress
     const res = await ctx.running.start({
       date: whenDate,
@@ -366,6 +378,7 @@ export function renderShootingSetup(ctx, kind) {
       distance,
       face,
       arrowsPerEnd,
+      grading: grading !== false,
       competition:
         kind === 'competition'
           ? { ...emptyCompetition(), event: comp.event, round: comp.round, conditions: comp.conditions }
@@ -405,7 +418,7 @@ export function renderShootingSetup(ctx, kind) {
 
   const summary = blank
     ? ['Blank bale', fields.goal ? `goal ${fields.goal} arrows` : '', equipment.gearName].filter(Boolean).join(' · ')
-    : setupSummary(fields, arrowsText(fields.arrowsPerEnd), equipment.gearName);
+    : setupSummary(fields, arrowsText(fields.arrowsPerEnd), fields.grading === false ? 'no grading' : '', equipment.gearName);
 
   const body = h(
     'div',

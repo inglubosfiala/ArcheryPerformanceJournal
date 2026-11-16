@@ -25,6 +25,12 @@ export function isScored(type) {
 
 export const sessionType = (session) => session.type || 'training';
 
+/**
+ * Whether a scored session asks for the M / S grades of each arrow. Chosen on the Shooting page;
+ * sessions stored before the choice existed (no `grading` field) are graded.
+ */
+export const isGraded = (session) => session?.grading !== false;
+
 const pad2 = (n) => String(n).padStart(2, '0');
 /** Local HH:MM of a Date (or ISO string); '' when it is not a date. */
 export function hourMinute(d) {

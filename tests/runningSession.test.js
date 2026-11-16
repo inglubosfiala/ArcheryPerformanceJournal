@@ -60,7 +60,7 @@ describe('starting', () => {
     expect(res.status).toBe('started');
     expect(running.get().id).toBe(res.session.id);
     expect(findRunning(repo).timer.running).toBe(true);
-    expect(repo.getSettings().lastSetup.training).toEqual({ distance: 18, face: '40s', arrowsPerEnd: 3, gear: 'none' });
+    expect(repo.getSettings().lastSetup.training).toEqual({ distance: 18, face: '40s', arrowsPerEnd: 3, grading: true, gear: 'none' });
     expect(repo.getSettings().lastSetup.competition).toEqual(defaultSettings.lastSetup.competition);
     expect(asked).toEqual([]);
   });
@@ -78,8 +78,15 @@ describe('starting', () => {
       competition: { event: 'Cup', round: 'WA 70 m', conditions: 'Sun, Wind', placement: '' },
     });
     const last = repo.getSettings().lastSetup;
-    expect(last.competition).toEqual({ distance: 70, face: '122', arrowsPerEnd: 6, gear: 'indoor', round: 'WA 70 m', conditions: 'Sun, Wind' });
+    expect(last.competition).toEqual({ distance: 70, face: '122', arrowsPerEnd: 6, grading: true, gear: 'indoor', round: 'WA 70 m', conditions: 'Sun, Wind' });
     expect(last.training).toEqual(defaultSettings.lastSetup.training);
+  });
+
+  it('starts a session without M / S grading and remembers that choice', async () => {
+    const running = make();
+    await running.start({ ...SETUP, grading: false });
+    expect(running.get().grading).toBe(false);
+    expect(repo.getSettings().lastSetup.training.grading).toBe(false);
   });
 
   it('finishes the session in progress when it has arrows, and syncs it', async () => {

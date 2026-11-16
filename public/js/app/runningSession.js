@@ -76,10 +76,10 @@ export function createRunningSession({
       }
     }
     // remembered for the next session of this kind (the Shooting page starts from it)
-    const { distance, face, arrowsPerEnd, type = 'training', competition } = setup;
+    const { distance, face, arrowsPerEnd, grading = true, type = 'training', competition } = setup;
     const gear = setup.gearSnapshotId || (setup.gear ? null : 'none');
     const comp = type === 'competition' ? { round: competition?.round || '', conditions: competition?.conditions || '' } : {};
-    saveSettings(rememberSetup(repo.getSettings(), type, { distance, face, arrowsPerEnd, gear, ...comp }));
+    saveSettings(rememberSetup(repo.getSettings(), type, { distance, face, arrowsPerEnd, grading, gear, ...comp }));
     const session = save('sessions', L.createSession({ ...setup, now: now() }));
     return session ? { status: 'started', session } : { status: 'failed' };
   }

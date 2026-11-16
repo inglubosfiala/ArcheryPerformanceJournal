@@ -78,6 +78,7 @@ export const collections = {
       }
       if (!(Number.isFinite(r.distance) && r.distance > 0)) errs.push('invalid distance');
       if (!FACE_IDS.includes(r.face)) errs.push('invalid face');
+      if (r.grading != null && typeof r.grading !== 'boolean') errs.push('invalid grading choice');
       if (!isValidArrowsPerEnd(r.arrowsPerEnd)) errs.push(`arrows per end must be 1 to ${ARROWS_PER_END_MAX}`);
       if (!Array.isArray(r.ends)) errs.push('ends must be a list');
       // ends may be partly scored (Next auto-saves an unfinished end)

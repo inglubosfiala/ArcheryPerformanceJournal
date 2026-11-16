@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { collections } from '../public/js/app/collections.js';
 import { migrate, migrations } from '../public/js/storage/migrations.js';
 import * as L from '../public/js/app/sessionLogic.js';
-import { isScored, formSummary, setupSummary, emptyDrill, newestFirst } from '../public/js/app/sessionTypes.js';
+import { isScored, isGraded, formSummary, setupSummary, emptyDrill, newestFirst } from '../public/js/app/sessionTypes.js';
 import { faceLabel } from '../public/js/app/scoring.js';
 
 const validate = (r) => collections.sessions.validate({ id: 'a', ...r });
@@ -160,5 +160,23 @@ describe('toggling one condition chip', () => {
     expect(toggleCondition('Hall, dusty', 'Wind')).toBe('Hall, Wind, dusty');
     expect(toggleCondition('Hall, Wind, dusty', 'Hall')).toBe('Wind, dusty');
     expect(toggleCondition('', 'Low light')).toBe('Low light');
+  });
+});
+
+describe('M / S grading of a scored session', () => {
+  const base = { date: '2026-11-16', distance: 18, face: '40s', arrowsPerEnd: 3 };
+  it('is on by default and for sessions stored before the choice existed', () => {
+    const s = L.createSession(base);
+    expect('grading' in s).toBe(false);
+    expect(isGraded(s)).toBe(true);
+  });
+  it('is stored as grading: false when turned off, and the session stays valid', () => {
+    const s = L.createSession({ ...base, grading: false });
+    expect(s.grading).toBe(false);
+    expect(isGraded(s)).toBe(false);
+    expect(validate(s)).toEqual([]);
+  });
+  it('rejects a grading value that is not a yes / no', () => {
+    expect(validate({ ...L.createSession(base), grading: 'off' })).toContain('invalid grading choice');
   });
 });

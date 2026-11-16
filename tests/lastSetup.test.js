@@ -6,9 +6,16 @@ import { collections } from '../public/js/app/collections.js';
 describe('last setup per kind', () => {
   it('reads the single object of schema 7 as training and competition', () => {
     const out = normalizeLastSetup({ distance: 25, face: '60', arrowsPerEnd: 6 });
-    expect(out.training).toEqual({ distance: 25, face: '60', arrowsPerEnd: 6, gear: null });
-    expect(out.competition).toEqual({ distance: 25, face: '60', arrowsPerEnd: 6, gear: null, round: '', conditions: '' });
+    expect(out.training).toEqual({ distance: 25, face: '60', arrowsPerEnd: 6, grading: true, gear: null });
+    expect(out.competition).toEqual({ distance: 25, face: '60', arrowsPerEnd: 6, grading: true, gear: null, round: '', conditions: '' });
     expect(out.blank).toEqual({ goal: null, gear: null });
+  });
+
+  it('keeps the M / S grading choice of each kind; a missing or bad one is on', () => {
+    const out = normalizeLastSetup({ training: { grading: false }, competition: { grading: 'no' } });
+    expect(out.training.grading).toBe(false);
+    expect(out.competition.grading).toBe(true);
+    expect(rememberSetup({}, 'competition', { grading: false }).lastSetup.competition.grading).toBe(false);
   });
 
   it('falls back to the defaults for missing or bad values', () => {

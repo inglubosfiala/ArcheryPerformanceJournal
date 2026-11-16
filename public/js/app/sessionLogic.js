@@ -28,6 +28,8 @@ export function createSession({
   time = null,
   // logged afterwards: the timer stays stopped at the duration typed in (minutes), instead of running
   pastMinutes = null,
+  // false: the arrows are scored without the M / S grades (the end screen does not ask for them)
+  grading = true,
   now = new Date(),
 }) {
   return {
@@ -46,6 +48,7 @@ export function createSession({
     pinned: false,
     gear,
     gearSnapshotId,
+    ...(grading === false ? { grading: false } : {}),
     // the timer runs from the start; it keeps counting while the app is closed (it is a start time,
     // not a ticking counter) until it is paused
     timer:
