@@ -2,8 +2,28 @@
 // components. The same fields are used to create a session (New session page) and to edit a saved
 // one (History detail).
 import { h } from '../../core/dom.js';
-import { DRILLS, drillLabel, emptyDrill, MENTAL_TECHNIQUES, EFFORT_MAX, FOCUS_MAX } from '../sessionTypes.js';
+import {
+  DRILLS,
+  DRILL_LIMITS,
+  SPT_PRESETS,
+  drillLabel,
+  emptyDrill,
+  MENTAL_TECHNIQUES,
+  EFFORT_MAX,
+  FOCUS_MAX,
+} from '../sessionTypes.js';
+import {
+  hasHold,
+  presetOf,
+  presetFields,
+  drillSummary,
+  drillTimeline,
+  drillDuration,
+  stepValue,
+  clampValue,
+} from '../drillView.js';
 import { tabataTimer } from './tabataTimer.js';
+import { stepperTile } from './common.js';
 import * as APL from '../../ui/apl/index.js';
 
 /** Empty strength / mental session fields. */
@@ -15,8 +35,234 @@ export function emptyForm(type) {
     : { minutes: null, focus: null, techniques: [] };
 }
 
-// mid-sentence: "Draws with the bow" → "draws with the bow"; an acronym ("SPT holds") stays
-const sentenceCase = (label) => (/^[A-Z]{2}/.test(label) ? label : label[0].toLowerCase() + label.slice(1));
+// --------------------------------------------------------------------------- SPT drills
+
+// Done drills the archer opened again (tapped the one-line card). Held by the drill object itself:
+// a drill keeps its object until it changes, and a change to its numbers clears `done` anyway.
+const expandedDone = new WeakSet();
+
+/** Whether a drill is drawn as its full card (not the one-line card of a done drill). */
+const isOpen = (d) => !d.done || expandedDone.has(d);
+
+/**
+ * Whether the drills show a primary "Start timer" button: then the page's own Save button steps
+ * down to the secondary style, so there are never two green buttons on screen.
+ */
+export const showsStartTimer = (drills = []) => drills.some((d) => hasHold(d) && isOpen(d));
+
+const DRILL_FIELDS = [
+  ['sets', 'Sets', ''],
+  ['reps', 'Reps', ''],
+  ['holdSec', 'Hold', 's'],
+  ['restSec', 'Rest', 's'],
+];
+
+const drillIcon = (d) => APL.Icon({ name: hasHold(d) ? 'stopwatch' : 'bow' });
+
+/**
+ * The Drills section: a card per drill, then the "+ …" chips that add one. `change` as in
+ * formSections. The −/+ tiles and preset chips change a card in place (no page redraw, so a held
+ * button keeps repeating); adding, removing, finishing and opening a drill redraw the page.
+ */
+function drillsSection(drills, change) {
+  const setDrill = (i, patch, opts) =>
+    change((cur) => ({ drills: (cur.drills || []).map((d, j) => (j === i ? withPatch(d, patch) : d)) }), opts);
+  return APL.Section({
+    label: 'Drills',
+    id: 'form-drills',
+    children: [
+      h(
+        'div',
+        { class: 'drill-list' },
+        drills.map((d, i) => (isOpen(d) ? drillCard(d, i, setDrill, change) : doneCard(d, i, change))),
+      ),
+      h(
+        'div',
+        { class: 'drill-add' },
+        h('span', { class: 'apl-cap13', id: 'drill-add-label' }, 'Add a drill'),
+        h(
+          'div',
+          { class: 'drill-add-chips', role: 'group', 'aria-labelledby': 'drill-add-label' },
+          DRILLS.filter((d) => !d.retired).map((d) =>
+            h(
+              'button',
+              {
+                type: 'button',
+                class: 'drill-add-chip',
+                'aria-label': `Add ${d.label}`,
+                dataset: { fk: `add-${d.id}` },
+                onClick: () => change((cur) => ({ drills: [...(cur.drills || []), emptyDrill(d.id)] })),
+              },
+              `+ ${d.short || d.label}`,
+            ),
+          ),
+        ),
+      ),
+    ],
+  });
+}
+
+/** A drill with a patch applied; changing its numbers means it was not run like that: no longer done. */
+function withPatch(d, patch) {
+  const next = { ...d, ...patch };
+  if (!('done' in patch) && DRILL_FIELDS.some(([k]) => k in patch && patch[k] !== d[k])) delete next.done;
+  return next;
+}
+
+/** A done drill, folded to one line; tapping it opens the full card. */
+function doneCard(d, i, change) {
+  const name = drillLabel(d.kind);
+  return h(
+    'button',
+    {
+      type: 'button',
+      class: 'drill-done',
+      'aria-label': `${name}, ${drillSummary(d)}, done. Show the drill`,
+      dataset: { fk: `drill-${i}-open` },
+      onClick: () => {
+        expandedDone.add(d);
+        change(() => ({}));
+      },
+    },
+    h('span', { class: 'drill-well drill-well--done' }, drillIcon(d)),
+    h(
+      'span',
+      { class: 'apl-stack drill-done-text' },
+      h('span', { class: 'apl-t' }, name),
+      h('span', { class: 'apl-cap13' }, `${drillSummary(d, { short: true })} · done`),
+    ),
+    APL.Icon({ name: 'chevron', size: 18 }),
+  );
+}
+
+/** The full card of drill `i`: header with summary, presets, −/+ tiles, timeline and its action. */
+function drillCard(d, i, setDrill, change) {
+  const name = drillLabel(d.kind);
+  const hold = hasHold(d);
+  let cur = d; // the drill as now shown (the tiles change it without a redraw)
+
+  const summary = h('span', { class: 'apl-cap13 drill-summary' });
+  const presetBtns = hold
+    ? SPT_PRESETS.map((p) =>
+        h(
+          'button',
+          {
+            type: 'button',
+            class: 'drill-preset',
+            dataset: { fk: `drill-${i}-preset-${p.label}` },
+            onClick: () => {
+              const fields = presetFields(p);
+              update(fields);
+              for (const [key, tile] of Object.entries(tiles)) tile.setValue(fields[key]);
+            },
+          },
+          p.label,
+        ),
+      )
+    : [];
+  const bar = h('div', { class: 'drill-timeline-bar', 'aria-hidden': 'true' });
+  const startBtn = hold
+    ? APL.Button({
+        children: '',
+        leadingIcon: 'play',
+        fk: `drill-${i}-timer`,
+        onClick: async () => {
+          const res = await tabataTimer({
+            title: name,
+            work: cur.holdSec,
+            rest: cur.restSec ?? 0,
+            reps: cur.reps,
+            sets: cur.sets,
+          });
+          if (res?.completed) setDrill(i, { done: true });
+        },
+      })
+    : null;
+  const startText = hold ? h('span') : null;
+  startBtn?.append(startText);
+
+  function refresh() {
+    summary.textContent = cur.done ? `${drillSummary(cur)} · done` : drillSummary(cur);
+    if (!hold) return;
+    const on = presetOf(cur);
+    presetBtns.forEach((b, k) => b.setAttribute('aria-pressed', String(SPT_PRESETS[k] === on)));
+    bar.replaceChildren(
+      ...drillTimeline(cur).map((seg) =>
+        h('span', { class: `drill-seg drill-seg--${seg.kind}`, style: { flexGrow: String(seg.w) } }),
+      ),
+    );
+    startText.textContent = `Start timer · ${drillDuration(cur)}`;
+  }
+  function update(patch) {
+    cur = withPatch(cur, patch);
+    setDrill(i, patch, { rerender: false });
+    refresh();
+  }
+
+  const tiles = {};
+  for (const [key, label, unit] of hold ? DRILL_FIELDS : DRILL_FIELDS.slice(0, 2)) {
+    const [min, max, by] = DRILL_LIMITS[key];
+    tiles[key] = stepperTile({
+      label,
+      unit,
+      value: d[key],
+      min,
+      max,
+      by,
+      step: (v, dir) => stepValue(key, v, dir),
+      parse: (text) => clampValue(key, text),
+      onChange: (v) => update({ [key]: v }),
+      fk: `drill-${i}-${key}`,
+    });
+  }
+  refresh();
+
+  return h(
+    'section',
+    { class: 'drill-card', 'aria-label': name },
+    h(
+      'div',
+      { class: 'drill-head' },
+      h('span', { class: 'drill-well' }, drillIcon(d)),
+      h('div', { class: 'apl-stack drill-title' }, h('span', { class: 'drill-name' }, name), summary),
+      APL.IconButton({
+        icon: 'close',
+        label: `Remove ${name}`,
+        onClick: () => change((c) => ({ drills: (c.drills || []).filter((_, j) => j !== i) })),
+        fk: `drill-${i}-remove`,
+      }),
+    ),
+    hold ? h('div', { class: 'drill-presets', role: 'group', 'aria-label': 'Presets' }, presetBtns) : null,
+    h('div', { class: 'drill-tiles' }, Object.values(tiles)),
+    hold
+      ? h(
+          'div',
+          { class: 'drill-timeline' },
+          bar,
+          h(
+            'div',
+            { class: 'drill-legend', 'aria-hidden': 'true' },
+            h('span', null, h('i', { class: 'drill-seg--hold' }), 'Hold'),
+            h('span', null, h('i', { class: 'drill-seg--rest' }), 'Rest'),
+            h('span', null, 'One set shown'),
+          ),
+        )
+      : null,
+    // a drill without a hold has no timer to finish it: it is marked done by hand
+    hold
+      ? startBtn
+      : h(
+          'button',
+          {
+            type: 'button',
+            class: 'btn btn-text drill-mark',
+            dataset: { fk: `drill-${i}-done` },
+            onClick: () => setDrill(i, { done: !cur.done }),
+          },
+          cur.done ? 'Mark not done' : 'Mark done',
+        ),
+  );
+}
 
 const toInt = (v) => {
   const n = parseInt(v, 10);
@@ -220,93 +466,8 @@ export function formSections(type, value, change, { live = false, timer = null }
   }
 
   if (type === 'strength') {
-    const drills = value.drills || [];
-    const setDrill = (i, patch, opts) =>
-      change(
-        (cur) => ({ drills: (cur.drills || []).map((d, j) => (j === i ? { ...d, ...patch } : d)) }),
-        opts,
-      );
-    const drillInput = (i, d, key, label) =>
-      APL.TextField({
-        label,
-        type: 'number',
-        inputmode: 'numeric',
-        min: 0,
-        value: d[key] ?? '',
-        fk: `drill-${i}-${key}`,
-        onInput: (e) => setDrill(i, { [key]: toInt(e.target.value) }, { rerender: false }),
-      });
     return [
-      APL.Section({
-        label: 'Drills',
-        id: 'form-drills',
-        children: [
-          drills.map((d, i) => {
-            const hold = DRILLS.find((x) => x.id === d.kind)?.hold;
-            return h(
-              'div',
-              { class: 'drill-row' },
-              h(
-                'div',
-                { class: 'drill-row-head' },
-                h('span', { class: 'apl-t' }, drillLabel(d.kind)),
-                APL.IconButton({
-                  icon: 'close',
-                  label: `Remove ${drillLabel(d.kind)}`,
-                  onClick: () => change((cur) => ({ drills: (cur.drills || []).filter((_, j) => j !== i) })),
-                  fk: `drill-${i}-remove`,
-                }),
-              ),
-              h(
-                'div',
-                { class: hold ? 'apl-grid-4' : 'apl-grid-2' },
-                drillInput(i, d, 'sets', 'Sets'),
-                drillInput(i, d, 'reps', 'Reps'),
-                hold ? drillInput(i, d, 'holdSec', 'Hold (s)') : null,
-                hold ? drillInput(i, d, 'restSec', 'Rest (s)') : null,
-              ),
-              // a drill with a hold can be run on the interval timer: it counts the holds and rests
-              // typed in above (read when it starts, so what was just typed counts)
-              hold
-                ? APL.Button({
-                    children: 'Start timer',
-                    variant: 'secondary',
-                    trailingIcon: 'play',
-                    fk: `drill-${i}-timer`,
-                    onClick: () => {
-                      let now = d;
-                      change(
-                        (cur) => {
-                          now = (cur.drills || [])[i] || d;
-                          return {};
-                        },
-                        { rerender: false },
-                      );
-                      tabataTimer({
-                        title: drillLabel(now.kind),
-                        work: now.holdSec,
-                        rest: now.restSec ?? 0,
-                        reps: now.reps,
-                        sets: now.sets,
-                      });
-                    },
-                  })
-                : null,
-            );
-          }),
-          h(
-            'div',
-            { class: 'apl-list' },
-            DRILLS.filter((d) => !d.retired).map((d) =>
-              APL.AddButton({
-                children: `Add ${sentenceCase(d.label)}`,
-                fk: `add-${d.id}`,
-                onClick: () => change((cur) => ({ drills: [...(cur.drills || []), emptyDrill(d.id)] })),
-              }),
-            ),
-          ),
-        ],
-      }),
+      drillsSection(value.drills || [], change),
       // While the session runs the page is just the timer and the drills (as on the blank bale
       // page): the timer is the duration, and the duration, effort and note are filled in on the
       // saved session.

@@ -41,14 +41,15 @@ const sortKey = (s) => `${s.date} ${s.time || hourMinute(s.createdAt)} ${s.creat
 export const newestFirst = (a, b) => sortKey(b).localeCompare(sortKey(a));
 
 /**
- * Bow-specific strength drills. `hold`: the drill has a hold time in seconds. `retired`: no longer
+ * Bow-specific strength drills. `hold`: the drill has a hold time in seconds. `short`: the name on
+ * the "+ …" chip that adds it, when shorter than `label`. `retired`: no longer
  * offered for new sessions (holding at full draw is what SPT holds are), but sessions that have it
  * keep it and stay valid.
  */
 export const DRILLS = [
   { id: 'spt', label: 'SPT holds', hold: true },
   { id: 'hold', label: 'Holding at full draw', hold: true, retired: true },
-  { id: 'draw', label: 'Draws with the bow', hold: false },
+  { id: 'draw', label: 'Draws with the bow', short: 'Draws with bow', hold: false },
   { id: 'band', label: 'Band draws', hold: false },
 ];
 export const DRILL_IDS = DRILLS.map((d) => d.id);

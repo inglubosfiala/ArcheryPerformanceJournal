@@ -6,7 +6,7 @@
 // to give focus back to the same control after it redraws the page (main.js, renderNow).
 import { h, s } from '../../core/dom.js';
 
-/** @typedef {'back'|'repeat'|'calendar'|'clock'|'plus'|'arrowRight'|'target'|'bow'|'play'|'pause'|'close'|'chevron'|'erase'} IconName */
+/** @typedef {'back'|'repeat'|'calendar'|'clock'|'plus'|'arrowRight'|'target'|'bow'|'play'|'pause'|'close'|'chevron'|'stopwatch'|'erase'} IconName */
 /** @typedef {'full'|'six'|'triple'|'vegas'} FaceKind */
 /** @typedef {{value: string|number, label: string}} Option */
 /** @typedef {Node|string|number|null|undefined|false} Child */
@@ -47,6 +47,11 @@ const PATHS = {
   pause: [['path', { d: 'M9 5v14M15 5v14' }]],
   close: [['path', { d: 'M6 6l12 12M18 6L6 18' }]],
   chevron: [['path', { d: 'M9 18l6-6-6-6' }]],
+  stopwatch: [
+    ['circle', { cx: 12, cy: 13, r: 8 }],
+    ['path', { d: 'M12 9v4l2.5 2' }],
+    ['path', { d: 'M9 2h6' }],
+  ],
   erase: [
     ['path', { d: 'M21 5H9l-6 7 6 7h12a1 1 0 0 0 1-1V6a1 1 0 0 0-1-1z' }],
     ['path', { d: 'M17 9l-5 6M12 9l5 6' }],
