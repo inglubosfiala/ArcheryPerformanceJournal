@@ -3161,34 +3161,10 @@ a.apl-sessionrow:hover {
 .grades-count {
   flex: none;
 }
-.grades-preview {
+/* a group holding content instead of rows (Support the journal) */
+.set-box {
   display: flex;
   flex-direction: column;
-  gap: var(--space-2);
-  padding: var(--space-4);
-  border-radius: var(--radius-xl);
-  border: 1px solid var(--border);
-  background: var(--surface);
-}
-.grades-preview > .apl-label {
-  color: var(--muted);
-}
-
-/* the user's wording of the chosen grades (gradeWording in common.js): one muted line, cut with … */
-.grade-wording {
-  margin: 0;
-  min-height: 18px;
-  font-size: 13px;
-  line-height: 18px;
-  color: var(--muted);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-.grade-wording strong {
-  color: var(--ink-soft);
-  font-weight: 600;
-}
-.grade-wording-part + .grade-wording-part {
-  margin-left: 12px;
+  gap: 10px;
+  padding: 14px;
 }

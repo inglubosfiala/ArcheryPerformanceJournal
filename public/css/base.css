@@ -1980,21 +1980,6 @@ button.arrow-count:hover {
   gap: var(--space-2);
 }
 
-/* the QR code keeps its white quiet zone in both themes, so phones can read it */
-.support-qr {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: var(--space-2);
-  margin: var(--space-2) 0 0;
-}
-
-.support-qr img {
-  display: block;
-  border-radius: var(--radius-md);
-  background: #ffffff;
-}
-
 /* ---------------------------------------------------------------- scoring screen (running session) */
 /* The end on one phone screen: header, slot strip, face, keypad or grades; Previous, Next and Scan
    in the bottom bar. Let-downs, the note, the ends and Finish follow by scrolling. */

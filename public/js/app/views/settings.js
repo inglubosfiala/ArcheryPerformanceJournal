@@ -4,7 +4,7 @@
 import { h } from '../../core/dom.js';
 import * as APL from '../../ui/apl/index.js';
 import { confirmDialog } from './confirm.js';
-import { APP_VERSION, SUPPORT_URL, SUPPORT_QR, PAYPAL_ME, TIP_AMOUNTS } from '../../config.js';
+import { APP_VERSION, SUPPORT_URL, PAYPAL_ME, TIP_AMOUNTS } from '../../config.js';
 import { exportBackup, parseBackup } from '../../backup/backup.js';
 import { checkForUpdate, storageInfo } from '../../pwa/updates.js';
 import { card } from './common.js';
@@ -67,7 +67,7 @@ function settingsRow({ page, icon, title, sub, accent = false }) {
 }
 
 function settingsGroup(title, rows) {
-  const id = `set-group-${title.toLowerCase()}`;
+  const id = `set-group-${title.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`;
   return h(
     'section',
     { class: 'set-group', 'aria-labelledby': id },
@@ -351,13 +351,13 @@ function tipLink(href, label, fk, extra = []) {
 }
 
 /**
- * The "Support the journal" card: PayPal buttons with the amount filled in (when a PayPal.Me name is
- * set), a link to the tip page and, when there is one, a QR code of that page for another phone to
- * scan. Nothing when neither is set. The app stays free; this is only an offer.
+ * The "Support the journal" group: PayPal buttons with the amount filled in (when a PayPal.Me name is
+ * set) and a link to the tip page. Nothing when neither is set. The app stays free; this is only an offer.
  */
-export function supportCard(url = SUPPORT_URL, qr = SUPPORT_QR, paypal = PAYPAL_ME, amounts = TIP_AMOUNTS) {
+export function supportCard(url = SUPPORT_URL, paypal = PAYPAL_ME, amounts = TIP_AMOUNTS) {
   if (!url && !paypal) return null;
-  return sectionCard('set-support', 'Support the journal', [
+  // laid out like the overview's groups: the label above a bordered box
+  return settingsGroup('Support the journal', h('div', { class: 'set-list set-box' }, [
     caption(
       'The journal is free and stays free, with no ads and no account. If it helps your shooting, you can buy me a coffee to keep it going.',
     ),
@@ -375,15 +375,7 @@ export function supportCard(url = SUPPORT_URL, qr = SUPPORT_QR, paypal = PAYPAL_
         )
       : null,
     url ? tipLink(url, paypal ? '☕ Other ways (Ko-fi)' : '☕ Buy me a coffee', 'support') : null,
-    url && qr
-      ? h(
-          'figure',
-          { class: 'support-qr' },
-          h('img', { src: qr, alt: 'QR code of the support page', width: 180, height: 180 }),
-          h('figcaption', { class: 'apl-cap13' }, 'Or let a friend scan this to tip from their phone.'),
-        )
-      : null,
-  ]);
+  ]));
 }
 
 // ---------------------------------------------------------------- Google Drive sync

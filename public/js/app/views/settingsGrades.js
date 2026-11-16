@@ -5,7 +5,7 @@
 import { h } from '../../core/dom.js';
 import * as APL from '../../ui/apl/index.js';
 import { confirmDialog } from './confirm.js';
-import { gradeBadge, gradeWording } from './common.js';
+import { gradeBadge } from './common.js';
 import {
   GRADES,
   NAME_MAX,
@@ -21,7 +21,6 @@ import {
 } from '../gradeTexts.js';
 
 const SAVE_DELAY_MS = 400;
-const PREVIEW_GRADE = 2;
 
 // the save waiting for typing to stop; leaving the page (or the app) saves it at once
 let pending = null;
@@ -69,7 +68,6 @@ export function renderGrades(ctx) {
     fk: 'grades-scale',
   });
   const tabOf = (k) => tabs.querySelector(`[data-fk="grades-scale-${k}"]`);
-  const previewLine = h('div', { class: 'grades-preview-line' });
 
   const rows = GRADES.map((n) => {
     const area = h('textarea', {
@@ -127,7 +125,6 @@ export function renderGrades(ctx) {
       r.def.textContent = edited ? `Default: “${defaultGradeText(scale, r.n)}”` : '';
       r.count.textContent = `${r.area.value.length}/${TEXT_MAX}`;
     }
-    previewLine.replaceChildren(gradeWording(v, { [scale]: PREVIEW_GRADE }));
   }
 
   async function reset() {
@@ -142,20 +139,6 @@ export function renderGrades(ctx) {
     ctx.saveSettings({ gradeTexts: texts });
     ctx.rerender();
   }
-
-  // the preview: the grade buttons as while scoring, grade 2 chosen (shown only, not tappable)
-  const preview = h(
-    'section',
-    { class: 'grades-preview', 'aria-labelledby': 'grades-preview-label' },
-    h('h2', { class: 'apl-label', id: 'grades-preview-label' }, 'Preview · while scoring'),
-    h(
-      'div',
-      { class: 'grades-preview-keys', inert: true, 'aria-hidden': 'true' },
-      APL.GradeKeys({ label: `${letter} preview`, rowLabel: letter, value: PREVIEW_GRADE }),
-    ),
-    previewLine,
-    h('p', { class: 'apl-cap' }, 'The chosen grade’s wording shows under the buttons and in the Grading guide.'),
-  );
 
   refresh();
 
@@ -176,7 +159,6 @@ export function renderGrades(ctx) {
         ),
         h('p', { class: 'apl-cap13' }, 'Describe what each grade means to you. 1 is always the best, 5 the worst; the colours stay the same.'),
         h('div', { class: 'grades-rows' }, rows.map((r) => r.row)),
-        preview,
       ),
     ),
   };

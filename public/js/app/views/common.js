@@ -14,18 +14,6 @@ export const gradeBadge = (g, extra = '') => h('span', { class: `grade-badge g${
 
 export const card = (props, ...children) => h('section', { ...props, class: ['card', props?.class] }, ...children);
 
-/**
- * One muted line with the user's wording of chosen grades: "M2 · One small intrusion…  S1 · Automatic…".
- * `grades` = { m, s } (either may be null; a scale without a grade is left out). The line is always
- * there (empty when nothing is chosen) so the layout does not jump; it is cut with an ellipsis.
- */
-export function gradeWording(settings, grades, fk) {
-  const parts = ['m', 's']
-    .filter((k) => grades?.[k] != null)
-    .map((k) => h('span', { class: 'grade-wording-part' }, h('strong', null, `${k.toUpperCase()}${grades[k]}`), ` · ${gradeText(settings, k, grades[k])}`));
-  return h('p', { class: 'grade-wording', dataset: fk ? { fk } : undefined }, parts);
-}
-
 /** Bottom sheet with the full M/S rubric, in the user's wording (Settings › Grades). */
 export function guideSheet(onClose, settings) {
   return {
