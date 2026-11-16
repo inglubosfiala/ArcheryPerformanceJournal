@@ -43,6 +43,14 @@ describe('interval (Tabata) timer plan', () => {
     expect(tabataStartOf(plan, 99)).toBe(55000); // past the last phase: the end
   });
 
+  it('totals the drill for the "Start timer · m:ss" label, prepare and set rests included', () => {
+    expect(tabataPlan({ work: 10, rest: 10, reps: 10 }).totalSec).toBe(200); // 3:20
+    expect(tabataPlan({ work: 20, rest: 20, reps: 6 }).totalSec).toBe(230); // 3:50
+    expect(tabataPlan({ work: 30, rest: 30, reps: 5, sets: 2 }).totalSec).toBe(10 + 2 * (150 + 120) + 60);
+    expect(tabataPlan({ work: 5, rest: 5, reps: 2 }).totalSec).toBe(TABATA_PREPARE + 15);
+    expect(tabataClock(tabataPlan({ work: 10, rest: 10, reps: 10 }).totalSec * 1000)).toBe('3:20');
+  });
+
   it('shows the time left rounded up', () => {
     expect(tabataClock(20000)).toBe('0:20');
     expect(tabataClock(19001)).toBe('0:20');

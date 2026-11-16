@@ -52,6 +52,148 @@ export function guideSheet(onClose) {
   };
 }
 
+const STEP_DELAY_MS = 400; // a held −/+ starts repeating after this
+const STEP_REPEAT_MS = 100; // …and then steps this often
+
+/**
+ * A −/+ tile: the label on top, a big value (with its `unit` in muted) between 44px − and +
+ * buttons, on surface-sunken. Holding − or + repeats. Tapping the value turns it into a field for
+ * an exact number (Enter or leaving keeps it, Escape keeps the old one).
+ *
+ * The tile updates itself and never needs the page to redraw (a redraw in the middle of a long
+ * press would drop the button under the finger): `onChange(value)` reports each new value.
+ *
+ * `step(value, dir)` gives the value after one tap (dir -1 or 1); by default ±`by` within
+ * `min`–`max`. `parse(text)` turns a typed value into one (null: keep the old one); by default a
+ * whole number within `min`–`max`.
+ */
+export function stepperTile({ label, value, unit = '', min = 0, max = 999, by = 1, step, parse, onChange, fk }) {
+  const clamp = (n) => Math.max(min, Math.min(max, n));
+  const stepOf = step || ((v, dir) => clamp((v ?? min) + dir * by));
+  const parseOf =
+    parse ||
+    ((text) => {
+      const n = Math.round(Number(text));
+      return text === '' || !Number.isFinite(n) ? null : clamp(n);
+    });
+  const name = label.toLowerCase();
+  let current = value;
+
+  const num = h('span', { class: 'stepper-num' });
+  const out = h('output', { class: 'stepper-out', 'aria-live': 'polite' }, num, unit ? h('span', { class: 'stepper-unit' }, ` ${unit}`) : null);
+  const valueBtn = h(
+    'button',
+    { type: 'button', class: 'stepper-value', dataset: fk ? { fk: `${fk}-value` } : undefined, onClick: () => edit() },
+    out,
+  );
+
+  const press = (dir) => {
+    let timer = 0;
+    let fromPointer = false;
+    const stop = () => {
+      clearTimeout(timer);
+      timer = 0;
+    };
+    const once = () => {
+      const next = stepOf(current, dir);
+      if (next === current) return false;
+      set(next, true);
+      return true;
+    };
+    const btn = h(
+      'button',
+      {
+        type: 'button',
+        class: 'stepper-btn',
+        'aria-label': `${dir > 0 ? 'Increase' : 'Decrease'} ${name}`,
+        dataset: fk ? { fk: `${fk}-${dir > 0 ? 'up' : 'down'}` } : undefined,
+        onPointerdown: (e) => {
+          if (e.button !== 0) return;
+          fromPointer = true;
+          stop();
+          if (!once()) return;
+          const repeat = () => {
+            timer = once() ? setTimeout(repeat, STEP_REPEAT_MS) : 0;
+          };
+          timer = setTimeout(repeat, STEP_DELAY_MS);
+        },
+        onPointerup: stop,
+        onPointerleave: stop,
+        onPointercancel: stop,
+        onContextmenu: (e) => e.preventDefault(), // a long press is not a right-click
+        // keyboard (Enter / Space) and assistive technology click without a pointer
+        onClick: () => {
+          if (fromPointer) fromPointer = false;
+          else once();
+        },
+      },
+      dir > 0 ? '+' : '−',
+    );
+    return btn;
+  };
+  const down = press(-1);
+  const up = press(1);
+
+  function show() {
+    num.textContent = current == null ? '–' : String(current);
+    valueBtn.setAttribute('aria-label', `${label}: ${current ?? 'not set'}${unit && current != null ? ` ${unit}` : ''}. Tap to type`);
+    down.setAttribute('aria-disabled', String(current != null && stepOf(current, -1) === current));
+    up.setAttribute('aria-disabled', String(current != null && stepOf(current, 1) === current));
+  }
+  function set(v, report) {
+    current = v;
+    show();
+    if (report) onChange?.(v);
+  }
+
+  function edit() {
+    const input = h('input', {
+      class: 'input stepper-input',
+      type: 'number',
+      inputmode: 'numeric',
+      min,
+      max,
+      value: current ?? '',
+      'aria-label': unit ? `${label} (${unit})` : label,
+      dataset: fk ? { fk: `${fk}-input` } : undefined,
+    });
+    let done = false;
+    const finish = (keep) => {
+      if (done) return;
+      done = true;
+      const n = keep ? parseOf(input.value) : null;
+      input.replaceWith(valueBtn);
+      if (n != null && n !== current) set(n, true);
+      valueBtn.focus({ preventScroll: true });
+    };
+    input.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        finish(true);
+      } else if (e.key === 'Escape') {
+        e.preventDefault();
+        e.stopPropagation();
+        finish(false);
+      }
+    });
+    input.addEventListener('blur', () => finish(true));
+    valueBtn.replaceWith(input);
+    input.focus();
+    input.select();
+  }
+
+  show();
+  const tile = h(
+    'div',
+    { class: 'stepper-tile', role: 'group', 'aria-label': label },
+    h('span', { class: 'stepper-label', 'aria-hidden': 'true' }, label),
+    h('div', { class: 'stepper-row' }, down, valueBtn, up),
+  );
+  /** Show a value set from outside (a preset), without reporting it. */
+  tile.setValue = (v) => set(v, false);
+  return tile;
+}
+
 /** Dates that already have a session (marked with a dot in the date picker). */
 export const sessionDates = (ctx) => new Set(ctx.repo.list('sessions').map((s) => s.date));
 

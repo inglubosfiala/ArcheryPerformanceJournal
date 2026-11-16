@@ -41,18 +41,38 @@ const sortKey = (s) => `${s.date} ${s.time || hourMinute(s.createdAt)} ${s.creat
 export const newestFirst = (a, b) => sortKey(b).localeCompare(sortKey(a));
 
 /**
- * Bow-specific strength drills. `hold`: the drill has a hold time in seconds. `retired`: no longer
+ * Bow-specific strength drills. `hold`: the drill has a hold time in seconds. `short`: the name on
+ * the "+ …" chip that adds it, when shorter than `label`. `retired`: no longer
  * offered for new sessions (holding at full draw is what SPT holds are), but sessions that have it
  * keep it and stay valid.
  */
 export const DRILLS = [
   { id: 'spt', label: 'SPT holds', hold: true },
   { id: 'hold', label: 'Holding at full draw', hold: true, retired: true },
-  { id: 'draw', label: 'Draws with the bow', hold: false },
+  { id: 'draw', label: 'Draws with the bow', short: 'Draws with bow', hold: false },
   { id: 'band', label: 'Band draws', hold: false },
 ];
 export const DRILL_IDS = DRILLS.map((d) => d.id);
 export const drillLabel = (id) => DRILLS.find((d) => d.id === id)?.label || id;
+
+/**
+ * Common routines for a drill with a hold, offered as one-tap chips: sets × reps × hold seconds,
+ * with a rest after each hold as long as the hold. Edit freely: the chip whose numbers match the
+ * drill shows as selected.
+ */
+export const SPT_PRESETS = [
+  { label: '10 × 10 s', sets: 1, reps: 10, hold: 10 },
+  { label: '6 × 20 s', sets: 1, reps: 6, hold: 20 },
+  { label: '2 × 5 × 30 s', sets: 2, reps: 5, hold: 30 },
+];
+
+/** What the −/+ tiles of a drill allow: [min, max, step] per drill field. */
+export const DRILL_LIMITS = {
+  sets: [1, 10, 1],
+  reps: [1, 30, 1],
+  holdSec: [5, 120, 5],
+  restSec: [5, 180, 5],
+};
 
 export const MENTAL_TECHNIQUES = ['Visualisation', 'Breathing', 'Shot routine', 'Relaxation', 'Blank boss', 'Self-talk'];
 

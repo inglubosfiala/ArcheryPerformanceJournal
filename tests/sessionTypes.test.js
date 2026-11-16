@@ -57,6 +57,9 @@ describe('session types', () => {
       /unknown drill/,
     );
     expect(validate(strength({ status: 'active' })).join()).toMatch(/finished/);
+    // a drill run to its end on the timer is marked done (optional, a boolean)
+    expect(validate(strength({ drills: [{ kind: 'spt', sets: 1, reps: 10, holdSec: 10, restSec: 10, done: true }] }))).toEqual([]);
+    expect(validate(strength({ drills: [{ kind: 'draw', sets: 1, reps: 10, done: 'yes' }] })).join()).toMatch(/done/);
     expect(validate(mental({ focus: 0 })).join()).toMatch(/focus/);
     expect(validate(mental({ techniques: ['Juggling'] })).join()).toMatch(/techniques/);
     expect(validate({ ...mental(), type: 'yoga' }).join()).toMatch(/session type/);
