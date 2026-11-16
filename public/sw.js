@@ -66,6 +66,7 @@ const SHELL = [
   './js/app/stats.js',
   './js/app/endSummary.js',
   './js/app/strings.js',
+  './js/app/gradeTexts.js',
   './js/app/views/common.js',
   './js/app/views/confirm.js',
   './js/app/views/pickers.js',
@@ -90,6 +91,7 @@ const SHELL = [
   './js/app/views/insights.js',
   './js/app/views/charts.js',
   './js/app/views/settings.js',
+  './js/app/views/settingsGrades.js',
   './js/app/support.js',
 ];
 
