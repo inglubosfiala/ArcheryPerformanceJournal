@@ -131,6 +131,7 @@ export function setupSummary(session, ...more) {
 export function formSummary(session) {
   const parts = [];
   if (countsArrows(session.type) && session.arrows != null) parts.push(`${session.arrows} arrows`);
+  if (session.type === 'blank' && session.goal) parts.push(`goal ${session.goal}`);
   if (session.minutes) parts.push(`${session.minutes} min`);
   if (session.type === 'strength') {
     if (session.effort) parts.push(`effort ${session.effort}/${EFFORT_MAX}`);

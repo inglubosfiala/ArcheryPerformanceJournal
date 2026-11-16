@@ -145,7 +145,8 @@ function renderList(ctx) {
 function detailHeader(ctx, ss, detail) {
   return [
     APL.ScreenHeader({
-      title: `${typeLabel(ss)} session`,
+      // a manual session's label ("Logged afterwards") is a title of its own
+      title: ss.type === 'manual' ? typeLabel(ss) : `${typeLabel(ss)} session`,
       onBack: () => ctx.navigate('history'),
       backLabel: T.backToLog,
     }),

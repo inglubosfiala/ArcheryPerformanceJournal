@@ -715,11 +715,6 @@ button.saved-end {
   margin: 0 auto;
 }
 
-.group-face svg {
-  display: block;
-  width: 100%;
-  height: auto;
-}
 
 /* ---------------------------------------------------------------- test environment marker */
 .env-badge {
@@ -748,9 +743,6 @@ button.saved-end {
   border-radius: 8px;
 }
 
-.group-face svg {
-  max-height: 480px;
-}
 
 /* three-spot sheets: the sheet, with all arrows on one spot under it */
 .group-faces {
@@ -759,21 +751,8 @@ button.saved-end {
   gap: 16px;
 }
 
-.group-faces figure {
-  margin: 0;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 6px;
-}
 
-.group-faces .group-face {
-  width: min(100%, 360px);
-}
 
-.group-faces .group-face svg {
-  max-height: 360px;
-}
 
 /* The app frame is pinned to the window, so the bottom tabs always sit on the bottom edge.
    100dvh can be taller than the visible area in an installed (standalone) Android app, which
@@ -1600,10 +1579,6 @@ body {
   gap: 12px;
 }
 
-.arrow-count-row .arrow-count-box {
-  align-items: center;
-  padding: 0;
-}
 
 /* the number fills the same 68px height as the timer pill beside it, centred on the same line */
 .arrow-count-row .arrow-count {
@@ -1614,9 +1589,6 @@ body {
   line-height: 1;
 }
 
-.arrow-count-row .arrow-count-fly {
-  left: 2ch;
-}
 
 /* ---------------------------------------------------------------- running sessions (above the bottom bar) */
 /* running sessions (and, on the Dashboard, New session) in an APL bottom bar above the tab bar */

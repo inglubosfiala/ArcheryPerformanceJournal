@@ -79,6 +79,7 @@ describe('blank bale', () => {
     expect(validate(blank({ arrows: null }))).toEqual([]);
     expect(validate(blank({ arrows: -3 })).join()).toMatch(/arrow count/);
     expect(formSummary(blank())).toBe('60 arrows · 40 min');
+    expect(formSummary({ ...blank(), goal: 90 })).toBe('60 arrows · goal 90 · 40 min');
   });
 });
 

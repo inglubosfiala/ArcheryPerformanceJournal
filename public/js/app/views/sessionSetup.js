@@ -198,7 +198,8 @@ export function renderFormSetup(ctx, type) {
 
   // no back button on a running SPT session (Save or Discard end it; the tab bar leaves it running)
   const back = !(running && type === 'strength');
-  const title = `${TYPE_LABELS[type]} session`;
+  // the manual type is offered as "Log afterwards"
+  const title = type === 'manual' ? 'Log afterwards' : `${TYPE_LABELS[type]} session`;
   // a drill card's own green "Start timer" is the primary action while it shows: Save steps down
   const saveVariant = type === 'strength' && showsStartTimer(form.drills) ? 'secondary' : 'primary';
 
