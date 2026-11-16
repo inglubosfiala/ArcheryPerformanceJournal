@@ -29,7 +29,7 @@ import { sessionTimer } from './timer.js';
 import * as APL from '../../ui/apl/index.js';
 import { detectArrows } from '../photoDetect.js';
 import { drawArrowMarks, liveScan } from './liveScan.js';
-import { PREVIEW_MARGIN, spotsBox, resultOnCrop } from '../scanGeometry.js';
+import { PREVIEW_MARGIN, spotsBox, resultOnCrop, joinSpots } from '../scanGeometry.js';
 import { PHOTO_MAX, canScan, createScan } from '../scan.js';
 import { loupeCorner, loupeBox } from '../loupePlacement.js';
 
@@ -461,7 +461,16 @@ function renderActive(ctx, session) {
         h('section', { class: 'score-screen', 'aria-label': T.endN(endNo) }, strip, input, under, chips),
         totalSection,
       ),
-      APL.BottomBar({ children: h('div', { class: 'score-actions' }, prevBtn, nextBtn, photoButton(ctx, session)) }),
+      APL.BottomBar({
+        children: h(
+          'div',
+          { class: `score-actions${isMultiSpot(session.face) ? ' has-spots' : ''}` },
+          prevBtn,
+          nextBtn,
+          photoButton(ctx, session),
+          spotsButton(ctx, session),
+        ),
+      }),
     ),
     overlay: sheet === 'details' ? detailsSheet() : scoreOverlay(ctx, session, { sheet, setSheet }),
   };
@@ -615,16 +624,39 @@ function photoButton(ctx, session) {
 }
 
 /**
+ * Spot by spot (triple and Vegas sheets only): the camera close to one spot at a time, in the
+ * order of the target page, for more detail than a view of the whole sheet gives.
+ */
+function spotsButton(ctx, session) {
+  if (!isMultiSpot(session.face)) return null;
+  return h(
+    'button',
+    {
+      type: 'button',
+      class: 'score-spots',
+      'aria-label': 'Scan spot by spot',
+      title: 'Scan spot by spot',
+      disabled: !canScan(session),
+      onClick: () => scanTarget(ctx, { bySpot: true }),
+      dataset: { fk: 'scan-spots' },
+    },
+    icons.spots(),
+  );
+}
+
+/**
  * Scan the target into the shown end. The sequence (a full end first, the two looks at a photo,
  * the found arrows, Use) is scan.js's; this page lends it the camera, the photo, the detector and
  * the preview dialog.
  */
-async function scanTarget(ctx) {
+async function scanTarget(ctx, { bySpot = false } = {}) {
   const scan = createScan({
     running: ctx.running,
-    // the live camera locks by itself (or Take now); its frame is previewed cut to the sheet
+    // the live camera locks by itself (or Take now); its frame is previewed cut to the sheet, and
+    // spot by spot the spots' close-ups one under the other
     camera: async (room) => {
-      const got = await liveScan({ face: room.face, maxArrows: room.empty, spotHint: room.spotHint });
+      const got = await liveScan({ face: room.face, maxArrows: room.empty, spotHint: room.spotHint, bySpot: !!room.bySpot });
+      if (got?.tiles) return joinTiles(got.tiles);
       return got && !got.file ? cropToSpots(got.canvas, got.res) : got;
     },
     openPhoto,
@@ -633,7 +665,7 @@ async function scanTarget(ctx) {
     preview: ({ found, picture, again }) => previewFound(picture, found, { cancelLabel: again ? 'Back to camera' : 'Cancel' }),
     onChange: () => ctx.rerender(),
   });
-  const res = await scan.start();
+  const res = await scan.start({ bySpot });
   if (res.status === 'used') ctx.rerender();
   else if (res.status === 'unreadable') ctx.toast('Could not open the photo.');
   else if (res.status === 'no-target') ctx.toast(res.error);
@@ -653,6 +685,24 @@ function cropToSpots(source, res) {
   canvas.height = Math.round(hgt * k);
   canvas.getContext('2d').drawImage(source, box.x, box.y, w, hgt, 0, 0, canvas.width, canvas.height);
   return { picture: canvas, res: resultOnCrop(res, box, k) };
+}
+
+/**
+ * Spot by spot: each spot's frame cut to the spot, and the cuts drawn one under the other as one
+ * picture with one result (joinSpots), so the preview and its dragging work as for a whole sheet.
+ */
+function joinTiles(tiles) {
+  const pieces = tiles.map((t) => ({ spot: t.spot, ...cropToSpots(t.canvas, t.res) }));
+  const joined = joinSpots(pieces);
+  const canvas = h('canvas', { class: 'photo-preview' });
+  canvas.width = joined.width;
+  canvas.height = joined.height;
+  const g = canvas.getContext('2d');
+  pieces.forEach((p, i) => {
+    const at = joined.places[i];
+    g.drawImage(p.picture, at.x, at.y, Math.round(p.picture.width * at.k), Math.round(p.picture.height * at.k));
+  });
+  return { picture: canvas, res: joined.res };
 }
 
 /** A photo opened for the Scan: a part of it is drawn on a canvas of its own (see createScan). */
