@@ -9,6 +9,9 @@
   --tabbar-h: 66px;
   --font-display: var(--font-sans);
   --font-body: var(--font-sans);
+  /* interval timer phase colours, the same in both themes (not APL tokens) */
+  --timer-prepare: #f2b84b;
+  --timer-work-sub: #eaf6f0;
 }
 
 *,
@@ -1853,127 +1856,256 @@ button.arrow-count:hover {
   margin-top: auto;
 }
 
-/* full screen; the whole screen takes the colour of the phase, so it reads from across the room */
+/* Interval timer (tabataTimer.js): full screen, the whole screen takes the colour of the phase so it
+   reads from the corner of the eye at full draw. Each phase sets the colours below; get ready and
+   hold are the same in both themes, rest and done follow the theme. */
 .tabata {
+  --tb-bg: var(--surface-bar);
+  --tb-fg: var(--ink);
+  --tb-sub: var(--muted);
+  --tb-chip: color-mix(in srgb, var(--ink) 8%, transparent);
+  --tb-ring: var(--accent-bright);
+  --tb-track: var(--border-soft);
   width: 100vw;
   height: 100vh;
   height: 100dvh;
   max-width: none;
   max-height: none;
   margin: 0;
-  padding: 12px 16px calc(16px + env(safe-area-inset-bottom));
+  padding: 12px 12px calc(32px + env(safe-area-inset-bottom));
   border: 0;
-  background: var(--ground);
-  color: var(--ink);
+  background: var(--tb-bg);
+  color: var(--tb-fg);
   flex-direction: column;
-  gap: var(--space-3);
-  transition: background-color 200ms ease;
+  align-items: center;
+  overflow-y: auto;
+  transition: background-color 300ms ease;
 }
-
 .tabata[open] {
   display: flex;
 }
-
+/* get ready: amber, dark text (#4a3a12 on amber 6.3:1) */
+.tabata[data-phase='prepare'] {
+  --tb-bg: var(--timer-prepare);
+  --tb-fg: #14181b;
+  --tb-sub: #4a3a12;
+  --tb-chip: rgba(20, 24, 27, 0.12);
+  --tb-ring: #14181b;
+  --tb-track: rgba(20, 24, 27, 0.15);
+}
+/* hold: accent green, white text (5.3:1), sub-lines #eaf6f0 (4.8:1) */
 .tabata[data-phase='work'] {
-  background: var(--accent);
-  color: var(--on-accent);
-}
-
-/* rest: a dark blue that reads apart from the hold from across the room (no APL token fits) */
-.tabata[data-phase='rest'],
-.tabata[data-phase='setRest'] {
-  background: #17456e;
-  color: var(--on-accent);
-}
-
-.tabata[data-phase='done'] {
-  background: var(--ground);
+  --tb-bg: var(--accent);
+  --tb-fg: var(--on-accent);
+  --tb-sub: var(--timer-work-sub);
+  --tb-chip: rgba(255, 255, 255, 0.16);
+  --tb-ring: var(--on-accent);
+  --tb-track: rgba(255, 255, 255, 0.2);
 }
 
 .tabata-top {
+  width: 100%;
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 12px;
+  gap: 8px;
   flex: none;
 }
-
-.tabata-title {
-  font: var(--type-body-strong);
+.tabata-icon {
+  width: var(--tap-min);
+  height: var(--tap-min);
+  flex-shrink: 0;
+  border: none;
+  border-radius: var(--radius-pill);
+  background: var(--tb-chip);
+  color: var(--tb-fg);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
 }
-
-.tabata-face {
-  flex: 1 1 auto;
-  min-height: 0;
+.tabata-heading {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+}
+.tabata-title {
+  font: 700 16px/22px var(--font-sans);
+}
+.tabata-sub {
+  font: 400 13px/18px var(--font-sans);
+  color: var(--tb-sub);
+  font-variant-numeric: tabular-nums;
+}
+.tabata-progress {
+  flex: none;
+  width: 100%;
+  max-width: 358px;
+  height: 5px;
+  margin-top: 12px;
+  border-radius: 3px;
+  background: var(--tb-chip);
+  overflow: hidden;
+}
+.tabata-progress-fill {
+  height: 100%;
+  width: 0;
+  background: var(--tb-fg);
+  opacity: 0.8;
+}
+.tabata-phase {
+  margin: 34px 0 0;
+  font: 800 30px/36px var(--font-sans);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  text-align: center;
+}
+.tabata-rep {
+  margin: 4px 0 0;
+  font: 400 15px/20px var(--font-sans);
+  color: var(--tb-sub);
+  text-align: center;
+}
+.tabata-ring {
+  position: relative;
+  flex: none;
+  width: 290px;
+  height: 290px;
+  margin-top: 22px;
+}
+.tabata-ring svg {
+  position: absolute;
+  inset: 0;
+  transform: rotate(-90deg);
+}
+.tabata-ring circle {
+  fill: none;
+  stroke-width: 14;
+}
+.tabata-ring-track {
+  stroke: var(--tb-track);
+}
+.tabata-ring-fill {
+  stroke: var(--tb-ring);
+  stroke-linecap: round;
+  transition: stroke-dashoffset 100ms linear;
+}
+.tabata-ring-center {
+  position: absolute;
+  inset: 0;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 4px;
-  text-align: center;
 }
-
-.tabata-phase {
-  margin: 0;
-  font-size: clamp(26px, 8vw, 44px);
+.tabata-sec {
+  font: 800 132px/1 var(--font-sans);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.04em;
+}
+.tabata-of {
+  margin-top: 4px;
+  font: 600 15px/20px var(--font-sans);
+  color: var(--tb-sub);
+}
+.tabata-paused {
+  display: none;
+  position: absolute;
+  left: 50%;
+  top: 22px;
+  transform: translateX(-50%);
+  height: 28px;
+  padding: 0 12px;
+  border-radius: 14px;
+  background: var(--tb-fg);
+  color: var(--tb-bg);
+  font: 700 13px/28px var(--font-sans);
+  letter-spacing: 0.06em;
+}
+.tabata.is-paused .tabata-paused {
+  display: block;
+}
+.tabata-pills {
+  flex: none;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 6px;
+  max-width: 358px;
+  margin-top: 24px;
+}
+.tabata-pill {
+  width: 14px;
+  height: 10px;
+  border-radius: 5px;
+  border: 2px solid var(--tb-track);
+  box-sizing: border-box;
+}
+.tabata-pill.is-done {
+  background: var(--tb-fg);
+  border-color: var(--tb-fg);
+}
+.tabata-pill.is-current {
+  width: 26px;
+  border-color: var(--tb-fg);
+}
+.tabata-next {
+  margin: 18px 0 0;
+  font: 400 15px/20px var(--font-sans);
+  color: var(--tb-sub);
+}
+.tabata-next strong {
+  color: var(--tb-fg);
   font-weight: 700;
-  letter-spacing: 0.01em;
 }
-
-.tabata-clock {
-  margin: 0;
-  font-size: clamp(96px, 34vw, 220px);
-  font-weight: 800;
-  line-height: 1;
-  font-variant-numeric: tabular-nums;
-}
-
-.tabata.is-paused .tabata-clock {
-  opacity: 0.55;
-}
-
-.tabata-counts {
-  margin: 6px 0 0;
-  font-size: clamp(18px, 5.5vw, 26px);
-  font-weight: 600;
-  opacity: 0.9;
-}
-
-.tabata-bar {
+.tabata-controls {
   flex: none;
-  height: 8px;
-  border-radius: 4px;
-  background: color-mix(in srgb, currentColor 22%, transparent);
-  overflow: hidden;
+  display: flex;
+  align-items: center;
+  gap: 28px;
+  margin-top: auto;
+  padding-top: 24px;
+}
+.tabata-round {
+  border: none;
+  border-radius: var(--radius-pill);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+.tabata-round--side {
+  width: 60px;
+  height: 60px;
+  background: var(--tb-chip);
+  color: var(--tb-fg);
+}
+.tabata-round--side:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+/* Pause / Resume: inverted colours of the phase */
+.tabata-round--main {
+  width: 88px;
+  height: 88px;
+  background: var(--tb-fg);
+  color: var(--tb-bg);
+}
+.tabata-round-text {
+  font: 700 17px/1 var(--font-sans);
+}
+.tabata button:focus-visible {
+  outline: 3px solid var(--tb-fg);
+  outline-offset: 3px;
 }
 
-.tabata-bar-fill {
-  height: 100%;
-  width: 0;
-  background: currentColor;
-  transition: width 100ms linear;
-}
-
-.tabata-total {
-  flex: none;
-  margin: 0;
-  min-height: 20px;
-  text-align: center;
-  font-size: 14px;
-  opacity: 0.8;
-  font-variant-numeric: tabular-nums;
-}
-
-.tabata-actions {
-  flex: none;
-  display: grid;
-  grid-template-columns: 1fr 1.6fr 1fr;
-  gap: var(--space-3);
-}
-
-/* the buttons sit on the phase colour */
-.tabata-actions .apl-btn {
-  padding: 0 var(--space-2);
+@media (prefers-reduced-motion: reduce) {
+  .tabata,
+  .tabata-ring-fill {
+    transition: none;
+  }
 }
 
 /* Settings: the support link looks like a secondary button */
