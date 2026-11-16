@@ -9,7 +9,7 @@ import * as APL from '../../ui/apl/index.js';
 import { detectArrows } from '../photoDetect.js';
 import { spotCentres } from '../scoring.js';
 import { resultOffCrop, arrowMarkLayout } from '../scanGeometry.js';
-import { createSteadyReading, nextLook } from '../scan.js';
+import { createSteadyReading, createSpotReading, spotShares, nextLook } from '../scan.js';
 
 const FRAME_MAX = 560; // frames are scaled to this many pixels on their long side for detection
 const VIEW_MAX = 1280; // the overlay and the kept picture: the whole frame, up to this size
@@ -22,6 +22,17 @@ const STATUS = {
   partial: () => 'Show all the spots of the sheet (or Take now for this spot only).',
   reading: () => 'Reading the arrows…',
   holding: (r) => `${r.scores.join(' · ')}: hold steady…`,
+};
+
+/** Spot by spot: what the status line says (see createSpotReading); `n` is the spot's number. */
+const SPOT_STATUS = {
+  lost: (n) => `Fit spot ${n} in the frame.`,
+  far: (n) => `Come closer: fill the frame with spot ${n}.`,
+  empty: (n) => `Spot ${n}: no arrow seen. Take now if it is empty, or Skip it.`,
+  reading: (n) => `Spot ${n}: reading…`,
+  holding: (n, r) => `Spot ${n}: ${r.scores.join(' · ')}, hold steady…`,
+  move: (n) => `Now move to spot ${n}.`,
+  done: () => 'All spots read.',
 };
 
 /**
@@ -78,10 +89,14 @@ export function drawArrowMarks(g, spots, arrows, labels, { hollow = false, activ
 /**
  * Open the live view. Resolves with
  *   { canvas, res }  the locked (or taken) frame and its detection result,
- *   { file }         a photo chosen instead (taken with Photo, or picked with Gallery), or
+ *   { file }         a photo chosen instead (taken with Photo, or picked with Gallery),
+ *   { tiles }        spot by spot (`bySpot`): [{ spot, canvas, res }] the frame and result of each
+ *                    spot read, in the order of the sheet, or
  *   null             closed without a result.
+ * Spot by spot the camera is held close to one spot of a triple or Vegas sheet at a time, in the
+ * order of the target page; chips show which spots are read, and a chip reads its spot again.
  */
-export function liveScan({ face, maxArrows, spotHint = 0 }) {
+export function liveScan({ face, maxArrows, spotHint = 0, bySpot = false }) {
   return new Promise((resolve) => {
     let closed = false;
     let stream = null;
@@ -89,7 +104,11 @@ export function liveScan({ face, maxArrows, spotHint = 0 }) {
     let timer = 0;
     let busy = false;
     let seq = 0;
-    const reading = createSteadyReading({ face, maxArrows });
+    const reading = bySpot ? createSpotReading({ face, arrows: maxArrows }) : createSteadyReading({ face, maxArrows });
+    // spot by spot the detector is asked for a whole sheet's worth, so a close-up gets its spot's share
+    const shares = bySpot ? spotShares(face, maxArrows) : null;
+    const detectArrowsMax = bySpot ? Math.max(...shares) * shares.length : maxArrows;
+    const tiles = []; // spot by spot: the frame each spot was read on
 
     const video = h('video', { class: 'live-video', playsinline: true, muted: true, autoplay: true });
     video.muted = true;
@@ -116,9 +135,68 @@ export function liveScan({ face, maxArrows, spotHint = 0 }) {
     const cameraInput = fileInput(true);
     const galleryInput = fileInput(false);
     const takeBtn = APL.Button({ children: 'Take now', disabled: true, onClick: () => take(), fk: 'live-take' });
+    // spot by spot: one chip per spot (which is being read, which are read and their scores); a
+    // chip reads its spot again
+    const chipRow = h('div', { class: 'live-spots', role: 'group', 'aria-label': 'Spots of the sheet' });
+    const renderChips = (spots) => {
+      chipRow.replaceChildren(
+        ...spots.map((s, j) => {
+          const now = j === reading.spot;
+          const text = s.status === 'done' ? s.scores.join(' · ') || '–' : s.status === 'skipped' ? 'skipped' : now ? 'now' : '';
+          return h(
+            'button',
+            {
+              type: 'button',
+              class: `live-spot is-${now ? 'current' : s.status}`,
+              'aria-pressed': String(now),
+              'aria-label': now
+                ? `Spot ${j + 1}, being read`
+                : s.status === 'done'
+                  ? `Spot ${j + 1}: ${text}, read it again`
+                  : s.status === 'skipped'
+                    ? `Spot ${j + 1}: skipped, read it now`
+                    : `Spot ${j + 1}, read it now`,
+              disabled: !shares[j],
+              onClick: () => {
+                reading.goTo(j);
+                region = null;
+                renderChips(reading.chips);
+                status.textContent = SPOT_STATUS.lost(j + 1);
+              },
+              dataset: { fk: `live-spot-${j + 1}` },
+            },
+            h('span', { class: 'live-spot-no' }, String(j + 1)),
+            h('span', { class: 'live-spot-score' }, text),
+          );
+        }),
+      );
+    };
+    const actions = bySpot
+      ? [
+          APL.Button({ children: 'Skip spot', variant: 'secondary', onClick: () => skip(), fk: 'live-skip' }),
+          APL.Button({ children: 'Done', variant: 'secondary', onClick: () => finishSpots(), fk: 'live-done' }),
+          takeBtn,
+        ]
+      : [
+          APL.Button({
+            children: 'Photo',
+            variant: 'secondary',
+            leadingIcon: icons.camera(),
+            onClick: () => cameraInput.click(),
+            fk: 'live-photo',
+          }),
+          APL.Button({
+            children: 'Gallery',
+            variant: 'secondary',
+            leadingIcon: icons.gallery(),
+            onClick: () => galleryInput.click(),
+            fk: 'live-gallery',
+          }),
+          takeBtn,
+        ];
     const dialog = h(
       'dialog',
-      { class: 'live-scan', 'aria-label': 'Scan the target with the camera' },
+      { class: `live-scan${bySpot ? ' is-by-spot' : ''}`, 'aria-label': bySpot ? 'Scan the target spot by spot' : 'Scan the target with the camera' },
       h(
         'div',
         { class: 'live-top' },
@@ -126,28 +204,11 @@ export function liveScan({ face, maxArrows, spotHint = 0 }) {
       ),
       stage,
       progress,
+      bySpot ? chipRow : null,
       status,
-      h(
-        'div',
-        { class: 'live-actions' },
-        APL.Button({
-          children: 'Photo',
-          variant: 'secondary',
-          leadingIcon: icons.camera(),
-          onClick: () => cameraInput.click(),
-          fk: 'live-photo',
-        }),
-        APL.Button({
-          children: 'Gallery',
-          variant: 'secondary',
-          leadingIcon: icons.gallery(),
-          onClick: () => galleryInput.click(),
-          fk: 'live-gallery',
-        }),
-        takeBtn,
-      ),
-      cameraInput,
-      galleryInput,
+      h('div', { class: 'live-actions' }, ...actions),
+      bySpot ? null : cameraInput,
+      bySpot ? null : galleryInput,
     );
 
     // the frame being analysed, and a copy of the last analysed one (kept for the preview)
@@ -195,13 +256,13 @@ export function liveScan({ face, maxArrows, spotHint = 0 }) {
     }
     const detect = (img) => {
       if (!worker) {
-        const r = detectArrows(img, face, maxArrows, { spotHint });
+        const r = detectArrows(img, face, detectArrowsMax, { spotHint });
         return Promise.resolve(r.error ? { error: r.error } : { partial: r.partial, spots: r.spots.map((s) => ({ outer: s.outer })), arrows: r.arrows });
       }
       return new Promise((done) => {
         const id = ++seq;
         waiting.set(id, done);
-        worker.postMessage({ id, width: img.width, height: img.height, buffer: img.data.buffer, face, maxArrows, spotHint }, [img.data.buffer]);
+        worker.postMessage({ id, width: img.width, height: img.height, buffer: img.data.buffer, face, maxArrows: detectArrowsMax, spotHint }, [img.data.buffer]);
       });
     };
 
@@ -227,10 +288,43 @@ export function liveScan({ face, maxArrows, spotHint = 0 }) {
         octx.ellipse(s.outer.cx, s.outer.cy, s.outer.rx, s.outer.ry, s.outer.angle, 0, Math.PI * 2);
         octx.stroke();
       }
-      drawArrowMarks(octx, res.spots, res.arrows, scores, { hollow });
+      // only arrows with a score to show (moving on to the next spot, none)
+      drawArrowMarks(octx, res.spots, res.arrows.slice(0, scores.length), scores, { hollow });
+    }
+
+    // spot by spot: keep the frame a spot was read on, and hand over all of them once every spot
+    // is read or skipped (or Done)
+    function keepTile(j) {
+      const c = document.createElement('canvas');
+      c.width = shot.width;
+      c.height = shot.height;
+      c.getContext('2d').drawImage(shot, 0, 0);
+      tiles[j] = c;
+      if (navigator.vibrate) navigator.vibrate(40);
+    }
+    function finishSpots() {
+      const read = reading.results().filter((t) => tiles[t.spot]);
+      finish(read.length ? { tiles: read.map((t) => ({ ...t, canvas: tiles[t.spot] })) } : null);
+    }
+    function afterSpotChange() {
+      region = null; // the next spot is somewhere else: look at the whole frame again
+      renderChips(reading.chips);
+      if (reading.spot < 0) finishSpots();
+      else status.textContent = SPOT_STATUS.move(reading.spot + 1);
+    }
+    function skip() {
+      reading.skip();
+      afterSpotChange();
     }
 
     function take() {
+      if (bySpot) {
+        const j = reading.take();
+        if (j < 0) return;
+        keepTile(j);
+        afterSpotChange();
+        return;
+      }
       const res = reading.take();
       if (!res) return;
       finish({ canvas: shot, res });
@@ -248,6 +342,16 @@ export function liveScan({ face, maxArrows, spotHint = 0 }) {
       draw(r.show, r.scores, r.hollow);
       takeBtn.disabled = !r.canTake;
       bar.style.width = `${Math.round(r.progress * 100)}%`;
+      if (bySpot) {
+        if (r.locked >= 0) {
+          keepTile(r.locked);
+          afterSpotChange();
+          return;
+        }
+        if (r.kind !== 'move') renderChips(r.spots);
+        status.textContent = SPOT_STATUS[r.kind](r.spot + 1, r);
+        return;
+      }
       status.textContent = STATUS[r.kind](r);
       if (r.locked) {
         if (navigator.vibrate) navigator.vibrate(40);
@@ -264,7 +368,7 @@ export function liveScan({ face, maxArrows, spotHint = 0 }) {
     // to this one is not read as well. In video pixels (`guide`) and overlay pixels (`frame`).
     const centres = spotCentres(face);
     const span = (k) => Math.max(...centres.map((c) => c[k])) - Math.min(...centres.map((c) => c[k])) + 230; // spot Ø 200 + margin
-    const shape = span(0) / span(1); // width / height
+    const shape = bySpot ? 1 : span(0) / span(1); // width / height; spot by spot, one spot: square
     let guide = null;
     let frame = null;
 
@@ -288,7 +392,7 @@ export function liveScan({ face, maxArrows, spotHint = 0 }) {
           guide = { x: Math.round((vw - gw) / 2), y: Math.round((vh - gw / shape) / 2), w: Math.round(gw), h: Math.round(gw / shape) };
           frame = { x: guide.x * ko, y: guide.y * ko, w: guide.w * ko, h: guide.h * ko };
           region = null;
-          if (!reading.take()) draw(null); // no reading yet: just the scan frame
+          draw(null); // just the scan frame until the next reading
         }
         const r = region || guide;
         const k = Math.min(1, FRAME_MAX / Math.max(r.w, r.h));
@@ -312,7 +416,7 @@ export function liveScan({ face, maxArrows, spotHint = 0 }) {
             // analysed-part pixels → whole-frame overlay pixels
             const found = resultOffCrop(res, r, k, ko);
             // next time, analyse just the sheet (once every spot of it is seen)
-            region = nextLook(found, guide, ko);
+            region = nextLook(found, guide, ko, { oneSpot: bySpot });
             onResult(found);
           }
         } catch (err) {
@@ -326,9 +430,11 @@ export function liveScan({ face, maxArrows, spotHint = 0 }) {
     document.body.append(dialog);
     dialog.showModal();
 
+    if (bySpot) renderChips(reading.chips);
+    const noCamera = (why) => (bySpot ? `${why} Close this and use Scan instead.` : `${why} Use Photo or Gallery instead.`);
     const media = navigator.mediaDevices;
     if (!media?.getUserMedia) {
-      status.textContent = 'This browser has no camera access here. Use Photo or Gallery instead.';
+      status.textContent = noCamera('This browser has no camera access here.');
       return;
     }
     media
@@ -341,11 +447,11 @@ export function liveScan({ face, maxArrows, spotHint = 0 }) {
         stream = s;
         video.srcObject = s;
         video.play().catch(() => {});
-        status.textContent = 'Fit the target in the frame.';
+        status.textContent = bySpot ? SPOT_STATUS.lost(reading.spot + 1) : 'Fit the target in the frame.';
         tick();
       })
       .catch(() => {
-        status.textContent = 'The camera is not available (permission refused or no camera). Use Photo or Gallery instead.';
+        status.textContent = noCamera('The camera is not available (permission refused or no camera).');
       });
   });
 }
