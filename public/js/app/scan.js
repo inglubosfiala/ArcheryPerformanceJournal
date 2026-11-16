@@ -16,8 +16,8 @@
 //   'no-target' (with the detector's `error`) · 'failed' (the save was refused)
 
 import * as L from './sessionLogic.js';
-import { consensus, matchArrows } from './photoDetect.js';
-import { ringEdges, scoreFromPoint, scoringZoneAt, spotCentres } from './scoring.js';
+import { consensus } from './photoDetect.js';
+import { ringEdges, scoreFromPoint, scoringZoneAt } from './scoring.js';
 import { CLOSE_UP_MARGIN, spotsBox, isCloseUp, keepCloseUp, withArrows, moveArrow, arrowMarkLayout } from './scanGeometry.js';
 
 /** A photo is read at most this many pixels on its long side (each of the two looks). */
@@ -49,9 +49,8 @@ export function canScan(session) {
  * one spot first) it keeps looking at the whole frame, or the others are never found.
  * `res` is in a picture `scale` times the size of `bounds` (the scan frame).
  */
-export function nextLook(res, bounds, scale = 1, { oneSpot = false } = {}) {
-  // spot by spot, the one spot seen is what is wanted: look at just that spot
-  if (res.partial && !oneSpot) return null;
+export function nextLook(res, bounds, scale = 1) {
+  if (res.partial) return null;
   const box = spotsBox(res.spots, { margin: CLOSE_UP_MARGIN, bounds, scale });
   return isCloseUp(box, bounds) ? box : null;
 }
@@ -143,14 +142,10 @@ function foundArrows(res, face, size) {
       const outer = (res.spots[res.partial ? 0 : (a.spot ?? 0)] || res.spots[0]).outer;
       return { outer, inner: zone.inner, edge: zone.edge };
     },
-    /**
-     * The arrows as they go into the end: { v, x, y, spot }. A picture joined from spot close-ups
-     * (see joinSpots) numbers its spots by tile; `res.spotIds` gives each tile's spot of the sheet.
-     */
+    /** The arrows as they go into the end: { v, x, y, spot }. */
     toEnd() {
       const v = scoresOf(arrows, face);
-      const spotOf = (s) => (res.spotIds && s != null ? res.spotIds[s] : s);
-      return arrows.map((a, i) => ({ v: v[i], x: a.x, y: a.y, spot: spotOf(a.spot) }));
+      return arrows.map((a, i) => ({ v: v[i], x: a.x, y: a.y, spot: a.spot }));
     },
   };
 }
@@ -197,17 +192,15 @@ export function createScan({ running, camera, openPhoto, detect, preview, onChan
    * Scan the target into the shown end. On a full end the Scan means "the next end": the full one
    * is saved, a new end starts and the camera opens for it. On an end with room the Scan reads that
    * end anew (and replaces it). Back in the preview of a live frame goes back to the camera.
-   * `bySpot`: the camera reads the sheet one spot at a time (room.bySpot; see createSpotReading).
    */
-  async function start({ bySpot = false } = {}) {
+  async function start() {
     const session = running.get();
     if (!session) return { status: 'none' };
     if (!canScan(session)) return { status: 'refused' };
     if (L.shownEnd(session).arrows.every((a) => a.v != null) && running.apply(L.nextEnd)) onChange();
     for (;;) {
-      const free = running.scanRoom();
-      if (!free) return { status: 'none' };
-      const room = bySpot ? { ...free, bySpot } : free;
+      const room = running.scanRoom();
+      if (!room) return { status: 'none' };
       const got = await camera(room);
       if (!got) return { status: 'cancelled' };
       if (got.file) return fromPhoto(got.file, room);
@@ -233,9 +226,8 @@ export function createScan({ running, camera, openPhoto, detect, preview, onChan
  *   progress  0…1 towards the lock · canTake: "Take now" may take · locked: take it now
  * take() is what "Take now" (or the lock) hands over: the agreed arrows on the latest picture,
  * or the latest reading while nothing agrees; null before any.
- * `oneSpot`: a close-up of one spot is what is wanted (spot by spot), so it locks like a whole sheet.
  */
-export function createSteadyReading({ face, maxArrows, oneSpot = false }) {
+export function createSteadyReading({ face, maxArrows }) {
   let last = null; // the latest result without an error
   let recent = []; // the last readings: [{ t, arrows }]
   let hold = null; // what most of them agree on: { arrows, count, since }, or null
@@ -270,7 +262,7 @@ export function createSteadyReading({ face, maxArrows, oneSpot = false }) {
     }
     // With several arrows to place on a sheet of several spots, all its spots must be in the
     // picture. A view of one spot alone never locks by itself ("Take now" still takes it).
-    if (res.partial && maxArrows > 1 && !oneSpot) {
+    if (res.partial && maxArrows > 1) {
       hold = null;
       recent = [];
       return state('partial', res, { hollow: true });
@@ -287,167 +279,4 @@ export function createSteadyReading({ face, maxArrows, oneSpot = false }) {
   }
 
   return { read, take };
-}
-
-/**
- * How many arrows of an end go on each spot of a sheet, in the order of the target page: arrow n
- * on spot n, and round again when the end has more arrows than the sheet has spots.
- */
-export function spotShares(face, arrows) {
-  const count = spotCentres(face).length;
-  return Array.from({ length: count }, (_, j) => Math.floor(arrows / count) + (j < arrows % count ? 1 : 0));
-}
-
-/** How far (in spot radii) the spot seen must move in the picture before the next spot is read. */
-const MOVE_ON = 0.8;
-
-/**
- * Spot by spot: the live camera close up on one spot of a triple or Vegas sheet at a time, in the
- * order of the target page (spot 1, 2, 3), for more detail than a view of the whole sheet gives.
- * Each spot is read like a whole sheet (it locks once the frames agree, or "Take now"); then the
- * camera must move on before the next spot is read, so the same spot is never read twice: the spot
- * leaves its place in the picture, the target is lost a moment, or the frames agree on arrows
- * other than the spot just read (the next spot centred where the last one was).
- *
- * read(res, now) takes a frame's detection result and says:
- *   kind      'lost' · 'far' (the whole sheet is seen: come closer) · 'move' (move on to the next
- *             spot) · 'done' (every spot read or skipped) · or the steady reading's 'empty',
- *             'reading', 'holding'
- *   spot      the spot being read (0-based), -1 once done; show, scores, hollow, progress, canTake
- *             as in createSteadyReading
- *   locked    the spot read with this frame, or -1
- *   spots     [{ status: 'todo' | 'done' | 'skipped', scores }], one per spot of the sheet
- * take() reads the spot in view now ("Take now"): the spot read, or -1.
- * skip() leaves the spot being read (for the keypad); goTo(j) reads spot j (again) next.
- * results() → [{ spot, res }] of the spots read, in order, each res with its arrows on that spot.
- */
-export function createSpotReading({ face, arrows }) {
-  const shares = spotShares(face, arrows);
-  const count = shares.length;
-  let spots = shares.map((share) => ({ share, status: share ? 'todo' : 'skipped', res: null }));
-  let current = -1;
-  let steady = null;
-  let away = null; // the spot just read, where it was in the picture, until the camera moves on
-  let seen = null; // where the spot of the latest frame was
-
-  const nextTodo = (from) => {
-    for (let i = 0; i < count; i++) {
-      const j = (from + i) % count;
-      if (spots[j].status === 'todo') return j;
-    }
-    return -1;
-  };
-  const begin = (j) => {
-    current = j;
-    steady = j < 0 ? null : createSteadyReading({ face, maxArrows: shares[j], oneSpot: true });
-  };
-  begin(nextTodo(0));
-
-  const setSpot = (j, s) => {
-    spots = spots.map((old, i) => (i === j ? { ...old, ...s } : old));
-  };
-  const chips = () => spots.map((s) => ({ status: s.status, scores: s.res ? scoresOf(s.res.arrows, face) : [] }));
-  const state = (kind, more = {}) => ({
-    kind,
-    spot: current,
-    show: null,
-    scores: [],
-    hollow: false,
-    progress: 0,
-    canTake: false,
-    locked: -1,
-    ...more,
-    spots: chips(),
-  });
-  const placeOf = (res) => {
-    const o = res.spots[0].outer;
-    return { cx: o.cx, cy: o.cy, r: (o.rx + o.ry) / 2 };
-  };
-
-  function lock(res) {
-    const j = current;
-    setSpot(j, { status: 'done', res: { ...res, arrows: res.arrows.map((a) => ({ ...a, spot: j })) } });
-    away = { ...placeOf(res), arrows: res.arrows };
-    begin(nextTodo(j + 1));
-    return j;
-  }
-
-  /** Are these the arrows of the spot just read (the camera has not moved on)? */
-  const sameAsAway = (arrows) =>
-    arrows.length === away.arrows.length && (!arrows.length || !!matchArrows(away.arrows, arrows));
-
-  function read(res, now) {
-    if (current < 0) return state('done');
-    if (!res.error) seen = placeOf(res);
-    // the camera moved on: the target was lost a moment, or the spot seen left its place. What was
-    // read while it waited was the last spot: the next is read afresh.
-    if (away && (res.error || Math.hypot(seen.cx - away.cx, seen.cy - away.cy) > MOVE_ON * away.r)) {
-      away = null;
-      begin(current);
-    }
-    if (res.error) {
-      steady.read(res, now);
-      return state('lost');
-    }
-    if (!res.partial) {
-      steady.read({ error: 'far' }, now); // a view of the whole sheet: nothing agreed so far counts
-      return state(away ? 'move' : 'far', { show: res, hollow: true });
-    }
-    // the spot's own share of the arrows: the best ones (the detector lists them from the middle out)
-    const r = steady.read({ ...res, arrows: res.arrows.slice(0, shares[current]) }, now);
-    if (away) {
-      // The next spot often comes to sit where the last one was, so its place alone cannot tell
-      // them apart: steady arrows other than the last spot's are the next spot. Take now takes
-      // what is in view.
-      if (!(r.kind === 'holding' && !sameAsAway(r.show.arrows))) {
-        return state('move', { show: r.show ?? res, scores: r.scores, hollow: true, canTake: r.canTake });
-      }
-      away = null;
-    }
-    if (r.locked) {
-      const taken = steady.take();
-      const j = lock(taken);
-      return state(current < 0 ? 'done' : 'move', { show: taken, scores: r.scores, locked: j });
-    }
-    return state(r.kind, { show: r.show, scores: r.scores, hollow: r.hollow, progress: r.progress, canTake: r.canTake });
-  }
-
-  function take() {
-    const res = current >= 0 ? steady.take() : null;
-    if (!res || !res.partial) return -1;
-    away = null;
-    return lock(res);
-  }
-
-  function skip() {
-    if (current < 0) return;
-    setSpot(current, { status: 'skipped', res: null });
-    away = seen;
-    begin(nextTodo(current + 1));
-  }
-
-  function goTo(j) {
-    if (!spots[j]?.share) return;
-    setSpot(j, { status: 'todo', res: null });
-    away = null;
-    begin(j);
-  }
-
-  const results = () => spots.map((s, spot) => (s.res ? { spot, res: s.res } : null)).filter(Boolean);
-
-  return {
-    read,
-    take,
-    skip,
-    goTo,
-    results,
-    count,
-    get spot() {
-      return current;
-    },
-    /** The chips as read() gives them in `spots`. */
-    get chips() {
-      return chips();
-    },
-  };
 }

@@ -11,7 +11,6 @@ import {
   pictureFromFace,
   withArrows,
   moveArrow,
-  joinSpots,
 } from '../public/js/app/scanGeometry.js';
 import { scoreFromPoint } from '../public/js/app/scoring.js';
 
@@ -288,45 +287,5 @@ describe('moveArrow', () => {
     expect(b.image).toEqual({ x: 0, y: 500 });
     expect(b.x).toBeCloseTo(-2, 9);
     expect(b.y).toBeCloseTo(2.5, 9);
-  });
-});
-
-describe('joinSpots (spot by spot)', () => {
-  const piece = (spotId, w, h, arrows) => ({
-    spot: spotId,
-    picture: { width: w, height: h },
-    res: result([spot(w / 2, h / 2, w / 3)], arrows, true),
-  });
-
-  it('stacks the close-ups one under the other, each scaled to the same width', () => {
-    const j = joinSpots([piece(0, 200, 200, []), piece(2, 400, 300, [])], { width: 400, gap: 10 });
-    expect(j.places).toEqual([
-      { x: 0, y: 0, k: 2 },
-      { x: 0, y: 410, k: 1 },
-    ]);
-    expect([j.width, j.height]).toEqual([400, 710]);
-    expect(j.res.spots.map((s) => [s.outer.cx, s.outer.cy, s.outer.rx])).toEqual([
-      [200, 200, (200 / 3) * 2],
-      [200, 560, 400 / 3],
-    ]);
-    expect(j.res.spotIds).toEqual([0, 2]);
-    expect(j.res.partial).toBe(false);
-  });
-
-  it('keeps each arrow on its place of the face, and puts them in the order of the end', () => {
-    const a = (x) => ({ x, y: 0, spot: 0 });
-    const j = joinSpots([piece(0, 300, 300, [a(0), a(0.4)]), piece(1, 300, 300, [a(0.2)]), piece(2, 300, 300, [a(0.6)])]);
-    // the first arrow of each spot, then the second
-    expect(j.res.arrows.map((r) => [r.spot, r.x])).toEqual([
-      [0, 0],
-      [1, 0.2],
-      [2, 0.6],
-      [0, 0.4],
-    ]);
-    for (const r of j.res.arrows) {
-      const back = faceFromPicture(j.res.spots[r.spot].outer, r.image);
-      expect(back.x).toBeCloseTo(r.x, 9);
-      expect(back.y).toBeCloseTo(r.y, 9);
-    }
   });
 });

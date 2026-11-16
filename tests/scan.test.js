@@ -4,8 +4,8 @@ import { createMemoryAdapter } from '../public/js/storage/localStorageAdapter.js
 import { collections, defaultSettings } from '../public/js/app/collections.js';
 import * as L from '../public/js/app/sessionLogic.js';
 import { createRunningSession } from '../public/js/app/runningSession.js';
-import { canScan, createScan, createSteadyReading, createSpotReading, spotShares, nextLook, LOCK_MS, LOCK_FRAMES } from '../public/js/app/scan.js';
-import { pictureFromFace, joinSpots } from '../public/js/app/scanGeometry.js';
+import { canScan, createScan, createSteadyReading, nextLook, LOCK_MS, LOCK_FRAMES } from '../public/js/app/scan.js';
+import { pictureFromFace } from '../public/js/app/scanGeometry.js';
 import { FACE_IDS, ringEdges, scoreFromPoint, scoringZones } from '../public/js/app/scoring.js';
 
 const spot = (cx, cy, r) => ({ outer: { cx, cy, rx: r, ry: r, angle: 0 } });
@@ -517,118 +517,5 @@ describe('a steady reading (live camera)', () => {
     const a = A();
     r.read(a, 0);
     expect(r.take()).toBe(a);
-  });
-});
-
-describe('spot by spot (live camera)', () => {
-  const face = '40t';
-  // a close-up of one spot of the sheet, filling the picture; `at` moves the spot in the picture
-  const closeUp = (arrows, cx = 300) => result([spot(cx, 300, 200)], arrows.map((a) => ({ ...a, spot: 0 })), true);
-  // the same frame for a second and a bit: the state of the frame that read a spot, else the last
-  const hold = (r, frame, from = 0) => {
-    let s;
-    for (let t = 0; t <= 1250; t += 250) {
-      s = r.read(frame(), from + t);
-      if (s.locked >= 0) return s;
-    }
-    return s;
-  };
-
-  it('gives each spot its share of the end, in the order of the target page', () => {
-    expect(spotShares('40t', 3)).toEqual([1, 1, 1]);
-    expect(spotShares('40t', 4)).toEqual([2, 1, 1]);
-    expect(spotShares('40v', 6)).toEqual([2, 2, 2]);
-    expect(spotShares('40t', 2)).toEqual([1, 1, 0]);
-  });
-
-  it('reads spot 1, waits for the camera to move on, then reads spot 2 and 3', () => {
-    const r = createSpotReading({ face, arrows: 3 });
-    const one = hold(r, () => closeUp([{ x: 0.05, y: 0 }]));
-    expect(one).toMatchObject({ kind: 'move', locked: 0, spot: 1 });
-    expect(one.spots.map((s) => s.status)).toEqual(['done', 'todo', 'todo']);
-    expect(one.spots[0].scores).toEqual(['X']);
-    // still on spot 1 (a little shake): nothing new is read, however long it is held
-    expect(hold(r, () => closeUp([{ x: 0.05, y: 0 }], 330), 2000)).toMatchObject({ kind: 'move', locked: -1, spot: 1 });
-    // the camera moved on: spot 2 comes into view where spot 1 was not
-    const two = hold(r, () => closeUp([{ x: 0.3, y: 0 }], 520), 4000);
-    expect(two).toMatchObject({ locked: 1, spot: 2 });
-    // lost a moment while moving on also counts as moving on
-    r.read({ error: 'no target' }, 6000);
-    const three = hold(r, () => closeUp([{ x: 0, y: 0.5 }], 520), 7000);
-    expect(three).toMatchObject({ kind: 'done', locked: 2, spot: -1 });
-    expect(r.results().map((x) => [x.spot, x.res.arrows.map((a) => a.spot)])).toEqual([
-      [0, [0]],
-      [1, [1]],
-      [2, [2]],
-    ]);
-    expect(three.spots.map((s) => s.scores)).toEqual([['X'], [9], [8]]);
-  });
-
-  it('reads the next spot centred where the last one was, once its arrows differ', () => {
-    const r = createSpotReading({ face, arrows: 3 });
-    hold(r, () => closeUp([{ x: 0.05, y: 0 }]));
-    // the camera panned to spot 2 between two frames and spot 2 sits where spot 1 sat; while it
-    // waits the arrow seen is shown (hollow), with its score
-    const first = r.read(closeUp([{ x: 0.3, y: 0 }]), 2000);
-    expect(first).toMatchObject({ kind: 'move', spot: 1, hollow: true, scores: [9] });
-    const two = hold(r, () => closeUp([{ x: 0.3, y: 0 }]), 2250);
-    expect(two).toMatchObject({ locked: 1, spot: 2 });
-    expect(two.spots[1].scores).toEqual([9]);
-  });
-
-  it('Take now reads the spot in view while it waits for the camera to move on', () => {
-    const r = createSpotReading({ face, arrows: 3 });
-    hold(r, () => closeUp([{ x: 0.05, y: 0 }]));
-    // two arrows in the same place on spots 1 and 2: nothing tells them apart but the archer
-    const waiting = r.read(closeUp([{ x: 0.05, y: 0 }]), 2000);
-    expect(waiting).toMatchObject({ kind: 'move', canTake: true });
-    expect(r.take()).toBe(1);
-    expect(r.results().map((x) => x.spot)).toEqual([0, 1]);
-  });
-
-  it('asks to come closer while the whole sheet is in view', () => {
-    const r = createSpotReading({ face, arrows: 3 });
-    const whole = () => result(triple(), [{ x: 0, y: 0, spot: 0 }]);
-    expect(hold(r, whole)).toMatchObject({ kind: 'far', locked: -1, spot: 0 });
-    expect(r.take()).toBe(-1); // Take now takes only a close-up
-  });
-
-  it('keeps only the spot’s share of the arrows seen on it', () => {
-    const r = createSpotReading({ face, arrows: 3 });
-    hold(r, () => closeUp([{ x: 0, y: 0 }, { x: 0.5, y: 0 }]));
-    expect(r.results()[0].res.arrows).toHaveLength(1);
-  });
-
-  it('Take now reads the spot in view; Skip leaves one for the keypad; a chip reads one again', () => {
-    const r = createSpotReading({ face, arrows: 3 });
-    r.read(closeUp([{ x: 0.05, y: 0 }]), 0);
-    expect(r.take()).toBe(0);
-    expect(r.spot).toBe(1);
-    r.skip();
-    expect(r.spot).toBe(2);
-    r.goTo(0); // spot 1 again
-    expect(r.spot).toBe(0);
-    const s = hold(r, () => closeUp([{ x: 0.3, y: 0 }]), 1000);
-    expect(s.locked).toBe(0);
-    expect(s.spots.map((x) => x.status)).toEqual(['done', 'skipped', 'todo']);
-    expect(s.spot).toBe(2);
-    expect(r.results().map((x) => x.spot)).toEqual([0]);
-  });
-
-  it('Use enters the arrows of a joined picture on their spots of the sheet', async () => {
-    await running.start(SETUP);
-    const pieces = [
-      { spot: 0, picture: { width: 400, height: 400 }, res: closeUp([{ x: 0.05, y: 0 }]) },
-      { spot: 2, picture: { width: 400, height: 400 }, res: closeUp([{ x: 0.3, y: 0 }]) },
-    ];
-    const joined = joinSpots(pieces);
-    camera = [{ picture: joined, res: joined.res }];
-    previews = [true];
-    expect((await make().start({ bySpot: true })).status).toBe('used');
-    expect(asked[0][1].bySpot).toBe(true);
-    expect(shown().slice(0, 2)).toEqual([
-      expect.objectContaining({ v: 'X', spot: 0 }),
-      expect.objectContaining({ v: 9, spot: 2 }),
-    ]);
   });
 });

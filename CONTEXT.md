@@ -125,6 +125,3 @@ An arrow's position is kept only when it lies on its spot or just off its edge; 
 
 **Scan**:
 Reading arrows from the camera or a photo of the target into the end being shot. On a full end the scan saves it and fills the next end; on an end with room it reads that end anew and replaces it. An earlier end opened for editing is never scanned.
-
-**Spot by spot**:
-A Scan of a triple or Vegas sheet with the camera close to one spot at a time, in the order of the target page (arrow n on spot n), for more detail. Each spot locks by itself; the next is read only after the camera has moved on. A skipped spot is left for the keypad.

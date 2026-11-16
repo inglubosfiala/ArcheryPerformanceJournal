@@ -107,45 +107,6 @@ export function pictureFromFace(outer, f) {
 }
 
 /**
- * Spot by spot: the close-ups of the spots read, one under the other like the spots of a triple,
- * as one picture with one result. `pieces` are [{ spot, picture: { width, height }, res }] in the
- * order of the sheet, each res with the one spot of its picture. Each picture is drawn `width` wide
- * at `places[i]` ({ x, y, k }: where, and at what scale). In the joined result the spots are the
- * pieces' (an arrow's `spot` is its piece), `spotIds` gives each piece's spot of the sheet, and the
- * arrows are in the order of the end: the first arrow of each spot, then the second of each.
- */
-export function joinSpots(pieces, { width = 480, gap = 16 } = {}) {
-  let y = 0;
-  const places = pieces.map((p) => {
-    const k = width / p.picture.width;
-    const place = { x: 0, y, k };
-    y += Math.round(p.picture.height * k) + gap;
-    return place;
-  });
-  const parts = pieces.map((p, i) =>
-    moved(
-      p.res,
-      (x) => places[i].x + x * places[i].k,
-      (v) => places[i].y + v * places[i].k,
-      places[i].k,
-    ),
-  );
-  const rounds = Math.max(0, ...parts.map((r) => r.arrows.length));
-  const arrows = [];
-  for (let n = 0; n < rounds; n++) {
-    parts.forEach((r, i) => {
-      if (r.arrows[n]) arrows.push({ ...r.arrows[n], spot: i });
-    });
-  }
-  return {
-    width,
-    height: Math.max(0, y - gap),
-    places,
-    res: { partial: false, spots: parts.map((r) => r.spots[0]), arrows, spotIds: pieces.map((p) => p.spot) },
-  };
-}
-
-/**
  * The result with other arrows in place of its own: each (a place on the face, on its spot) is
  * put where it is in the result's picture.
  */

@@ -1848,118 +1848,6 @@ button.arrow-count:hover {
   font: var(--type-body-strong);
 }
 
-/* spot by spot: a spot was read. The picture dims under a big banner (what was read, which spot
-   is next) that flashes green once, readable from arm's length. Always on the dark camera
-   picture, so fixed light-on-dark colours in both themes. */
-.live-banner {
-  position: absolute;
-  inset: 0;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 10px;
-  padding: 16px;
-  background: rgba(0, 0, 0, 0.62);
-  color: #ffffff;
-  text-align: center;
-  pointer-events: none;
-}
-
-.live-banner[hidden] {
-  display: none;
-}
-
-.live-banner-read {
-  font-size: 30px;
-  font-weight: 800;
-  line-height: 1.15;
-}
-
-.live-banner-next {
-  padding: 10px 18px;
-  border-radius: 999px;
-  background: #ffffff;
-  color: #111111;
-  font-size: 22px;
-  font-weight: 800;
-}
-
-.live-banner.is-flash {
-  animation: live-banner-flash 700ms ease-out;
-}
-
-@keyframes live-banner-flash {
-  0% {
-    background: rgba(22, 163, 74, 0.85);
-  }
-  100% {
-    background: rgba(0, 0, 0, 0.62);
-  }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .live-banner.is-flash {
-    animation: none;
-  }
-}
-
-/* spot by spot: one chip per spot of the sheet, in the order of the target page; the spot being
-   read in accent, a spot read with its score, a skipped one dimmed. A chip reads its spot again. */
-.live-spots {
-  flex: none;
-  display: flex;
-  justify-content: center;
-  gap: var(--space-2);
-}
-
-.live-spot {
-  flex: 1 1 0;
-  max-width: 112px;
-  min-height: 52px;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 2px;
-  padding: 4px 8px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-lg);
-  background: var(--surface);
-  color: var(--ink);
-}
-
-.live-spot-no {
-  font-size: 18px;
-  font-weight: 800;
-  line-height: 1;
-}
-
-.live-spot-score {
-  min-height: 1.2em;
-  font-size: 13px;
-  font-weight: 700;
-  color: var(--muted);
-  white-space: nowrap;
-}
-
-.live-spot.is-current {
-  border: 2px solid var(--accent-bright);
-  background: var(--accent-tint);
-}
-
-.live-spot.is-done .live-spot-score {
-  color: var(--ink);
-}
-
-.live-spot.is-skipped {
-  opacity: 0.6;
-}
-
-.live-spot:disabled {
-  opacity: 0.35;
-}
-
 .live-actions {
   flex: none;
   display: grid;
@@ -2923,32 +2811,8 @@ button.arrow-count:hover {
   color: var(--accent-bright);
 }
 
-/* with the spot-by-spot button beside Scan, Previous and Next take only their words, so Scan
-   keeps room for its icon and name on a 360px phone */
-.score-actions.has-spots .score-prev,
-.score-actions.has-spots .score-next {
-  min-width: 0;
-  padding: 0 10px;
-}
-
-/* spot by spot (triple and Vegas sheets): a square button beside Scan, in Scan's colours */
-.score-spots {
-  flex: none;
-  width: var(--tap-primary);
-  height: var(--tap-primary);
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  padding: 0;
-  border: 2px solid var(--accent-bright);
-  border-radius: var(--radius-xl);
-  background: var(--accent-tint);
-  color: var(--accent-bright);
-}
-
 .score-prev:disabled,
 .score-next:disabled,
-.score-spots:disabled,
 .score-scan:disabled {
   opacity: 0.45;
 }
