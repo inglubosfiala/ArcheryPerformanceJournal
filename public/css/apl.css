@@ -1197,6 +1197,8 @@ a.apl-sessionrow:hover {
 .apl-dialog--sheet {
   position: relative;
   width: 100%;
+  /* sits at the bottom of the overlay layer (the centred dialog's auto margin would lift it) */
+  margin: 0;
   max-height: calc(100% - 12px);
   overflow-y: auto;
   display: flex;
@@ -1261,4 +1263,339 @@ a.apl-sessionrow:hover {
   color: var(--ink);
   font: var(--type-body);
   animation: apl-fade 160ms ease-out;
+}
+
+/* ---------------------------------------------------------------- Gear setups (gear.js) */
+/* No visible scrollbars on the gear pages: the page, the chip row and the sheets scroll without one. */
+.main:has(> .gear-screen),
+.gear-screen *,
+.gear-sheet {
+  scrollbar-width: none;
+}
+.main:has(> .gear-screen)::-webkit-scrollbar,
+.gear-screen *::-webkit-scrollbar,
+.gear-sheet::-webkit-scrollbar {
+  display: none;
+}
+
+.gear-body {
+  gap: var(--space-4);
+}
+.gear-gap {
+  margin-top: var(--space-2);
+}
+.gear-note {
+  margin: 0;
+  text-align: center;
+}
+.gear-header {
+  gap: 4px;
+  padding-right: 8px;
+}
+.gear-title {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.gear-back {
+  color: var(--ink);
+}
+.gear-well {
+  width: 44px;
+  height: 44px;
+  border-radius: var(--radius-md);
+  background: var(--accent-icon-bg);
+  color: var(--accent-bright);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+.gear-go {
+  display: inline-flex;
+  color: var(--muted);
+  flex-shrink: 0;
+}
+.gear-name {
+  font-size: 18px;
+  line-height: 24px;
+  font-weight: 700;
+  color: var(--ink);
+  margin: 0;
+}
+.gear-name-sm {
+  font-size: 15px;
+  line-height: 20px;
+}
+.gear-sub {
+  font-size: 13px;
+  line-height: 18px;
+  color: var(--muted);
+}
+.gear-unit {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--muted);
+}
+
+/* the active setup */
+.gear-active {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  padding: var(--space-5);
+  border-radius: var(--radius-xl);
+  border: 1px solid var(--accent);
+  background: var(--accent-tint);
+  color: var(--ink);
+  text-decoration: none;
+}
+.gear-active-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.gear-active-title {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-width: 0;
+}
+.gear-name-line {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.gear-keys {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-2);
+}
+.gear-key {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: var(--space-3) 12px;
+  border-radius: var(--radius-md);
+  background: var(--surface-sunken);
+  min-width: 0;
+}
+.gear-key-label {
+  font-size: 12px;
+  line-height: 16px;
+  color: var(--muted);
+}
+.gear-key-value {
+  font: var(--type-count);
+  overflow-wrap: anywhere;
+}
+.gear-key-empty {
+  color: var(--muted);
+}
+.gear-progress {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+.gear-progress-track {
+  flex: 1;
+  height: 6px;
+  border-radius: 3px;
+  background: var(--surface-sunken);
+  overflow: hidden;
+}
+.gear-progress-fill {
+  display: block;
+  height: 6px;
+  background: var(--accent-bright);
+}
+.gear-progress-text {
+  font-size: 12px;
+  line-height: 16px;
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+/* other setups */
+.gear-other {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: var(--space-4);
+  border-radius: var(--radius-xl);
+  border: 1px solid var(--border);
+  background: var(--surface);
+}
+.gear-other-link {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  flex: 1;
+  min-width: 0;
+  min-height: var(--tap-min);
+  color: var(--ink);
+  text-decoration: none;
+}
+.gear-other-link .gear-name {
+  font-size: 16px;
+  line-height: 22px;
+}
+.gear-pill {
+  height: var(--tap-min);
+  padding: 0 var(--space-4);
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--border);
+  background: var(--surface-sunken);
+  color: var(--ink);
+  font: var(--type-body-strong);
+  font-size: 14px;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+.gear-new {
+  min-height: 52px;
+  border-radius: var(--radius-xl);
+  font-size: 15px;
+}
+.gear-empty {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-5);
+  border-radius: var(--radius-xl);
+  border: 1px solid var(--border);
+  background: var(--surface);
+}
+.gear-empty p {
+  margin: 0;
+}
+
+/* one setup: the header and the jump chips stay on top; the chips scroll sideways with a fade */
+.gear-top {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  background: var(--ground);
+}
+.gear-chips {
+  display: flex;
+  gap: var(--space-2);
+  padding: 4px var(--space-5) var(--space-3);
+  overflow-x: auto;
+  overflow-y: hidden;
+  -webkit-mask-image: linear-gradient(90deg, #000 85%, transparent);
+  mask-image: linear-gradient(90deg, #000 85%, transparent);
+}
+.gear-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: var(--tap-min);
+  padding: 0 14px;
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--ink);
+  font: var(--type-body-strong);
+  font-size: 14px;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+.gear-chip:last-child {
+  margin-right: 40px;
+}
+.gear-chip-count {
+  color: var(--muted);
+  font-weight: 500;
+}
+.gear-group {
+  border-radius: var(--radius-xl);
+  border: 1px solid var(--border);
+  background: var(--surface);
+  overflow: hidden;
+  scroll-margin-top: 120px;
+}
+.gear-group-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px var(--space-4) 6px;
+}
+.gear-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  width: 100%;
+  min-height: 52px;
+  padding: 6px 12px 6px var(--space-4);
+  border: none;
+  border-top: 1px solid var(--border-soft);
+  background: transparent;
+  color: var(--ink);
+  font: inherit;
+  text-align: left;
+}
+.gear-row:hover {
+  background: var(--surface-sunken);
+}
+.gear-row-label {
+  flex: 1;
+  font-size: 15px;
+  line-height: 20px;
+  color: var(--ink-soft);
+}
+.gear-row-value {
+  font: var(--type-body-strong);
+  text-align: right;
+  max-width: 55%;
+  overflow-wrap: anywhere;
+}
+.gear-row-add {
+  font: var(--type-body-strong);
+  color: var(--accent-bright);
+}
+.gear-row-go {
+  display: inline-flex;
+  color: var(--muted);
+}
+.gear-sights-link {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 72px;
+  padding: var(--space-4);
+  border-radius: var(--radius-xl);
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--ink);
+  text-decoration: none;
+  scroll-margin-top: 120px;
+}
+
+/* the ⋯ menu (a small sheet) */
+.gear-menu {
+  display: flex;
+  flex-direction: column;
+}
+.gear-menu-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 52px;
+  padding: 0 var(--space-2);
+  border: none;
+  border-top: 1px solid var(--border-soft);
+  background: transparent;
+  color: var(--ink);
+  font: var(--type-body-strong);
+  text-align: left;
+}
+.gear-menu-item.danger {
+  color: var(--danger);
+}
+.gear-menu-icon {
+  display: inline-flex;
+  width: 24px;
+  justify-content: center;
 }

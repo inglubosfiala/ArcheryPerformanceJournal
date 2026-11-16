@@ -1,252 +1,418 @@
-// Gear tab: the current equipment setup with its sight marks, and saved setup snapshots (HANDOFF §7).
-// Sight marks belong to the setup (1:1): saving, updating and loading a setup carries them along.
-import { h, formatDate, todayIso } from '../../core/dom.js';
+// Gear tab: the archer's gear setups. One is active (new sessions take a copy of it); a setup is a read
+// view of its fields and sight marks, and every change is saved to it at once. Routes:
+//   #/gear              the setups (the active one first)
+//   #/gear/<id>         one setup, its fields by group
+//   #/gear/<id>/sights  its sight marks (gearSights.js)
+import { h } from '../../core/dom.js';
 import * as APL from '../../ui/apl/index.js';
 import { confirmDialog } from './confirm.js';
-import { GEAR_GROUPS, GEAR_KEYS, filledCount, hasGear, isBlankMark, markCount, sightMarks } from '../gearFields.js';
+import { icons } from '../icons.js';
+import {
+  GEAR_GROUPS,
+  GEAR_KEYS,
+  activeSetup,
+  copyFields,
+  displayValue,
+  filledCount,
+  keyValues,
+  markCount,
+  markText,
+  orderedSetups,
+  sessionsUsing,
+  setupSummary,
+  sightMarks,
+  hasMark,
+  uniqueName,
+} from '../gearFields.js';
 import { T } from '../strings.js';
-import { card } from './common.js';
 
-export function renderGear(ctx) {
-  const settings = ctx.repo.getSettings();
-  const gear = settings.gear || {};
-  const filled = (fields) => `${filledCount(fields)} / ${GEAR_KEYS.length} filled`;
-  const counter = h('span', { class: 'apl-cap13 apl-header-count', 'aria-live': 'polite' }, filled(gear));
+export function renderGear(ctx, params = []) {
+  const [id, sub] = params;
+  if (!id) return renderList(ctx);
+  const setup = ctx.repo.get('setups', id);
+  if (!setup || setup.deleted) {
+    queueMicrotask(() => ctx.navigate('gear', { replace: true }));
+    return { content: h('div', { class: 'apl-screen gear-screen' }) };
+  }
+  if (sub === 'sights') return renderSightsPage(ctx, setup);
+  return renderSetup(ctx, setup);
+}
 
-  const onInput = (key) => (e) => {
-    const next = { ...ctx.repo.getSettings().gear, [key]: e.target.value };
-    // Editing detaches the setup from the snapshot it was loaded from.
-    if (ctx.saveSettings({ gear: next, activeSnapshotId: null })) counter.textContent = filled(next);
-  };
+// ---------------------------------------------------------------- shared actions
 
-  const sights = sightsCard(ctx, gear);
+const plural = (n, one, many) => `${n} ${n === 1 ? one : many}`;
+const sessionsLine = (n) => (n ? `used in ${plural(n, 'session', 'sessions')}` : 'not used yet');
 
-  const snapshots = ctx.repo.list('gearSnapshots', { sort: (a, b) => b.createdAt.localeCompare(a.createdAt) });
-  const nameField = APL.TextField({
-    label: T.snapshotName,
-    placeholder: T.snapshotPh,
-    value: ctx.ui.get().snapName || '',
-    fk: 'snap-name',
-    onInput: (e) => ctx.ui.quietSet({ snapName: e.target.value }),
-  });
-  const nameInput = nameField.querySelector('input');
-
-  const saveSnap = () => {
-    const name = nameInput.value.trim() || `Setup ${snapshots.length + 1}`;
-    const saved = ctx.save('gearSnapshots', { name, date: todayIso(), fields: structuredClone(ctx.repo.getSettings().gear) });
-    if (saved) {
-      ctx.saveSettings({ activeSnapshotId: saved.id, loadedSnapshotId: saved.id });
-      ctx.ui.quietSet({ snapName: '' });
-      ctx.rerender();
-    }
-  };
-
-  // The setup loaded from a saved one can be written back to it (sessions keep their own copy).
-  const loaded = snapshots.find((sn) => sn.id === (settings.loadedSnapshotId ?? settings.activeSnapshotId));
-  const updateSnap = () => {
-    const cur = ctx.repo.get('gearSnapshots', loaded.id);
-    if (!cur) return;
-    const saved = ctx.save('gearSnapshots', { ...cur, date: todayIso(), fields: structuredClone(ctx.repo.getSettings().gear) });
-    if (saved) {
-      ctx.saveSettings({ activeSnapshotId: saved.id, loadedSnapshotId: saved.id });
-      ctx.toast(`"${saved.name}" updated`);
-      ctx.rerender();
-    }
-  };
-
-  const load = async (sn) => {
-    if (
-      hasGear(ctx.repo.getSettings().gear) &&
-      !(await confirmDialog({ title: 'Load this setup?', message: T.confirmLoadSnap(sn.name), confirmLabel: T.load }))
-    )
-      return;
-    if (ctx.saveSettings({ gear: structuredClone(sn.fields), activeSnapshotId: sn.id, loadedSnapshotId: sn.id })) ctx.rerender();
-  };
-
-  const remove = async (sn) => {
-    const ok = await confirmDialog({
-      title: 'Delete snapshot?',
-      message: T.confirmDeleteSnap(sn.name),
-      confirmLabel: T.delete,
-      danger: true,
-    });
-    if (!ok) return;
-    ctx.remove('gearSnapshots', sn.id);
-    const st = ctx.repo.getSettings();
-    if (st.activeSnapshotId === sn.id || st.loadedSnapshotId === sn.id) {
-      ctx.saveSettings({
-        activeSnapshotId: st.activeSnapshotId === sn.id ? null : st.activeSnapshotId,
-        loadedSnapshotId: st.loadedSnapshotId === sn.id ? null : st.loadedSnapshotId,
-      });
-    }
+function makeActive(ctx, setup) {
+  if (ctx.saveSettings({ activeSetupId: setup.id })) {
+    ctx.toast(`"${setup.name}" is now active`);
     ctx.rerender();
+  }
+}
+
+/** Ask for a setup's name; resolves the trimmed name, or null when cancelled or left empty. */
+async function askName({ title, value, confirmLabel }) {
+  const field = APL.TextField({ label: 'Name', value, fk: 'setup-name' });
+  const ok = await confirmDialog({ title, body: field, confirmLabel, icon: 'pencil' });
+  const name = field.querySelector('input').value.trim();
+  return ok && name ? name : null;
+}
+
+async function rename(ctx, setup) {
+  const name = await askName({ title: 'Rename setup', value: setup.name, confirmLabel: 'Rename' });
+  if (!name || name === setup.name) return;
+  const cur = ctx.repo.get('setups', setup.id);
+  if (cur && ctx.save('setups', { ...cur, name: uniqueName(name, ctx.repo.list('setups'), setup.id) })) ctx.rerender();
+}
+
+/** A new setup starting as a copy of `from` (none: empty); opens it and asks for its name. */
+async function createFrom(ctx, from, { base = 'New setup' } = {}) {
+  const setups = ctx.repo.list('setups');
+  const saved = ctx.save('setups', {
+    name: uniqueName(from ? `${from.name} copy` : base, setups),
+    fields: copyFields(from?.fields),
+    history: [],
+  });
+  if (!saved) return;
+  if (!activeSetup(ctx.repo.getSettings(), setups)) ctx.saveSettings({ activeSetupId: saved.id });
+  ctx.navigate(`gear/${encodeURIComponent(saved.id)}`);
+  const name = await askName({ title: 'Name the new setup', value: saved.name, confirmLabel: 'Save' });
+  if (name && name !== saved.name) {
+    const cur = ctx.repo.get('setups', saved.id);
+    if (cur) ctx.save('setups', { ...cur, name: uniqueName(name, ctx.repo.list('setups'), saved.id) });
+  }
+  ctx.rerender();
+}
+
+async function remove(ctx, setup) {
+  const settings = ctx.repo.getSettings();
+  const setups = ctx.repo.list('setups');
+  if (activeSetup(settings, setups)?.id === setup.id) {
+    const more = setups.length > 1;
+    const go = await confirmDialog({
+      title: 'This setup is active',
+      message: more
+        ? 'New sessions use it. Make another setup active first, then delete this one.'
+        : 'New sessions use it. Add another setup and make it active first, then delete this one.',
+      confirmLabel: more ? 'Pick another' : 'New setup',
+      cancelLabel: 'Close',
+      icon: 'help',
+    });
+    if (go && more) ctx.navigate('gear');
+    else if (go) createFrom(ctx, setup);
+    return;
+  }
+  const used = sessionsUsing(setup.id, ctx.repo.list('sessions'));
+  const ok = await confirmDialog({
+    title: 'Delete setup?',
+    message: `Delete "${setup.name}"?${used ? ` The ${plural(used, 'session', 'sessions')} shot with it keep their own copy.` : ''}`,
+    confirmLabel: T.delete,
+    danger: true,
+  });
+  if (!ok) return;
+  if (ctx.remove('setups', setup.id)) {
+    ctx.toast(`"${setup.name}" deleted`);
+    ctx.navigate('gear', { replace: true });
+  }
+}
+
+/** The ⋯ menu of a setup: a small sheet with rename, duplicate and delete. */
+function menuSheet(ctx, setup) {
+  const close = () => ctx.ui.set({ gearMenu: null });
+  const run = (fn) => () => {
+    ctx.ui.quietSet({ gearMenu: null });
+    ctx.rerender();
+    fn();
   };
+  const item = (icon, label, onClick, danger = false) =>
+    h(
+      'button',
+      { type: 'button', class: ['gear-menu-item', danger && 'danger'], onClick, dataset: { fk: `menu-${label.toLowerCase()}` } },
+      h('span', { class: 'gear-menu-icon' }, icons[icon]()),
+      label,
+    );
+  return {
+    onClose: close,
+    node: APL.Dialog({
+      sheet: true,
+      title: setup.name,
+      idPrefix: 'gear-menu',
+      onClose: close,
+      closeLabel: 'Close menu',
+      children: h(
+        'div',
+        { class: 'gear-menu', role: 'group', 'aria-label': `Options for ${setup.name}` },
+        item('pencil', 'Rename', run(() => rename(ctx, setup))),
+        item('copy', 'Duplicate', run(() => createFrom(ctx, setup))),
+        item('trash', 'Delete', run(() => remove(ctx, setup)), true),
+      ),
+    }),
+  };
+}
+
+const moreButton = (ctx, setup) =>
+  h(
+    'button',
+    {
+      type: 'button',
+      class: 'apl-iconbtn',
+      'aria-label': `Setup options: rename, duplicate, delete`,
+      'aria-haspopup': 'dialog',
+      onClick: () => ctx.ui.set({ gearMenu: setup.id }),
+      dataset: { fk: 'setup-more' },
+    },
+    icons.more(),
+  );
+
+const backLink = (href, label) => h('a', { class: 'apl-iconbtn gear-back', href, 'aria-label': label }, icons.back());
+
+// ---------------------------------------------------------------- the setups
+
+function renderList(ctx) {
+  const settings = ctx.repo.getSettings();
+  const setups = orderedSetups(settings, ctx.repo.list('setups'));
+  const active = activeSetup(settings, setups);
+  const sessions = ctx.repo.list('sessions');
+  const distance = Number(settings.lastSetup?.distance) || 18;
+  const others = setups.filter((s) => s !== active);
+
+  const activeCard = (s) => {
+    const filled = filledCount(s.fields);
+    const pct = Math.round((filled / GEAR_KEYS.length) * 100);
+    return h(
+      'a',
+      { class: 'gear-active', href: `#/gear/${encodeURIComponent(s.id)}`, dataset: { fk: `setup-${s.id}` } },
+      h(
+        'span',
+        { class: 'gear-active-head' },
+        h('span', { class: 'gear-well', 'aria-hidden': 'true' }, icons.gear()),
+        h(
+          'span',
+          { class: 'gear-active-title' },
+          h('span', { class: 'gear-name-line' }, h('span', { class: 'gear-name' }, s.name), APL.Badge({ children: 'Active' })),
+          h('span', { class: 'gear-sub' }, [String(s.fields?.riser || '').trim(), sessionsLine(sessionsUsing(s.id, sessions))].filter(Boolean).join(' · ')),
+        ),
+        h('span', { class: 'gear-go' }, icons.chevron()),
+      ),
+      h(
+        'span',
+        { class: 'gear-keys' },
+        keyValues(s, distance).map((k) =>
+          h(
+            'span',
+            { class: 'gear-key' },
+            h('span', { class: 'gear-key-label' }, k.label),
+            k.value
+              ? h('span', { class: 'gear-key-value' }, k.value, k.unit ? h('span', { class: 'gear-unit' }, ` ${k.unit}`) : null)
+              : h('span', { class: 'gear-key-value gear-key-empty' }, '—'),
+          ),
+        ),
+      ),
+      h(
+        'span',
+        { class: 'gear-progress' },
+        h('span', { class: 'gear-progress-track', 'aria-hidden': 'true' }, h('span', { class: 'gear-progress-fill', style: { width: `${pct}%` } })),
+        h('span', { class: 'gear-progress-text' }, `${filled} of ${GEAR_KEYS.length} details`),
+      ),
+    );
+  };
+
+  const otherCard = (s) =>
+    h(
+      'div',
+      { class: 'gear-other' },
+      h(
+        'a',
+        { class: 'gear-other-link', href: `#/gear/${encodeURIComponent(s.id)}`, dataset: { fk: `setup-${s.id}` } },
+        h('span', { class: 'gear-name' }, s.name),
+        h('span', { class: 'gear-sub' }, setupSummary(s)),
+      ),
+      h(
+        'button',
+        { type: 'button', class: 'gear-pill', 'aria-label': `Make ${s.name} active`, onClick: () => makeActive(ctx, s), dataset: { fk: `activate-${s.id}` } },
+        'Make active',
+      ),
+    );
+
+  const body = setups.length
+    ? [
+        h('h2', { class: 'apl-label' }, 'Active setup'),
+        activeCard(active),
+        others.length ? h('h2', { class: 'apl-label gear-gap' }, 'Other setups') : null,
+        others.map(otherCard),
+        h(
+          'button',
+          { type: 'button', class: 'apl-add gear-new', onClick: () => createFrom(ctx, active), dataset: { fk: 'setup-new' } },
+          icons.plus(),
+          'New setup',
+        ),
+        h('p', { class: 'apl-cap gear-note' }, 'Starts as a copy of the active setup. New sessions use the active one.'),
+      ]
+    : [
+        h(
+          'div',
+          { class: 'gear-empty' },
+          h('h2', { class: 'gear-name' }, 'No setup yet'),
+          h('p', { class: 'apl-cap13' }, 'Add your bow, arrows and sight marks. New sessions take a copy, so you always know what you shot with.'),
+        ),
+        h(
+          'button',
+          { type: 'button', class: 'apl-add gear-new', onClick: () => createFrom(ctx, null, { base: 'My setup' }), dataset: { fk: 'setup-new' } },
+          icons.plus(),
+          'New setup',
+        ),
+      ];
 
   return {
     content: h(
       'div',
-      { class: 'apl-screen' },
-      APL.ScreenHeader({ title: T.equipment, trailing: counter }),
-      h(
-        'div',
-        { class: 'apl-screen-body history-body' },
-        GEAR_GROUPS.map((gr, gi) =>
-          card(
-            { class: 'apl-card' },
-            APL.Section({
-              label: gr.title,
-              id: `gear-group-${gi}`,
-              children: h(
-                'div',
-                { class: 'apl-grid-2' },
-                gr.fields.map(([key, label, ph]) =>
-                  APL.TextField({ label, value: gear[key] || '', placeholder: ph, fk: `g-${key}`, onInput: onInput(key) }),
-                ),
-              ),
-            }),
-          ),
-        ),
-        sights,
-        card(
-          { class: 'apl-card' },
-          APL.Section({
-            label: T.snapshots,
-            id: 'snaps',
-            children: [
-              nameField,
-              loaded
-                ? h(
-                    'div',
-                    { class: 'apl-grid-2' },
-                    APL.Button({ children: 'Update', label: `Update "${loaded.name}"`, onClick: updateSnap, fk: 'update-snap' }),
-                    APL.Button({ children: 'Save as new', variant: 'secondary', onClick: saveSnap, fk: 'save-snap' }),
-                  )
-                : APL.Button({ children: T.save, onClick: saveSnap, fk: 'save-snap' }),
-              snapshots.length ? null : h('p', { class: 'apl-cap13' }, T.noSnaps),
-              snapshots.length
-                ? h(
-                    'ul',
-                    { class: 'apl-list plain-list' },
-                    snapshots.map((sn) =>
-                      h(
-                        'li',
-                        null,
-                        APL.SessionRow({
-                          when: sn.name,
-                          type: settings.activeSnapshotId === sn.id ? 'Current' : null,
-                          summary: [formatDate(sn.date), `${filledCount(sn.fields)} fields`, sightSummary(sn.fields)].filter(Boolean).join(' · '),
-                          actions: [
-                            APL.Button({
-                              children: T.load,
-                              variant: 'secondary',
-                              label: `${T.load} ${sn.name}`,
-                              onClick: () => load(sn),
-                              fk: `load-${sn.id}`,
-                            }),
-                            h(
-                              'button',
-                              {
-                                type: 'button',
-                                class: 'btn btn-text danger',
-                                'aria-label': `${T.delete} ${sn.name}`,
-                                dataset: { fk: `delete-${sn.id}` },
-                                onClick: () => remove(sn),
-                              },
-                              T.delete,
-                            ),
-                          ],
-                        }),
-                      ),
-                    ),
-                  )
-                : null,
-            ],
-          }),
-        ),
-      ),
+      { class: 'apl-screen gear-screen' },
+      APL.ScreenHeader({ title: T.equipment }),
+      h('div', { class: 'apl-screen-body gear-body' }, body),
     ),
   };
 }
 
-const sightSummary = (fields) => {
-  const n = markCount(fields);
-  return n ? `${n} sight ${n === 1 ? 'mark' : 'marks'}` : '';
-};
+// ---------------------------------------------------------------- one setup
 
-/**
- * The current setup's sight marks: distance, elevation, windage and note on one row. Editing them is
- * editing the setup (it detaches it from the saved one it was loaded from, like any field).
- */
-function sightsCard(ctx, gear) {
-  const ui = ctx.ui.get();
-  const keep = ui.newSightIds || [];
-  const focusId = ui.focusSight;
-  if (focusId) ctx.ui.quietSet({ focusSight: null });
+const groupCount = (fields, g) => g.fields.filter(([k]) => String(fields?.[k] ?? '').trim()).length;
 
-  // Empty rows are not kept, except ones added in this visit (dropping them is no change to the setup).
-  if (Array.isArray(gear.sights) && gear.sights.some((m) => isBlankMark(m) && !keep.includes(m.id))) {
-    gear.sights = gear.sights.filter((m) => !isBlankMark(m) || keep.includes(m.id));
-    ctx.saveSettings({ gear: { ...ctx.repo.getSettings().gear, sights: gear.sights } });
-  }
-  const marks = [...sightMarks(gear)].sort((a, b) => sortKey(a) - sortKey(b));
-
-  /** Store the setup's marks after `fn`; the default rows become stored ones on the first edit. */
-  const setMarks = (fn) => {
-    const cur = ctx.repo.getSettings().gear || {};
-    return ctx.saveSettings({ gear: { ...cur, sights: fn(sightMarks(cur).map((m) => ({ ...m }))) }, activeSnapshotId: null });
-  };
-  const onSight = (id, key) => (e) => setMarks((ms) => ms.map((m) => (m.id === id ? { ...m, [key]: e.target.value } : m)));
-
-  const addRow = () => {
-    const id = crypto.randomUUID();
-    if (setMarks((ms) => [...ms, { id, distance: '', elevation: '', windage: '', note: '' }])) {
-      ctx.ui.quietSet({ newSightIds: [...keep, id], focusSight: id });
-      ctx.rerender();
-    }
-  };
-
-  // one row per mark; the column header says what each field is, screen readers hear it per field
-  const markRow = (m, i) => {
-    const name = m.distance || `row ${i + 1}`;
-    const field = (key, label) =>
-      APL.TextField({ label, hideLabel: true, value: m[key], fk: `sight-${m.id}-${key}`, onInput: onSight(m.id, key) });
-    const row = h(
-      'div',
-      { class: 'sight-grid' },
-      field('distance', `Distance, row ${i + 1}`),
-      field('elevation', `Elevation for ${name}`),
-      field('windage', `Windage for ${name}`),
-      field('note', `Note for ${name}`),
-    );
-    if (focusId === m.id) queueMicrotask(() => row.querySelector('input')?.focus());
-    return row;
-  };
-
-  return card(
-    { class: 'apl-card' },
-    APL.Section({
-      label: T.sightMarks,
-      id: 'gear-sights',
-      children: h(
-        'div',
-        { class: 'sight-card' },
-        h(
-          'div',
-          { class: 'sight-grid sight-head', 'aria-hidden': 'true' },
-          h('span', null, 'Dist.'),
-          h('span', null, 'Elevation'),
-          h('span', null, 'Windage'),
-          h('span', null, 'Note'),
+function setupHeader(ctx, setup, isActive) {
+  return h(
+    'header',
+    { class: 'apl-header gear-header' },
+    backLink('#/gear', 'Back to equipment'),
+    h('h1', { class: 'gear-title' }, setup.name),
+    isActive
+      ? APL.Badge({ children: 'Active' })
+      : h(
+          'button',
+          { type: 'button', class: 'gear-pill', onClick: () => makeActive(ctx, setup), dataset: { fk: 'setup-activate' } },
+          'Make active',
         ),
-        marks.map(markRow),
-        APL.AddButton({ children: T.addDistance, onClick: addRow, fk: 'add-distance' }),
-        h('p', { class: 'apl-cap' }, 'Marks for this setup, saved with it. Clear every field of a row to remove it.'),
-      ),
-    }),
+    moreButton(ctx, setup),
   );
 }
 
-function sortKey(m) {
-  const n = parseInt(m.distance, 10);
-  return Number.isFinite(n) ? n : 9999;
+function renderSetup(ctx, setup) {
+  const settings = ctx.repo.getSettings();
+  const isActive = activeSetup(settings, ctx.repo.list('setups'))?.id === setup.id;
+  const fields = setup.fields || {};
+  const ui = ctx.ui.get();
+  const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const jump = (sectionId) => () =>
+    document.getElementById(sectionId)?.scrollIntoView({ block: 'start', behavior: reduce ? 'auto' : 'smooth' });
+
+  const chips = [
+    ...GEAR_GROUPS.map((g) => ({ id: `gear-sec-${g.id}`, label: g.chip, count: `${groupCount(fields, g)}/${g.fields.length}` })),
+    { id: 'gear-sec-sights', label: T.sightMarks, count: String(markCount(fields)) },
+  ];
+
+  const row = (key, label) => {
+    const d = displayValue(key, fields[key]);
+    return h(
+      'button',
+      {
+        type: 'button',
+        class: 'gear-row',
+        onClick: () => openField(ctx, setup.id, key),
+        dataset: { fk: `field-${key}` },
+        'aria-label': d.value ? `${label}: ${d.value}${d.unit ? ` ${d.unit}` : ''}. Edit` : `${label}: not set. Add`,
+      },
+      h('span', { class: 'gear-row-label' }, label),
+      d.value
+        ? h('span', { class: 'gear-row-value' }, d.value, d.unit ? h('span', { class: 'gear-unit' }, ` ${d.unit}`) : null)
+        : h('span', { class: 'gear-row-add' }, 'Add'),
+      h('span', { class: 'gear-row-go' }, icons.chevron()),
+    );
+  };
+
+  const marks = sightMarks(fields).filter(hasMark);
+  const sightsLine = marks.length ? marks.slice(0, 3).map((m) => `${m.distance} ${markText(m)}`).join('   ·   ') : 'Add the marks for your distances';
+
+  const content = h(
+    'div',
+    { class: 'apl-screen gear-screen' },
+    h(
+      'div',
+      { class: 'gear-top' },
+      setupHeader(ctx, setup, isActive),
+      h(
+        'nav',
+        { class: 'gear-chips', 'aria-label': 'Jump to section' },
+        chips.map((c) =>
+          h(
+            'button',
+            { type: 'button', class: 'gear-chip', onClick: jump(c.id), dataset: { fk: `jump-${c.id}` } },
+            c.label,
+            h('span', { class: 'gear-chip-count' }, c.count),
+          ),
+        ),
+      ),
+    ),
+    h(
+      'div',
+      { class: 'apl-screen-body gear-body' },
+      GEAR_GROUPS.map((g) =>
+        h(
+          'section',
+          { class: 'gear-group', id: `gear-sec-${g.id}`, 'aria-labelledby': `gear-h-${g.id}` },
+          h(
+            'div',
+            { class: 'gear-group-head' },
+            h('h2', { class: 'apl-label', id: `gear-h-${g.id}` }, g.title),
+            h('span', { class: 'apl-cap' }, `${groupCount(fields, g)} of ${g.fields.length}`),
+          ),
+          g.fields.map(([key, label]) => row(key, label)),
+        ),
+      ),
+      h(
+        'a',
+        { class: 'gear-sights-link', id: 'gear-sec-sights', href: `#/gear/${encodeURIComponent(setup.id)}/sights`, dataset: { fk: 'open-sights' } },
+        h('span', { class: 'gear-well', 'aria-hidden': 'true' }, icons.sights()),
+        h('span', { class: 'gear-active-title' }, h('span', { class: 'gear-name gear-name-sm' }, T.sightMarks), h('span', { class: 'gear-sub' }, sightsLine)),
+        h('span', { class: 'gear-go' }, icons.chevron()),
+      ),
+      h('p', { class: 'apl-cap gear-note' }, 'Changes save automatically. Sessions keep the setup they were shot with.'),
+    ),
+  );
+  return { content, overlay: overlayFor(ctx, setup, ui) };
+}
+
+/** The view's overlay: the ⋯ menu or the edit sheet. */
+function overlayFor(ctx, setup, ui) {
+  if (ui.gearMenu === setup.id) return menuSheet(ctx, setup);
+  return null;
+}
+
+/** Edit one field (a plain text dialog for now; the edit sheet replaces it). */
+async function openField(ctx, setupId, key) {
+  const setup = ctx.repo.get('setups', setupId);
+  if (!setup) return;
+  const label = GEAR_GROUPS.flatMap((g) => g.fields).find((f) => f[0] === key)[1];
+  const field = APL.TextField({ label, value: setup.fields?.[key] || '', fk: 'edit-value' });
+  if (!(await confirmDialog({ title: label, body: field, confirmLabel: T.save, icon: 'pencil' }))) return;
+  const value = field.querySelector('input').value.trim();
+  const fields = { ...setup.fields };
+  if (value) fields[key] = value;
+  else delete fields[key];
+  if (ctx.save('setups', { ...setup, fields })) ctx.rerender();
+}
+
+// ---------------------------------------------------------------- sight marks (a page of the setup)
+
+function renderSightsPage(ctx, setup) {
+  return {
+    content: h(
+      'div',
+      { class: 'apl-screen gear-screen' },
+      h(
+        'header',
+        { class: 'apl-header gear-header' },
+        backLink(`#/gear/${encodeURIComponent(setup.id)}`, `Back to ${setup.name}`),
+        h('h1', { class: 'gear-title' }, T.sightMarks),
+      ),
+      h('div', { class: 'apl-screen-body gear-body' }, h('p', { class: 'apl-cap13' }, `${markCount(setup.fields)} marks`)),
+    ),
+  };
 }
