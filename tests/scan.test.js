@@ -524,9 +524,13 @@ describe('spot by spot (live camera)', () => {
   const face = '40t';
   // a close-up of one spot of the sheet, filling the picture; `at` moves the spot in the picture
   const closeUp = (arrows, cx = 300) => result([spot(cx, 300, 200)], arrows.map((a) => ({ ...a, spot: 0 })), true);
+  // the same frame for a second and a bit: the state of the frame that read a spot, else the last
   const hold = (r, frame, from = 0) => {
     let s;
-    for (let t = 0; t <= 1000; t += 250) s = r.read(frame(), from + t);
+    for (let t = 0; t <= 1250; t += 250) {
+      s = r.read(frame(), from + t);
+      if (s.locked >= 0) return s;
+    }
     return s;
   };
 
@@ -558,6 +562,28 @@ describe('spot by spot (live camera)', () => {
       [2, [2]],
     ]);
     expect(three.spots.map((s) => s.scores)).toEqual([['X'], [9], [8]]);
+  });
+
+  it('reads the next spot centred where the last one was, once its arrows differ', () => {
+    const r = createSpotReading({ face, arrows: 3 });
+    hold(r, () => closeUp([{ x: 0.05, y: 0 }]));
+    // the camera panned to spot 2 between two frames and spot 2 sits where spot 1 sat; while it
+    // waits the arrow seen is shown (hollow), with its score
+    const first = r.read(closeUp([{ x: 0.3, y: 0 }]), 2000);
+    expect(first).toMatchObject({ kind: 'move', spot: 1, hollow: true, scores: [9] });
+    const two = hold(r, () => closeUp([{ x: 0.3, y: 0 }]), 2250);
+    expect(two).toMatchObject({ locked: 1, spot: 2 });
+    expect(two.spots[1].scores).toEqual([9]);
+  });
+
+  it('Take now reads the spot in view while it waits for the camera to move on', () => {
+    const r = createSpotReading({ face, arrows: 3 });
+    hold(r, () => closeUp([{ x: 0.05, y: 0 }]));
+    // two arrows in the same place on spots 1 and 2: nothing tells them apart but the archer
+    const waiting = r.read(closeUp([{ x: 0.05, y: 0 }]), 2000);
+    expect(waiting).toMatchObject({ kind: 'move', canTake: true });
+    expect(r.take()).toBe(1);
+    expect(r.results().map((x) => x.spot)).toEqual([0, 1]);
   });
 
   it('asks to come closer while the whole sheet is in view', () => {

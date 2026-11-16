@@ -16,7 +16,7 @@
 //   'no-target' (with the detector's `error`) · 'failed' (the save was refused)
 
 import * as L from './sessionLogic.js';
-import { consensus } from './photoDetect.js';
+import { consensus, matchArrows } from './photoDetect.js';
 import { ringEdges, scoreFromPoint, scoringZoneAt, spotCentres } from './scoring.js';
 import { CLOSE_UP_MARGIN, spotsBox, isCloseUp, keepCloseUp, withArrows, moveArrow, arrowMarkLayout } from './scanGeometry.js';
 
@@ -305,8 +305,9 @@ const MOVE_ON = 0.8;
  * Spot by spot: the live camera close up on one spot of a triple or Vegas sheet at a time, in the
  * order of the target page (spot 1, 2, 3), for more detail than a view of the whole sheet gives.
  * Each spot is read like a whole sheet (it locks once the frames agree, or "Take now"); then the
- * camera must move on (the spot leaves its place in the picture, or the target is lost a moment)
- * before the next spot is read, so the same spot is never read twice.
+ * camera must move on before the next spot is read, so the same spot is never read twice: the spot
+ * leaves its place in the picture, the target is lost a moment, or the frames agree on arrows
+ * other than the spot just read (the next spot centred where the last one was).
  *
  * read(res, now) takes a frame's detection result and says:
  *   kind      'lost' · 'far' (the whole sheet is seen: come closer) · 'move' (move on to the next
@@ -366,18 +367,23 @@ export function createSpotReading({ face, arrows }) {
   function lock(res) {
     const j = current;
     setSpot(j, { status: 'done', res: { ...res, arrows: res.arrows.map((a) => ({ ...a, spot: j })) } });
-    away = placeOf(res);
+    away = { ...placeOf(res), arrows: res.arrows };
     begin(nextTodo(j + 1));
     return j;
   }
 
+  /** Are these the arrows of the spot just read (the camera has not moved on)? */
+  const sameAsAway = (arrows) =>
+    arrows.length === away.arrows.length && (!arrows.length || !!matchArrows(away.arrows, arrows));
+
   function read(res, now) {
     if (current < 0) return state('done');
     if (!res.error) seen = placeOf(res);
-    if (away) {
-      const gone = res.error || Math.hypot(seen.cx - away.cx, seen.cy - away.cy) > MOVE_ON * away.r;
-      if (!gone) return state('move', { show: res, hollow: true });
+    // the camera moved on: the target was lost a moment, or the spot seen left its place. What was
+    // read while it waited was the last spot: the next is read afresh.
+    if (away && (res.error || Math.hypot(seen.cx - away.cx, seen.cy - away.cy) > MOVE_ON * away.r)) {
       away = null;
+      begin(current);
     }
     if (res.error) {
       steady.read(res, now);
@@ -385,10 +391,19 @@ export function createSpotReading({ face, arrows }) {
     }
     if (!res.partial) {
       steady.read({ error: 'far' }, now); // a view of the whole sheet: nothing agreed so far counts
-      return state('far', { show: res, hollow: true });
+      return state(away ? 'move' : 'far', { show: res, hollow: true });
     }
     // the spot's own share of the arrows: the best ones (the detector lists them from the middle out)
     const r = steady.read({ ...res, arrows: res.arrows.slice(0, shares[current]) }, now);
+    if (away) {
+      // The next spot often comes to sit where the last one was, so its place alone cannot tell
+      // them apart: steady arrows other than the last spot's are the next spot. Take now takes
+      // what is in view.
+      if (!(r.kind === 'holding' && !sameAsAway(r.show.arrows))) {
+        return state('move', { show: r.show ?? res, scores: r.scores, hollow: true, canTake: r.canTake });
+      }
+      away = null;
+    }
     if (r.locked) {
       const taken = steady.take();
       const j = lock(taken);
@@ -400,6 +415,7 @@ export function createSpotReading({ face, arrows }) {
   function take() {
     const res = current >= 0 ? steady.take() : null;
     if (!res || !res.partial) return -1;
+    away = null;
     return lock(res);
   }
 
