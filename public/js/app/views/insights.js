@@ -1,4 +1,4 @@
-// Insights: trends, a sortable sessions table, the review journal and weekly training load, drawn
+// Insights: trends, a sortable sessions table, the review journal and daily or weekly training load, drawn
 // with the APL components. Built for a desktop browser (wide layout); on a phone the same content
 // stacks in one column.
 import { h, formatDate } from '../../core/dom.js';
@@ -15,6 +15,7 @@ import {
   sortRows,
   reviewRows,
   weeklyLoad,
+  dailyLoad,
 } from '../insights.js';
 import { card } from './common.js';
 import { lineChart, stackedBars, legend } from './charts.js';
@@ -39,7 +40,7 @@ const TYPE_COLORS = {
   gym: 'var(--series-7)',
 };
 
-const DEFAULTS = { range: '90d', type: 'all', distance: 'all', sortKey: 'date', sortDir: 'desc', q: '' };
+const DEFAULTS = { range: '90d', type: 'all', distance: 'all', sortKey: 'date', sortDir: 'desc', q: '', loadBy: 'week' };
 
 const shortDate = (d) => formatDate(d, { day: 'numeric', month: 'short' });
 
@@ -63,7 +64,7 @@ export function renderInsights(ctx, params) {
       : view === 'reviews'
         ? reviewsView(ctx, sessions, f, setF)
         : view === 'load'
-          ? loadView(sessions)
+          ? loadView(sessions, f, setF)
           : trendsView(ctx, sessions);
 
   return {
@@ -376,16 +377,46 @@ function reviewsView(ctx, sessions, f, setF) {
 
 // ---------------------------------------------------------------- training load
 
-function loadView(sessions) {
-  const weeks = weeklyLoad(sessions);
-  if (!weeks.length) return empty('No sessions in this range.');
+const LOAD_PERIODS = {
+  week: {
+    label: 'Weekly',
+    rows: weeklyLoad,
+    per: 'per week',
+    title: (p) => `Week of ${formatDate(p, { day: 'numeric', month: 'short' })}`,
+    head: 'Week of',
+    tick: (p) => formatDate(p, { day: 'numeric', month: 'short' }),
+  },
+  day: {
+    label: 'Daily',
+    rows: dailyLoad,
+    per: 'per day',
+    title: (p) => formatDate(p, { weekday: 'short', day: 'numeric', month: 'short' }),
+    head: 'Day',
+    tick: (p) => formatDate(p, { day: 'numeric', month: 'short' }),
+  },
+};
+
+function loadView(sessions, f, setF) {
+  const by = LOAD_PERIODS[f.loadBy] ? f.loadBy : 'week';
+  const P = LOAD_PERIODS[by];
+  const periodSwitch = card(
+    { class: 'apl-card' },
+    APL.SegmentedControl({
+      label: 'Load per period',
+      value: by,
+      options: Object.entries(LOAD_PERIODS).map(([value, p]) => ({ value, label: p.label })),
+      onChange: (loadBy) => setF({ loadBy }),
+      fk: 'load-by',
+    }),
+  );
+  const rows = P.rows(sessions);
+  if (!rows.length) return h('div', { class: 'insights-view' }, periodSwitch, empty('No sessions in this range.'));
   const series = CHART_TYPES.map((t) => ({ key: t, label: TYPE_LABELS[t], color: TYPE_COLORS[t] }));
-  const weekLabel = (w) => formatDate(w, { day: 'numeric', month: 'short' });
-  const bars = weeks.map((w) => ({
-    label: weekLabel(w.week),
+  const bars = rows.map((w) => ({
+    label: P.tick(w.period),
     values: w,
     tip: [
-      `Week of ${weekLabel(w.week)}`,
+      P.title(w.period),
       ...CHART_TYPES.filter((t) => w[t]).map((t) => `${TYPE_LABELS[t]}: ${w[t]}`),
       w.arrows ? `Arrows: ${w.arrows}` : null,
       w.strengthMin ? `SPT: ${w.strengthMin} min` : null,
@@ -393,30 +424,30 @@ function loadView(sessions) {
       w.mentalMin ? `Mental: ${w.mentalMin} min` : null,
     ].filter(Boolean),
   }));
-  // Time and arrows: two panels on the same weeks (one scale each, never two y-axes on one plot),
-  // sharing one tooltip so a week reads as a whole.
+  // Time and arrows: two panels on the same periods (one scale each, never two y-axes on one plot),
+  // sharing one tooltip so a period reads as a whole.
   const fmtMin = (m) => (m >= 60 ? `${Math.floor(m / 60)} h${m % 60 ? ` ${m % 60} min` : ''}` : `${m} min`);
   const volumeTip = (w) => [
-    `Week of ${weekLabel(w.week)}`,
+    P.title(w.period),
     `Time: ${w.totalMin ? fmtMin(w.totalMin) : '–'}`,
     ...CHART_TYPES.filter((t) => w.min[t]).map((t) => `  ${TYPE_LABELS[t]}: ${fmtMin(w.min[t])}`),
     `Arrows: ${w.arrows || '–'}`,
   ];
-  const hourBars = weeks.map((w) => ({
-    label: weekLabel(w.week),
+  const hourBars = rows.map((w) => ({
+    label: P.tick(w.period),
     values: Object.fromEntries(CHART_TYPES.map((t) => [t, w.min[t] / 60])),
     tip: volumeTip(w),
   }));
   const arrowSeries = [{ key: 'arrows', label: 'Arrows', color: 'var(--muted)' }];
-  const arrowBars = weeks.map((w) => ({
-    label: weekLabel(w.week),
+  const arrowBars = rows.map((w) => ({
+    label: P.tick(w.period),
     values: { arrows: w.arrows },
     tip: volumeTip(w),
   }));
   const panelLabel = (text) => h('span', { class: 'apl-cap' }, text);
 
   const cols = [
-    ['Week of', (w) => weekLabel(w.week)],
+    [P.head, (w) => (by === 'day' ? P.title(w.period) : P.tick(w.period))],
     ...CHART_TYPES.map((t) => [TYPE_LABELS[t], (w) => String(w[t] || '–')]),
     ['Arrows', (w) => String(w.arrows || '–')],
     ['Time', (w) => (w.totalMin ? fmtMin(w.totalMin) : '–')],
@@ -424,24 +455,27 @@ function loadView(sessions) {
     ['Gym min', (w) => String(w.gymMin || '–')],
     ['Mental min', (w) => String(w.mentalMin || '–')],
   ];
+  // the daily table lists training days only; the charts keep the rest days as gaps
+  const tableRows = by === 'day' ? rows.filter((w) => CHART_TYPES.some((t) => w[t])) : rows;
   return h(
     'div',
     { class: 'insights-view' },
-    sectionCard('ch-weeks', 'Sessions per week', 'by type', [
+    periodSwitch,
+    sectionCard('ch-periods', `Sessions ${P.per}`, 'by type', [
       legend(series),
-      stackedBars({ bars, series, yLabel: 'Sessions per week by type' }),
+      stackedBars({ bars, series, yLabel: `Sessions ${P.per} by type` }),
     ]),
-    sectionCard('ch-volume', 'Time and arrows per week', 'time by type', [
+    sectionCard('ch-volume', `Time and arrows ${P.per}`, 'time by type', [
       legend(series),
       panelLabel('Hours'),
-      stackedBars({ bars: hourBars, series, height: 180, yLabel: 'Hours per week by type' }),
+      stackedBars({ bars: hourBars, series, height: 180, yLabel: `Hours ${P.per} by type` }),
       panelLabel('Arrows'),
-      stackedBars({ bars: arrowBars, series: arrowSeries, height: 150, yLabel: 'Arrows per week' }),
+      stackedBars({ bars: arrowBars, series: arrowSeries, height: 150, yLabel: `Arrows ${P.per}` }),
     ]),
     APL.DataTable({
-      label: 'Weekly load table, scrolls sideways',
+      label: `${P.label} load table, scrolls sideways`,
       columns: cols.map(([label], i) => ({ label, align: i === 0 ? null : 'end', nowrap: true })),
-      rows: [...weeks].reverse().map((w) => cols.map(([, fn]) => fn(w))),
+      rows: [...tableRows].reverse().map((w) => cols.map(([, fn]) => fn(w))),
     }),
   );
 }

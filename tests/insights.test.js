@@ -6,6 +6,7 @@ import {
   reviewRows,
   weekStart,
   weeklyLoad,
+  dailyLoad,
   distancesOf,
 } from '../public/js/app/insights.js';
 
@@ -100,6 +101,14 @@ describe('weekly load', () => {
     expect(weekStart('2026-11-11')).toBe('2026-11-09');
     expect(weekStart('2026-11-09')).toBe('2026-11-09');
     expect(weekStart('2026-11-08')).toBe('2026-11-02');
+  });
+  it('counts load per day, with empty days in between', () => {
+    const days = dailyLoad([scored('x', '2026-11-10'), scored('y', '2026-11-12'), scored('z', '2026-11-12')]);
+    expect(days.map((d) => d.day)).toEqual(['2026-11-10', '2026-11-11', '2026-11-12']);
+    expect(days[0]).toMatchObject({ training: 1, period: '2026-11-10' });
+    expect(days[1]).toMatchObject({ training: 0, arrows: 0, totalMin: 0 });
+    expect(days[2].training).toBe(2);
+    expect(dailyLoad([])).toEqual([]);
   });
   it('counts sessions per type, arrows and minutes, with empty weeks in between', () => {
     const weeks = weeklyLoad(filterSessions(all, { range: '30d' }, now));

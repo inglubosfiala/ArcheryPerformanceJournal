@@ -96,11 +96,12 @@ export function weekStart(date) {
 }
 
 /**
- * Training load per week (oldest first), with empty weeks in between filled in:
+ * Training load per period (oldest first), with empty periods in between filled in:
  * sessions per type, arrows shot, and strength (SPT), gym and mental minutes.
+ * Each row carries its period start as `period` (and as `week` or `day`).
  */
-const emptyWeek = (week) => ({
-  week,
+const emptyRow = (period) => ({
+  period,
   training: 0,
   blank: 0,
   competition: 0,
@@ -117,13 +118,13 @@ const emptyWeek = (week) => ({
   totalMin: 0,
 });
 
-export function weeklyLoad(sessions) {
+function loadBy(sessions, keyOf, stepDays) {
   if (!sessions.length) return [];
-  const byWeek = new Map();
+  const byPeriod = new Map();
   for (const s of sessions) {
-    const w = weekStart(s.date);
-    if (!byWeek.has(w)) byWeek.set(w, emptyWeek(w));
-    const row = byWeek.get(w);
+    const p = keyOf(s.date);
+    if (!byPeriod.has(p)) byPeriod.set(p, emptyRow(p));
+    const row = byPeriod.get(p);
     const type = sessionType(s);
     row[type] += 1;
     row.min[type] += s.minutes || 0;
@@ -134,15 +135,25 @@ export function weeklyLoad(sessions) {
     else if (type === 'gym') row.gymMin += s.minutes || 0;
     else if (type === 'mental') row.mentalMin += s.minutes || 0;
   }
-  const weeks = [...byWeek.keys()].sort();
+  const periods = [...byPeriod.keys()].sort();
   const out = [];
   for (
-    let t = Date.parse(`${weeks[0]}T00:00:00Z`);
-    t <= Date.parse(`${weeks.at(-1)}T00:00:00Z`);
-    t += 7 * DAY_MS
+    let t = Date.parse(`${periods[0]}T00:00:00Z`);
+    t <= Date.parse(`${periods.at(-1)}T00:00:00Z`);
+    t += stepDays * DAY_MS
   ) {
-    const w = isoDay(new Date(t));
-    out.push(byWeek.get(w) || emptyWeek(w));
+    const p = isoDay(new Date(t));
+    out.push(byPeriod.get(p) || emptyRow(p));
   }
   return out;
+}
+
+/** Training load per ISO week (Monday start); rows also carry `week`. */
+export function weeklyLoad(sessions) {
+  return loadBy(sessions, weekStart, 7).map((r) => ({ ...r, week: r.period }));
+}
+
+/** Training load per calendar day, empty days in between filled in; rows also carry `day`. */
+export function dailyLoad(sessions) {
+  return loadBy(sessions, (d) => d, 1).map((r) => ({ ...r, day: r.period }));
 }
