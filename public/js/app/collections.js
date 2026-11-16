@@ -1,6 +1,6 @@
 // What the app stores (ARCHITECTURE §6.4). The repository validates before every save and on import.
 import { FACE_IDS, ARROWS_PER_END_MAX, isValidArrowsPerEnd, isValidArrowValue } from './scoring.js';
-import { sightErrors } from './gearFields.js';
+import { sightErrors, historyErrors } from './gearFields.js';
 import { SESSION_TYPES, DRILL_IDS, MENTAL_TECHNIQUES, EFFORT_MAX, FOCUS_MAX, isScored, countsArrows, isTime, emptyReview, emptyCompetition } from './sessionTypes.js';
 
 const isStr = (v) => typeof v === 'string';
@@ -95,13 +95,15 @@ export const collections = {
       return errs;
     },
   },
-  gearSnapshots: {
-    defaults: () => ({ name: '', date: '', fields: {} }),
+  // gear setups (stored as `setups` since schema 7; "gear snapshots" before). One is active.
+  setups: {
+    defaults: () => ({ name: '', fields: {}, history: [] }),
     validate(r) {
       const errs = [];
       if (!isStr(r.name) || !r.name.trim()) errs.push('name is required');
-      if (!r.fields || typeof r.fields !== 'object') errs.push('fields must be an object');
+      if (!r.fields || typeof r.fields !== 'object' || Array.isArray(r.fields)) errs.push('fields must be an object');
       else errs.push(...sightErrors(r.fields.sights));
+      errs.push(...historyErrors(r.history));
       return errs;
     },
   },
@@ -123,18 +125,15 @@ export const defaultSettings = {
   theme: 'system',
   defaultInput: 'target',
   askGrades: true,
-  // the current setup: the GEAR_KEYS fields and its sight marks (`sights`, see gearFields.js)
-  gear: {},
-  activeSnapshotId: null,
-  // the saved setup the Gear tab was last loaded from (kept while editing, so it can be updated)
-  loadedSnapshotId: null,
+  // the gear setup new sessions use (a record of `setups`; see activeSetup in gearFields.js)
+  activeSetupId: null,
   lastSetup: { distance: 18, face: '40t', arrowsPerEnd: 3 },
 };
 
 /** Settings shared between devices by Google Drive sync; all others stay on the device. */
-// Only the gear setup (its sight marks included): lastSetup changes on its own (starting a session)
-// and would otherwise make a fresh device's settings look newer than the real gear setup.
-export const SYNCED_SETTING_KEYS = ['gear', 'activeSnapshotId', 'loadedSnapshotId'];
+// Only which gear setup is active: the setups themselves sync as a collection. lastSetup changes on
+// its own (starting a session) and would otherwise make a fresh device's settings look newer.
+export const SYNCED_SETTING_KEYS = ['activeSetupId'];
 
 /** The Ink accent follows the text colour, so it is light in dark mode (see applyTheme in main.js). */
 export const INK_ACCENT = '#14181C';

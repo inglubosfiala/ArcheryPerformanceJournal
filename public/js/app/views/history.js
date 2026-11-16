@@ -206,11 +206,11 @@ function renderDetail(ctx, ss) {
   if (!isScored(ss.type)) return renderFormDetail(ctx, ss);
   const st = computeStats(ss.ends);
   const dateLbl = formatDate(ss.date);
-  const snapshot = ss.gearSnapshotId ? ctx.repo.get('gearSnapshots', ss.gearSnapshotId) : null;
+  const usedSetup = ss.gearSnapshotId ? ctx.repo.get('setups', ss.gearSnapshotId) : null;
   const [header, when] = detailHeader(
     ctx,
     ss,
-    setupSummary(ss, `${st.arrows} arrows`, ss.minutes != null ? formatDuration(ss.minutes) : '', snapshot?.name),
+    setupSummary(ss, `${st.arrows} arrows`, ss.minutes != null ? formatDuration(ss.minutes) : '', usedSetup?.name),
   );
 
   const byM = sectionCard(

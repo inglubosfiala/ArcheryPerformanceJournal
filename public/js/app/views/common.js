@@ -1,9 +1,9 @@
 // Small shared view pieces.
-import { h, todayIso, formatDate } from '../../core/dom.js';
+import { h, todayIso } from '../../core/dom.js';
 import * as APL from '../../ui/apl/index.js';
 import { zoneOf } from '../scoring.js';
 import { RUBRIC, T } from '../strings.js';
-import { gearChoices } from '../gearFields.js';
+import { gearChoices, setupSummary } from '../gearFields.js';
 import { isScored } from '../sessionTypes.js';
 import { datePicker, timePicker } from './pickers.js';
 
@@ -247,24 +247,24 @@ export function whenCard(ctx, ss) {
   );
 }
 
-/** The line under a saved equipment choice (gearChoices option ids). */
-export function gearDetail(id, snapshots) {
+/** The line under an equipment choice (gearChoices option ids). */
+export function gearDetail(id, setups, activeId = null) {
   if (id === 'none') return 'Log without a bow setup';
-  if (id === 'current') return 'From the Gear tab';
   if (id === 'recorded') return 'As saved with the session';
-  const sn = snapshots.find((x) => x.id === id);
-  return sn ? `Saved ${formatDate(sn.createdAt.slice(0, 10))}` : null;
+  const s = setups.find((x) => x.id === id);
+  if (!s) return null;
+  return id === activeId ? `Active · ${setupSummary(s)}` : setupSummary(s);
 }
 
 /** Equipment choices (gearChoices output) as APL radio cards, ending with Add equipment. */
-export function gearCards(ctx, { options, value, onChange, snapshots }) {
+export function gearCards(ctx, { options, value, onChange, setups, activeId }) {
   return h(
     'div',
     { class: 'apl-list', role: 'group', 'aria-label': 'Equipment' },
     options.map(([id, name]) =>
       APL.SelectCard({
         title: name,
-        detail: gearDetail(id, snapshots),
+        detail: gearDetail(id, setups, activeId),
         selected: id === value,
         onClick: () => id !== value && onChange(id),
         fk: `gear-${id}`,
@@ -275,16 +275,16 @@ export function gearCards(ctx, { options, value, onChange, snapshots }) {
 }
 
 /**
- * The equipment a finished session used, changeable in History (picking a saved setup copies its
- * fields into the session). `onChange(choice)` stores the choice. A running session shows none:
+ * The equipment a finished session used, changeable in History (picking a setup copies its fields
+ * into the session). `onChange(choice)` stores the choice. A running session shows none:
  * its equipment is chosen when it is set up.
  */
 export function gearCard(ctx, ss, onChange) {
   const settings = ctx.repo.getSettings();
-  const snapshots = ctx.repo.list('gearSnapshots', { sort: (a, b) => b.createdAt.localeCompare(a.createdAt) });
-  const choices = gearChoices({ settings, snapshots, session: ss });
+  const setups = ctx.repo.list('setups');
+  const choices = gearChoices({ settings, setups, session: ss });
   return card(
     { class: 'gear-card' },
-    APL.Section({ label: 'Equipment', id: 'gear', children: gearCards(ctx, { ...choices, onChange, snapshots }) }),
+    APL.Section({ label: 'Equipment', id: 'gear', children: gearCards(ctx, { ...choices, onChange, setups }) }),
   );
 }

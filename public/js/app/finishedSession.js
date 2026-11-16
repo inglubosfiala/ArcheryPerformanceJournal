@@ -88,16 +88,10 @@ export function createFinishedSessions({ repo, save, trash, restore: restoreReco
   const setMinutes = (id, typed) => change(id, () => ({ minutes: parseMinutes(typed) }));
 
   /**
-   * The equipment, by a choice of the gear picker: 'current' (the setup on the Equipment tab),
-   * 'none', a saved setup's id, or 'recorded' (keep what the session has: nothing changes).
+   * The equipment, by a choice of the gear picker: a setup's id (its fields are copied into the
+   * session), 'none', or 'recorded' (keep what the session has: nothing changes).
    */
-  const setGear = (id, choice) =>
-    change(id, () =>
-      gearForChoice(choice, {
-        settings: repo.getSettings(),
-        snapshots: repo.list('gearSnapshots'),
-      }),
-    );
+  const setGear = (id, choice) => change(id, () => gearForChoice(choice, { setups: repo.list('setups') }));
 
   /** Move the session to Recently deleted after a yes. */
   async function moveToDeleted(id) {

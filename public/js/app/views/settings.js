@@ -16,7 +16,7 @@ const THEMES = [
 ];
 const COLLECTION_LABELS = {
   sessions: 'Sessions',
-  gearSnapshots: 'Gear snapshots',
+  setups: 'Gear setups',
   competitions: 'Competitions',
 };
 

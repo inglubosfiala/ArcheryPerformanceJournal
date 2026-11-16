@@ -157,27 +157,27 @@ describe('conflicts and deletions', () => {
 });
 
 describe('settings', () => {
-  it('syncs the gear setup but not device-only settings', async () => {
+  it('syncs the active setup but not device-only settings', async () => {
     const phone = device(drive);
-    phone.repo.saveSettings({ gear: { riser: 'Hoyt' }, accent: '#1D4ED8' });
+    phone.repo.saveSettings({ activeSetupId: 'a', accent: '#1D4ED8' });
     await phone.sync();
     const tablet = device(drive);
     tablet.repo.saveSettings({ accent: '#B45309' });
     await tablet.sync();
-    expect(tablet.repo.getSettings().gear.riser).toBe('Hoyt');
+    expect(tablet.repo.getSettings().activeSetupId).toBe('a');
     expect(tablet.repo.getSettings().accent).toBe('#B45309');
     expect(drive.doc.settings.accent).toBeUndefined();
   });
 
-  it('the newer gear setup wins', async () => {
+  it('the newer choice of active setup wins', async () => {
     const phone = device(drive);
     const tablet = device(drive);
-    phone.repo.saveSettings({ gear: { riser: 'Old' } });
+    phone.repo.saveSettings({ activeSetupId: 'old' });
     tick();
-    tablet.repo.saveSettings({ gear: { riser: 'New' } });
+    tablet.repo.saveSettings({ activeSetupId: 'new' });
     await tablet.sync();
     await phone.sync();
-    expect(phone.repo.getSettings().gear.riser).toBe('New');
+    expect(phone.repo.getSettings().activeSetupId).toBe('new');
   });
 });
 
