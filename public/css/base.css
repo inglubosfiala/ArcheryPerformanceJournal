@@ -805,6 +805,81 @@ body {
   margin: -6px -10px -6px 0;
 }
 
+/* −/+ tile (common.js stepperTile): label on top, big value between 44px buttons, on sunken */
+.stepper-tile {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  padding: 8px 6px 6px;
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--border-soft);
+  background: var(--surface-sunken);
+}
+.stepper-label {
+  font: var(--type-label);
+  font-size: 12px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  text-align: center;
+  color: var(--muted);
+}
+.stepper-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 2px;
+}
+.stepper-btn {
+  flex-shrink: 0;
+  width: var(--tap-min);
+  height: var(--tap-min);
+  border-radius: var(--radius-pill);
+  border: none;
+  background: var(--surface);
+  color: var(--ink);
+  font: 400 22px/1 var(--font-sans);
+  cursor: pointer;
+  touch-action: manipulation;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+}
+.stepper-btn[aria-disabled='true'] {
+  color: var(--radio-off);
+  cursor: default;
+}
+.stepper-value {
+  flex: 1;
+  min-width: 0;
+  height: var(--tap-min);
+  border: none;
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: var(--ink);
+  padding: 0;
+  cursor: text;
+}
+.stepper-out {
+  font: 700 24px/1 var(--font-sans);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.stepper-unit {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--muted);
+}
+.stepper-input {
+  flex: 1;
+  min-width: 0;
+  width: 100%;
+  height: var(--tap-min);
+  text-align: center;
+  font: 700 20px/1 var(--font-sans);
+  font-variant-numeric: tabular-nums;
+}
+
 /* ---------------------------------------------------------------- Insights */
 /* wide layout on a desktop browser */
 .app.app-wide {
