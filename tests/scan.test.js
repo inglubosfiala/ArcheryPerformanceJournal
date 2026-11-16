@@ -215,6 +215,21 @@ describe('a photo: two looks', () => {
     expect(photos.a.closed).toBe(true);
   });
 
+  it('shows the kept look drawn again as sharp as the photo allows, with the found arrows moved to match', async () => {
+    detector = (p) => (isWhole(p) ? wholeRes() : closeUpRes());
+    await make().start();
+    expect(detected).toHaveLength(2); // the sharp picture is only shown, not analysed again
+    const { picture, found } = asked[1][1];
+    // the close-up (260 × 700 on the photo) was analysed at 640 / 700; shown at full size
+    expect(picture).toMatchObject({ box: { x: 510, y: 130, w: 260, h: 700 }, scale: 1, width: 260, height: 700 });
+    const k = 700 / 640;
+    expect(found.spots[1].outer.cx).toBeCloseTo(200 * k, 9);
+    expect(found.spots[1].outer.rx).toBeCloseTo(50 * k, 9);
+    const a = found.arrows[0];
+    expect(a.image.x).toBeCloseTo(pictureFromFace(triple()[1].outer, a).x * k, 9);
+    expect(found.scores()).toEqual(['X']);
+  });
+
   it('drops the close-up when it finds fewer spots, or no face', async () => {
     detector = (p) => (isWhole(p) ? wholeRes() : closeUpRes(triple().slice(0, 2)));
     await make().start();
