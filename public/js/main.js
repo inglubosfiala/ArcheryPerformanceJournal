@@ -27,8 +27,9 @@ import { T } from './app/strings.js';
 import { icons } from './app/icons.js';
 import * as L from './app/sessionLogic.js';
 import { TYPE_LABELS, sessionType } from './app/sessionTypes.js';
+import { doneSets } from './app/gym.js';
 import { guideSheet } from './app/views/common.js';
-import { renderLog, renderNewSession, renderBlankBale, askAboutRunningSession, askAboutOpenFormSession } from './app/views/log.js';
+import { renderLog, renderNewSession, renderBlankBale, renderGym, askAboutRunningSession, askAboutOpenFormSession } from './app/views/log.js';
 import * as APL from './ui/apl/index.js';
 import { startTimerTicker } from './app/views/timer.js';
 import { createRunningSession } from './app/runningSession.js';
@@ -88,7 +89,7 @@ const TABS = [
   ['gear', T.tabs.gear, icons.gear],
   ['settings', T.tabs.settings, icons.settings],
 ];
-const VIEWS = { home: renderDashboard, insights: renderInsights, log: renderLog, new: renderNewSession, blank: renderBlankBale, history: renderHistory, gear: renderGear, settings: renderSettings };
+const VIEWS = { home: renderDashboard, insights: renderInsights, log: renderLog, new: renderNewSession, blank: renderBlankBale, gym: renderGym, history: renderHistory, gear: renderGear, settings: renderSettings };
 
 let route = { name: 'home', params: [] };
 let shell;
@@ -131,7 +132,7 @@ function renderNow({ scrollTop = false } = {}) {
   shell.app.classList.toggle('app-wide', route.name === 'insights');
   for (const [name, el] of Object.entries(shell.tabButtons)) {
     // the new-session setup and the running session are opened from the Dashboard, so its tab stays marked
-    if (name === route.name || (name === 'home' && (route.name === 'new' || route.name === 'log' || route.name === 'blank'))) el.setAttribute('aria-current', 'page');
+    if (name === route.name || (name === 'home' && (route.name === 'new' || route.name === 'log' || route.name === 'blank' || route.name === 'gym'))) el.setAttribute('aria-current', 'page');
     else el.removeAttribute('aria-current');
   }
 
@@ -222,14 +223,22 @@ function renderRunning() {
     );
   }
   for (const f of ctx.openForms.list()) {
-    // not on its own page: the blank bale's (#/blank), or the form of SPT / mental (#/new/<type>)
-    if (f.type === 'blank' ? route.name === 'blank' : route.name === 'new' && route.params[0] === f.type) continue;
+    // not on its own page: the blank bale's (#/blank), the gym's (#/gym), or the form of SPT / mental
+    // (#/new/<type>)
+    const ownPage = f.type === 'blank' || f.type === 'gym' ? f.type : null;
+    if ((ownPage && route.name === ownPage) || (route.name === 'new' && route.params[0] === f.type)) continue;
     const arrows = f.draft?.arrows || 0;
+    const sets = f.type === 'gym' ? doneSets(f.draft?.exercises) : 0;
     items.push(
       bar({
-        href: f.type === 'blank' ? '#/blank' : `#/new/${f.type}`,
+        href: ownPage ? `#/${ownPage}` : `#/new/${f.type}`,
         title: `${TYPE_LABELS[f.type]} running`,
-        detail: f.type === 'blank' ? `${arrows} ${arrows === 1 ? 'arrow' : 'arrows'}` : null,
+        detail:
+          f.type === 'blank'
+            ? `${arrows} ${arrows === 1 ? 'arrow' : 'arrows'}`
+            : f.type === 'gym'
+              ? `${sets} ${sets === 1 ? 'set' : 'sets'}`
+              : null,
         timer: f.timer,
         fk: `running-${f.type}`,
       }),
@@ -330,7 +339,7 @@ const router = createRouter((r) => {
   }
   const changed = r.name !== route.name || r.params.join('/') !== route.params.join('/');
   route = r;
-  if (changed) ui.quietSet({ importPreview: null, gearMenu: null, gearEdit: null, sightMenu: null, sightEdit: null, ov: null });
+  if (changed) ui.quietSet({ importPreview: null, gearMenu: null, gearEdit: null, sightMenu: null, sightEdit: null, ov: null, gymMenu: null, gymRename: null, gymOther: null });
   renderNow({ scrollTop: changed });
   if (changed && auth.configured && auth.isSignedIn() && !auth.getToken()) renewIfSafe();
 });

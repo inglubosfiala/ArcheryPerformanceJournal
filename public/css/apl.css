@@ -2784,3 +2784,215 @@ a.apl-sessionrow:hover {
 .ov-actions--even {
   grid-template-columns: repeat(2, minmax(0, 1fr));
 }
+
+/* ---------------------------------------------------------------- running gym session (gymForm.js) */
+.gym-body {
+  gap: 12px;
+}
+.gym-card {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px;
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--border);
+  background: var(--surface);
+}
+.gym-card.is-complete {
+  border-color: var(--accent-tint-border);
+}
+.gym-card-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.gym-card-text {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.gym-card-name {
+  margin: 0;
+  font-size: 16px;
+  line-height: 22px;
+  font-weight: 700;
+  overflow-wrap: anywhere;
+}
+.gym-name-input {
+  height: 44px;
+  padding: 0 12px;
+  font: inherit;
+  font-size: 16px;
+  font-weight: 600;
+  width: 100%;
+  box-sizing: border-box;
+}
+.gym-more {
+  width: 44px;
+  height: 44px;
+  flex-shrink: 0;
+  border: none;
+  border-radius: var(--radius-pill);
+  background: transparent;
+  color: var(--muted);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.gym-more[aria-expanded='true'] {
+  background: var(--surface-sunken);
+  color: var(--ink);
+}
+.gym-menu {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px;
+}
+.gym-menu-item {
+  min-height: 44px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border);
+  background: var(--surface-sunken);
+  color: var(--ink);
+  font: inherit;
+  font-size: 14px;
+  font-weight: 600;
+}
+.gym-menu-item.danger {
+  color: var(--danger);
+}
+.gym-menu-item:disabled {
+  color: var(--muted);
+  border-style: dashed;
+}
+.gym-sets {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.gym-set {
+  display: grid;
+  grid-template-columns: 44px minmax(0, 1fr) minmax(0, 1fr);
+  gap: 8px;
+  align-items: center;
+}
+.gym-done {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  border: 2px solid var(--border-dashed);
+  background: transparent;
+  color: var(--ink-soft);
+  font: inherit;
+  font-size: 15px;
+  font-weight: 800;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+}
+.gym-done[aria-pressed='true'] {
+  border-color: var(--accent);
+  background: var(--accent);
+  color: var(--on-accent);
+}
+.gym-step {
+  display: grid;
+  grid-template-columns: 44px minmax(0, 1fr) 44px;
+  align-items: center;
+  height: 44px;
+  border-radius: var(--radius-md);
+  background: var(--surface-sunken);
+}
+.gym-step-btn {
+  width: 44px;
+  height: 44px;
+  border: none;
+  background: transparent;
+  color: var(--ink);
+  font: inherit;
+  font-size: 20px;
+  padding: 0;
+}
+.gym-step-value {
+  height: 44px;
+  min-width: 0;
+  border: none;
+  background: transparent;
+  color: var(--ink);
+  font: inherit;
+  font-size: 16px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  padding: 0;
+  white-space: nowrap;
+}
+.gym-step-unit {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--muted);
+}
+.gym-step.is-dim .gym-step-value {
+  color: var(--muted);
+}
+.gym-step-input {
+  height: 40px;
+  width: 100%;
+  box-sizing: border-box;
+  text-align: center;
+  font: inherit;
+  font-size: 16px;
+  font-weight: 700;
+  padding: 0 4px;
+}
+.gym-add-set,
+.gym-chip {
+  min-height: 44px;
+  padding: 0 14px;
+  border-radius: var(--radius-pill);
+  border: 1px dashed var(--border-dashed);
+  background: transparent;
+  color: var(--accent-bright);
+  font: inherit;
+  font-size: 14px;
+  font-weight: 600;
+}
+.gym-add-set {
+  align-self: flex-start;
+}
+.gym-chip--other {
+  border-style: solid;
+  border-color: var(--border);
+  background: var(--surface);
+  color: var(--ink);
+}
+.gym-add {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.gym-add .apl-label {
+  margin: 0;
+}
+.gym-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.gym-other {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px;
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--border);
+  background: var(--surface);
+}
+.gym-other-actions {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 8px;
+}

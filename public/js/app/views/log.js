@@ -22,6 +22,8 @@ import { renderFormSetup } from './sessionSetup.js';
 import { renderTypeChoice, renderStrengthChoice, renderShootingSetup } from './shootingSetup.js';
 import { renderBlankRunning } from './blankBale.js';
 import { renderGymSetup } from './gymSetup.js';
+import { renderGymRunning } from './gymRunning.js';
+import { doneSets } from '../gym.js';
 import { SHOOTING_KINDS } from '../lastSetup.js';
 import { sessionTimer } from './timer.js';
 import * as APL from '../../ui/apl/index.js';
@@ -77,6 +79,7 @@ export function askAboutOpenFormSession(q) {
     const { type, fields, minutes } = q;
     const facts = [
       type === 'blank' || type === 'manual' ? `${fields.arrows || 0} ${fields.arrows === 1 ? 'arrow' : 'arrows'}` : null,
+      type === 'gym' ? `${doneSets(fields.exercises)} ${doneSets(fields.exercises) === 1 ? 'set' : 'sets'}` : null,
       minutes != null ? `${minutes} min` : null,
     ].filter(Boolean);
     return confirmDialog({
@@ -127,6 +130,15 @@ export function renderBlankBale(ctx) {
   queueMicrotask(() => ctx.navigate('new/shooting/blank', { replace: true }));
   return renderShootingSetup(ctx, 'blank');
 }
+
+/** The running gym session (#/gym); none open: the Gym setup page. */
+export function renderGym(ctx) {
+  const open = ctx.openForms.list().find((f) => f.type === 'gym');
+  if (open) return renderGymRunning(ctx, open);
+  queueMicrotask(() => ctx.navigate('new/gym', { replace: true }));
+  return renderGymSetup(ctx);
+}
+
 /** Apply a session transition to the running session; the page is drawn again when it changed. */
 function update(ctx, fn, { rerender = true } = {}) {
   const changed = ctx.running.apply(fn);
