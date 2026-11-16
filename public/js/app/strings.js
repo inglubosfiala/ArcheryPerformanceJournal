@@ -70,6 +70,7 @@ export const T = {
   cannotBeUndone: 'cannot be undone',
   finishInstead: 'Finish and save instead',
   endSaved: (n, total) => `End ${n} saved, total ${total}`,
+  endDetails: (n) => `End ${n} details`,
   mentalProgram: 'Mental program (M)',
   shootingCycle: 'Shooting cycle (S)',
   gradingGuide: 'Grading guide',

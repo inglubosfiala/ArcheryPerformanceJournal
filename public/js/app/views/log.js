@@ -12,7 +12,7 @@ import {
   faceLabel,
 } from '../scoring.js';
 import { sumArrows, computeStats, fmt } from '../stats.js';
-import { endSum, endRows, sessionCounts } from '../endSummary.js';
+import { endSum, endRows, sessionCounts, scoringHint } from '../endSummary.js';
 import * as L from '../sessionLogic.js';
 import { T } from '../strings.js';
 import { icons } from '../icons.js';
@@ -278,31 +278,44 @@ function renderActive(ctx, session) {
     },
   });
 
-  // --- under the face, in one place: the score keypad while the selected arrow has no score, else
-  // its M / S grades
-  const under =
-    picked.v == null
-      ? h(
-          'div',
-          { class: 'score-under' },
-          h('div', { class: 'or-divider' }, h('span', null, T.scoreOnly)),
-          APL.ScoreKeypad({
-            label: 'Score without position',
-            keys: ['X', 10, 9, 8, 7, 6, 'M'].map((k) => ({
-              value: k,
-              zone: zoneOf(k),
-              ariaLabel: `Score ${k === 'M' ? 'miss' : k}`,
-            })),
-            value: picked.v,
-            onKey: (k) => enter(k, null, null),
-            fk: 'quick',
-          }),
-        )
-      : h(
-          'div',
-          { class: 'score-under' },
-          gradePanel(session, { onGrade: (kind, g) => update(ctx, (c) => L.gradeArrow(c, kind, g)) }),
-        );
+  // --- under the face, always both: the score keypad (a score without a position, today's entry)
+  // and the selected arrow's M / S grades
+  const under = h(
+    'div',
+    { class: 'score-under' },
+    APL.ScoreKeypad({
+      label: 'Score without position',
+      keys: ['X', 10, 9, 8, 7, 6, 'M'].map((k) => ({
+        value: k,
+        zone: zoneOf(k),
+        ariaLabel: `Score ${k === 'M' ? 'miss' : k}`,
+      })),
+      value: picked.v,
+      onKey: (k) => enter(k, null, null),
+      fk: 'quick',
+    }),
+    gradePanel(session, { onGrade: (kind, g) => update(ctx, (c) => L.gradeArrow(c, kind, g)) }),
+  );
+
+  // --- the end's let-downs and note (one sheet), and what to do next
+  const chip = (label, fk, ...children) =>
+    h(
+      'button',
+      { type: 'button', class: 'score-chip-btn', 'aria-haspopup': 'dialog', 'aria-label': label, onClick: () => setSheet('details'), dataset: { fk } },
+      ...children,
+    );
+  const chips = h(
+    'div',
+    { class: 'score-chips' },
+    chip(
+      `${T.letDowns} ${current.ld}, correct ${current.cld}. ${T.endDetails(endNo)}`,
+      'details-ld',
+      T.letDowns,
+      h('strong', null, `${current.ld} · ${current.cld}`),
+    ),
+    chip(`${T.noteForEnd}${current.note ? ' (written)' : ''}. ${T.endDetails(endNo)}`, 'details-note', icons.pencil(), 'Note', current.note ? h('span', { class: 'score-chip-dot', 'aria-hidden': 'true' }) : null),
+    h('span', { class: 'score-hint' }, scoringHint(session)),
+  );
 
   // --- bottom bar, in thumb reach: Previous / Next end, and Scan (the most used) at the end.
   // There is no Save end step (every change is saved as it is made): Next opens the next end, and
@@ -328,7 +341,7 @@ function renderActive(ctx, session) {
     fk: 'end-next',
   });
 
-  // --- end details, below the end (reached by scrolling)
+  // --- the End n details sheet: let-downs, correct let-downs and the note (same handlers as before)
   const stepper = (key, label) =>
     APL.Section({
       label,
@@ -342,18 +355,34 @@ function renderActive(ctx, session) {
       }),
     });
 
-  const details = card(
-    { class: 'end-details' },
-    h('div', { class: 'apl-grid-2' }, stepper('ld', T.letDowns), stepper('cld', T.correctLetDowns)),
-    APL.TextArea({
-      label: T.noteForEnd,
-      rows: 2,
-      placeholder: T.notePh,
-      value: current.note,
-      fk: 'note',
-      onInput: (e) => update(ctx, (c) => L.setNote(c, e.target.value), { rerender: false }),
-    }),
-  );
+  const detailsSheet = () => {
+    const close = () => setSheet(null);
+    return {
+      onClose: close,
+      returnFk: 'details-ld',
+      node: APL.Dialog({
+        sheet: true,
+        title: T.endDetails(endNo),
+        idPrefix: 'score-details',
+        onClose: close,
+        closeLabel: 'Close',
+        children: h(
+          'div',
+          { class: 'end-details' },
+          h('div', { class: 'apl-grid-2' }, stepper('ld', T.letDowns), stepper('cld', T.correctLetDowns)),
+          APL.TextArea({
+            label: T.noteForEnd,
+            rows: 3,
+            placeholder: T.notePh,
+            value: current.note,
+            fk: 'note',
+            onInput: (e) => update(ctx, (c) => L.setNote(c, e.target.value), { rerender: false }),
+          }),
+          APL.Button({ children: 'Done', onClick: close, fk: 'details-done' }),
+        ),
+      }),
+    };
+  };
 
   // --- the session's ends, newest first: the end being shot is listed from the moment it opens
   // (even empty); every change to it is saved as it is made
@@ -414,8 +443,7 @@ function renderActive(ctx, session) {
       h(
         'div',
         { class: 'apl-screen-body log-body' },
-        h('section', { class: 'score-screen', 'aria-label': T.endN(endNo) }, header, strip, input, under),
-        details,
+        h('section', { class: 'score-screen', 'aria-label': T.endN(endNo) }, header, strip, input, under, chips),
         card(
           { class: 'card-list', 'aria-label': T.ends },
           // the session's total, just over its ends
@@ -425,7 +453,7 @@ function renderActive(ctx, session) {
       ),
       APL.BottomBar({ children: h('div', { class: 'score-actions' }, prevBtn, nextBtn, photoButton(ctx, session)) }),
     ),
-    overlay: scoreOverlay(ctx, session, { sheet, setSheet }),
+    overlay: sheet === 'details' ? detailsSheet() : scoreOverlay(ctx, session, { sheet, setSheet }),
   };
 }
 

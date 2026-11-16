@@ -2422,15 +2422,51 @@ button.arrow-count:hover {
   font-size: 11px;
 }
 
-/* the face: a row over a multi-spot sheet, then the stage (the loupe docks inside it) */
-.score-face {
-  align-items: stretch;
-  gap: var(--space-1);
+/* Scoring v2: the end fills the scrolling main area down to the bottom bar, without scrolling.
+   The main area is a size container, so the end can be exactly as tall as it; the face takes
+   whatever height the rows around it leave (edge to edge), and Total follows by scrolling. */
+.main:has(> .apl-screen .score-screen) {
+  container-type: size;
 }
 
+.apl-screen:has(.score-screen) > .apl-bar {
+  --score-bar-pad: 8px;
+  padding: var(--score-bar-pad) var(--space-5);
+}
+
+.log-body:has(.score-screen) {
+  padding-top: 0;
+}
+
+.score-screen {
+  /* the main area's height less the bottom bar (56px button + its padding + its top border) */
+  height: calc(100cqh - var(--tap-primary) - 2 * 8px - 1px);
+  min-height: 560px;
+  gap: 6px;
+}
+
+/* the face: a row over a multi-spot sheet, then the stage (the loupe docks inside it) */
+.score-face {
+  flex: 1 1 0;
+  min-height: 180px;
+  margin-inline: calc(-1 * var(--space-5));
+  align-items: stretch;
+  gap: var(--space-1);
+  container-type: size;
+}
+
+.score-face .face-bar {
+  padding-inline: var(--space-5);
+}
+
+/* the square stage: as large as the face's box allows (less the row over a multi-spot sheet) */
 .score-face .target-stage {
   align-self: center;
-  width: min(100%, 560px, max(230px, calc(100dvh - 470px)));
+  width: min(100cqw, 100cqh, 560px);
+}
+
+.score-face:has(.face-bar) .target-stage {
+  width: min(100cqw, 100cqh - var(--tap-min) - var(--space-1), 560px);
 }
 
 .face-bar {
@@ -2478,37 +2514,82 @@ button.arrow-count:hover {
   display: none;
 }
 
-/* under the face, in one place: the score keypad or the M / S grades */
+/* under the face, always both: the score keypad (X … M) and the M / S grades */
 .score-under {
   display: flex;
   flex-direction: column;
-  gap: var(--space-2);
+  gap: 6px;
 }
 
-.or-divider {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  font: var(--type-caption);
-  color: var(--muted);
+.score-under .apl-keypad {
+  gap: 6px;
 }
 
-.or-divider::before,
-.or-divider::after {
-  content: '';
-  flex: 1;
-  height: 1px;
-  background: var(--border-soft);
-}
-
-.score-under .apl-keypad .apl-key {
-  min-height: 48px;
+.score-under .apl-keypad .apl-key,
+.score-under .grade-panel .apl-key {
+  min-height: var(--tap-min);
+  height: var(--tap-min);
 }
 
 .score-under .grade-panel {
   border-top: 0;
   padding-top: 0;
-  gap: var(--space-2);
+  gap: 6px;
+}
+
+.score-under .apl-grades {
+  grid-template-columns: 20px repeat(var(--apl-cols, 5), minmax(0, 1fr));
+  gap: 6px;
+}
+
+/* Let-downs a · b and Note (both open End n details), and the hint on the right */
+.score-chips {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: var(--tap-min);
+}
+
+.score-chip-btn {
+  flex: none;
+  height: var(--tap-min);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-pill);
+  background: var(--surface);
+  color: var(--ink);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.score-chip-btn strong {
+  font-weight: 800;
+}
+
+.score-chip-btn svg {
+  width: 14px;
+  height: 14px;
+}
+
+.score-chip-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--accent-bright);
+}
+
+.score-hint {
+  flex: 1;
+  min-width: 0;
+  text-align: right;
+  font-size: 13px;
+  color: var(--muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 /* let-down counters fill their column: − at the left edge, the count centred, + at the right edge */
