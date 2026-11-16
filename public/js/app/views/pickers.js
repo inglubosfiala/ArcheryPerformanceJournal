@@ -1,6 +1,6 @@
-// Date and time pickers: a field showing the value that opens a panel below it (a month calendar,
-// or hour and minute grids). The panel manages its own DOM while open (paging, keyboard focus) and
-// only calls `onChange` when a value is picked, so the page re-renders once, with the new value.
+// Date and time pickers: a field showing the value. The date field opens a month calendar below it,
+// the time field a bottom sheet. Each manages its own DOM while open (paging, stepping, keyboard focus)
+// and only calls `onChange` when a value is picked, so the page re-renders once, with the new value.
 import { h, formatDate, todayIso } from '../../core/dom.js';
 import {
   addDays,
@@ -11,18 +11,32 @@ import {
   clampIso,
   weekdayMon,
 } from '../../core/calendar.js';
+import {
+  parseTime,
+  formatTime,
+  timeOf,
+  dateOf,
+  addMinutes,
+  addHours,
+  withMinute,
+  withHour,
+  parseTyped,
+  maxTime,
+  isAfterMax,
+  quickTimes,
+  timeHint,
+} from '../timeMath.js';
 import { icons } from '../icons.js';
 import { Icon } from '../../ui/apl/index.js';
 
 const WEEKDAYS = ['Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa', 'Su'];
 const WEEKDAYS_FULL = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
 const LONG_DATE = { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' };
-const pad = (n) => String(n).padStart(2, '0');
 
 let uid = 0;
 
 /**
- * Field + popup panel shared by the pickers: opens on tap, closes on Escape, an outside tap or focus
+ * Field + popup panel of the date picker: opens on tap, closes on Escape, an outside tap or focus
  * leaving it. `render(focus)` fills the panel each time it opens.
  * The field is an APL FieldButton: `field` ({ icon, value, hint }) gives its accent-bright icon and
  * the value over the hint.
@@ -30,29 +44,14 @@ let uid = 0;
 function popupField({ fieldClass, ariaLabel, dialogLabel, fk, render, field }) {
   const id = `pk-${++uid}`;
   let open = false;
-  const content = [
-    Icon({ name: field.icon }),
-    h(
-      'span',
-      { class: 'apl-stack' },
-      h('span', { class: 'apl-t' }, field.value),
-      field.hint ? h('span', { class: 'apl-cap' }, field.hint) : null,
-    ),
-  ];
-  const trigger = h(
-    'button',
-    {
-      type: 'button',
-      class: ['apl', 'apl-field', 'picker-apl', fieldClass],
-      'aria-haspopup': 'dialog',
-      'aria-expanded': 'false',
-      'aria-controls': id,
-      'aria-label': ariaLabel,
-      dataset: fk ? { fk } : undefined,
-      onClick: () => (open ? close() : show()),
-    },
-    content,
-  );
+  const trigger = fieldButton({
+    fieldClass,
+    ariaLabel,
+    fk,
+    field,
+    controls: id,
+    onClick: () => (open ? close() : show()),
+  });
   const panel = h('div', {
     class: 'picker-panel',
     id,
@@ -102,24 +101,35 @@ function popupField({ fieldClass, ariaLabel, dialogLabel, fk, render, field }) {
   return { wrap, panel, close };
 }
 
+/** The field button of a picker (an APL FieldButton): its accent-bright icon, the value over the hint. */
+function fieldButton({ fieldClass, ariaLabel, fk, field, controls = null, onClick }) {
+  return h(
+    'button',
+    {
+      type: 'button',
+      class: ['apl', 'apl-field', 'picker-apl', fieldClass],
+      'aria-haspopup': 'dialog',
+      'aria-expanded': 'false',
+      'aria-controls': controls,
+      'aria-label': ariaLabel,
+      dataset: fk ? { fk } : undefined,
+      onClick,
+    },
+    Icon({ name: field.icon }),
+    h(
+      'span',
+      { class: 'apl-stack' },
+      h('span', { class: 'apl-t' }, field.value),
+      field.hint ? h('span', { class: 'apl-cap' }, field.hint) : null,
+    ),
+  );
+}
+
 /** The APL field of a date: "Today" / "Yesterday" over the day, or the day over its year. */
 function aplDate(value, today) {
   const day = formatDate(value, { weekday: 'short', day: 'numeric', month: 'short' });
   const named = value === today ? 'Today' : value === addDays(today, -1) ? 'Yesterday' : null;
   return { icon: 'calendar', value: named || day, hint: named ? day : value.slice(0, 4) };
-}
-
-/** Arrow keys move focus between the buttons of a grid with `cols` columns. */
-function gridKeys(container, cols) {
-  container.addEventListener('keydown', (e) => {
-    const step = { ArrowLeft: -1, ArrowRight: 1, ArrowUp: -cols, ArrowDown: cols }[e.key];
-    if (!step) return;
-    const items = [...container.querySelectorAll('button:not(:disabled)')];
-    const i = items.indexOf(document.activeElement);
-    if (i < 0) return;
-    e.preventDefault();
-    items[Math.min(items.length - 1, Math.max(0, i + step))].focus();
-  });
 }
 
 /**
@@ -301,16 +311,82 @@ export function datePicker({
   return wrap;
 }
 
+const HOLD_DELAY_MS = 400; // a held ▲ / ▼ starts repeating after this
+const HOLD_REPEAT_MS = 80; // …then steps this often
+const HOLD_FAST_MS = 40; // …and this often once held for HOLD_FAST_AFTER_MS
+const HOLD_FAST_AFTER_MS = 1500;
+const SWIPE_CLOSE_PX = 80; // dragging the sheet's top down this far cancels it
+const pad2 = (n) => String(n).padStart(2, '0');
+
+/** "Today · Mon 16 Nov", "Yesterday · Sun 15 Nov", or "Sun 8 Nov 2026". */
+function dateContext(date, now) {
+  if (!date) return '';
+  const today = dateOf(now);
+  const day = formatDate(date, { weekday: 'short', day: 'numeric', month: 'short' });
+  const named = date === today ? 'Today' : date === addDays(today, -1) ? 'Yesterday' : null;
+  return named
+    ? `${named} · ${day}`
+    : formatDate(date, { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' });
+}
+
 /**
- * Time field (24-hour) with hour and minute grids: pick the hour, then the minute (5-minute steps,
- * fine-tuned with −1 / +1). Picking a minute or Set saves; Now takes the clock's time.
+ * A ▲ / ▼ button: one step on a tap, repeating while held (after HOLD_DELAY_MS, faster after
+ * HOLD_FAST_AFTER_MS). Keyboard users step with the spinbutton's arrow keys, so it is no tab stop.
+ */
+function stepButton(dir, label, onStep) {
+  let timer = null;
+  const stop = () => {
+    clearTimeout(timer);
+    timer = null;
+  };
+  const btn = h(
+    'button',
+    {
+      type: 'button',
+      class: ['tp-step', dir === 'up' ? 'is-up' : 'is-down'],
+      tabindex: '-1',
+      'aria-label': label,
+    },
+    Icon({ name: 'chevron', size: 28, strokeWidth: 2.4 }),
+  );
+  btn.addEventListener('pointerdown', (e) => {
+    if (e.button !== 0) return;
+    e.preventDefault(); // no focus move, no text selection
+    btn.setPointerCapture?.(e.pointerId);
+    const held = Date.now();
+    onStep();
+    const tick = () => {
+      onStep();
+      timer = setTimeout(tick, Date.now() - held > HOLD_FAST_AFTER_MS ? HOLD_FAST_MS : HOLD_REPEAT_MS);
+    };
+    timer = setTimeout(tick, HOLD_DELAY_MS);
+  });
+  for (const ev of ['pointerup', 'pointercancel', 'lostpointercapture']) btn.addEventListener(ev, stop);
+  btn.addEventListener('contextmenu', (e) => e.preventDefault()); // a long press is a hold, not a menu
+  // a click from the keyboard or a screen reader (a pointer already stepped on pointerdown)
+  btn.addEventListener('click', (e) => {
+    if (e.detail === 0) onStep();
+  });
+  return btn;
+}
+
+/**
+ * Time field (24-hour) that opens a bottom sheet: quick chips (Now · −15 min · −30 min · −1 h), a big
+ * HH : MM with ▲ / ▼ per part (hold to repeat, tap the digits to type), round-minute chips, a hint and
+ * Cancel / Set. Esc, a tap on the scrim or a swipe down cancels; focus returns to the field.
  * @param {object} o
  * @param {string} o.value      'HH:MM', or '' / null for no time
- * @param {(time: string|null) => void} o.onChange
- * @param {boolean} [o.clearable] offer Clear (the time is optional)
- * @param {string} [o.label]
- * @param {string} [o.fk]
- * @param {string} [o.hint]     the line under the time ("Now", "Start time")
+ * @param {(time: string|null) => void} o.onChange  the time set, or null when cleared
+ * @param {boolean} [o.clearable] offer "Clear time" (the time is optional)
+ * @param {string} [o.label]    the field's name and the sheet's title
+ * @param {string} [o.fk]       focus key, so focus returns to the field after the re-render
+ * @param {string} [o.hint]     the line under the time in the field ("Now", "Start time")
+ * @param {string} [o.date]     ISO date the time belongs to; today: quick chips relative to now, and
+ *                              times later than now are blocked
+ * @param {string} [o.max]      latest time allowed, 'HH:MM' (default: now when `date` is today)
+ * @param {boolean} [o.quick]   show the quick chips (only ever for today)
+ * @param {boolean} [o.timer]   the page starts a session timer from this time: the hint says where
+ *                              it starts (false: the hint only says how long ago)
  */
 export function timePicker({
   value,
@@ -319,159 +395,307 @@ export function timePicker({
   label = 'Start time',
   fk,
   hint = 'Start time',
+  date = null,
+  max = null,
+  quick = true,
+  timer = true,
 }) {
-  const now = () => {
-    const d = new Date();
-    return { hh: d.getHours(), mm: d.getMinutes() };
-  };
-  const parse = (t) => {
-    const m = /^(\d{2}):(\d{2})$/.exec(t || '');
-    return m ? { hh: Number(m[1]), mm: Number(m[2]) } : null;
-  };
-  let draft = parse(value) || now();
-  let part = 'hh'; // the grid shown: hours or minutes
-  const fmt = (t) => `${pad(t.hh)}:${pad(t.mm)}`;
-
-  const { wrap, panel, close } = popupField({
+  const trigger = fieldButton({
     fieldClass: ['time-field', !value && 'is-empty'],
     ariaLabel: `${label}: ${value || 'not set'}`,
-    dialogLabel: `Choose ${label.toLowerCase()}`,
     fk,
     field: { icon: 'clock', value: value || 'No time', hint },
-    render: ({ focus }) => {
-      draft = parse(value) || now();
-      part = 'hh';
-      render({ focus });
-    },
+    onClick: () => openSheet(),
   });
-  panel.classList.add('tp');
 
-  const commit = (t) => {
-    close();
-    if (t !== (value || null)) onChange(t);
-  };
+  function openSheet() {
+    const id = `tp-${++uid}`;
+    const now = () => new Date();
+    let draft = parseTime(value) ?? parseTime(timeOf(now()));
+    let typing = false;
+    let typedError = false;
+    let result; // undefined: cancelled; a time, or null (cleared): picked
 
-  const nudge = (n) => {
-    const total = (draft.hh * 60 + draft.mm + n + 1440) % 1440;
-    draft = { hh: Math.floor(total / 60), mm: total % 60 };
-    render({ keep: true });
-  };
+    const set = (min) => {
+      draft = min;
+      typedError = false;
+      update();
+    };
+    const bound = () => maxTime(date, max, now());
+    const tooLate = () => isAfterMax(formatTime(draft), bound());
 
-  function render({ focus = false, keep = false } = {}) {
-    const keepFocus =
-      keep && panel.contains(document.activeElement) ? document.activeElement.dataset.tk : null;
-    const seg = (key, text, name) =>
-      h(
-        'button',
-        {
-          type: 'button',
-          class: ['tp-seg', part === key && 'is-on'],
-          'aria-pressed': String(part === key),
-          'aria-label': `${name} ${text}`,
-          dataset: { tk: `seg-${key}` },
-          onClick: () => {
-            part = key;
-            render({ focus: true });
-          },
-        },
-        text,
-      );
-    const cell = (n, on, onClick, name) =>
-      h(
-        'button',
-        {
-          type: 'button',
-          class: ['tp-cell', on && 'is-selected'],
-          'aria-label': name,
-          'aria-pressed': String(on),
-          dataset: { tk: `c-${n}` },
-          onClick,
-        },
-        pad(n),
-      );
-    const grid =
-      part === 'hh'
-        ? h(
-            'div',
-            { class: 'tp-grid tp-hours', role: 'group', 'aria-label': 'Hour' },
-            Array.from({ length: 24 }, (_, n) =>
-              cell(
-                n,
-                n === draft.hh,
-                () => {
-                  draft = { ...draft, hh: n };
-                  part = 'mm';
-                  render({ focus: true });
-                },
-                `${pad(n)} hours`,
-              ),
-            ),
-          )
-        : h(
-            'div',
-            { class: 'tp-grid tp-minutes', role: 'group', 'aria-label': 'Minute' },
-            Array.from({ length: 12 }, (_, i) => i * 5).map((n) =>
-              cell(n, n === draft.mm, () => commit(fmt({ ...draft, mm: n })), `${pad(n)} minutes`),
-            ),
-          );
-    gridKeys(grid, 6);
-    panel.replaceChildren(
-      h(
-        'div',
-        { class: 'tp-head' },
+    // ---- header
+    const title = h('h2', { class: 'tp-title', id: `${id}-title` }, label);
+    const context = dateContext(date, now());
+    const head = h(
+      'div',
+      { class: 'tp-head' },
+      title,
+      context ? h('span', { class: 'tp-date' }, context) : null,
+    );
+
+    // ---- quick chips (today only)
+    const showQuick = quick && !!date && date === dateOf(now());
+    const quickBtns = showQuick
+      ? quickTimes(formatTime(draft), now()).map((q, i) =>
+          h(
+            'button',
+            {
+              type: 'button',
+              class: 'tp-chip',
+              'aria-pressed': 'false',
+              onClick: () => set(parseTime(quickTimes(formatTime(draft), now())[i].time)),
+            },
+            q.label,
+          ),
+        )
+      : [];
+    const quickRow = showQuick
+      ? h('div', { class: 'tp-quick', role: 'group', 'aria-label': 'Quick times' }, quickBtns)
+      : null;
+
+    // ---- HH : MM: two spinbuttons; a tap (or a digit, or Enter) types the time instead
+    const spin = (name, valueMax, keys) => {
+      const el = h('div', {
+        class: 'tp-num',
+        role: 'spinbutton',
+        tabindex: '0',
+        'aria-label': name,
+        'aria-valuemin': '0',
+        'aria-valuemax': String(valueMax),
+        'aria-describedby': `${id}-hint`,
+      });
+      el.addEventListener('keydown', (e) => {
+        const step = keys[e.key];
+        if (step) {
+          e.preventDefault();
+          set(step(draft));
+        } else if (e.key === 'Enter' || /^\d$/.test(e.key)) {
+          e.preventDefault();
+          startTyping(/^\d$/.test(e.key) ? e.key : null);
+        }
+      });
+      el.addEventListener('click', () => startTyping());
+      return el;
+    };
+    const tenMinutes = { PageUp: (d) => addMinutes(d, 10), PageDown: (d) => addMinutes(d, -10) };
+    const hourNum = spin('Hour', 23, {
+      ArrowUp: (d) => addHours(d, 1),
+      ArrowDown: (d) => addHours(d, -1),
+      Home: (d) => withHour(d, 0),
+      End: (d) => withHour(d, 23),
+      ...tenMinutes,
+    });
+    const minuteNum = spin('Minute', 59, {
+      ArrowUp: (d) => addMinutes(d, 1),
+      ArrowDown: (d) => addMinutes(d, -1),
+      Home: (d) => withMinute(d, 0),
+      End: (d) => withMinute(d, 59),
+      ...tenMinutes,
+    });
+    const colon = h('span', { class: 'tp-colon', 'aria-hidden': 'true' }, ':');
+    const typed = h('input', {
+      class: 'tp-type',
+      type: 'text',
+      inputmode: 'numeric',
+      autocomplete: 'off',
+      enterkeyhint: 'done',
+      maxlength: '5',
+      'aria-label': `${label}, type hours and minutes`,
+      'aria-describedby': `${id}-hint`,
+      hidden: true,
+    });
+    const dial = h(
+      'div',
+      { class: 'tp-dial' },
+      stepButton('up', 'Hour later', () => set(addHours(draft, 1))),
+      h('span'),
+      stepButton('up', 'Minute later', () => set(addMinutes(draft, 1))),
+      hourNum,
+      colon,
+      minuteNum,
+      typed,
+      h('span', { class: 'tp-unit', 'aria-hidden': 'true' }, 'hour'),
+      h('span'),
+      h('span', { class: 'tp-unit', 'aria-hidden': 'true' }, 'minute · hold to scroll'),
+      stepButton('down', 'Hour earlier', () => set(addHours(draft, -1))),
+      h('span'),
+      stepButton('down', 'Minute earlier', () => set(addMinutes(draft, -1))),
+    );
+
+    function startTyping(first = null) {
+      typing = true;
+      typed.value = first ?? formatTime(draft);
+      update();
+      typed.focus({ preventScroll: true });
+      if (first == null) typed.select();
+    }
+    /** Ends typing: a real time is taken; anything else keeps the time and says how to type one. */
+    function endTyping({ keep = true } = {}) {
+      if (!typing) return;
+      typing = false;
+      const t = keep ? parseTyped(typed.value) : null;
+      if (t != null) draft = t;
+      typedError = keep && t == null && typed.value.trim() !== '';
+      update();
+    }
+    typed.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        endTyping();
+        hourNum.focus({ preventScroll: true });
+      } else if (e.key === 'Escape') {
+        e.preventDefault(); // leaves typing, not the sheet
+        e.stopPropagation();
+        endTyping({ keep: false });
+        hourNum.focus({ preventScroll: true });
+      }
+    });
+    typed.addEventListener('blur', () => endTyping());
+
+    // ---- round minutes (keep the hour)
+    const rounds = h(
+      'div',
+      { class: 'tp-rounds', role: 'group', 'aria-label': 'Round minutes' },
+      [0, 15, 30, 45].map((mm) =>
         h(
           'button',
           {
             type: 'button',
-            class: 'cal-nav',
-            'aria-label': 'One minute earlier',
-            dataset: { tk: 'minus' },
-            onClick: () => nudge(-1),
+            class: 'tp-round',
+            'aria-label': `${pad2(mm)} minutes past`,
+            onClick: () => set(withMinute(draft, mm)),
           },
-          '−1',
-        ),
-        h(
-          'div',
-          { class: 'tp-display', 'aria-live': 'polite' },
-          seg('hh', pad(draft.hh), 'Hour'),
-          h('span', { class: 'tp-colon', 'aria-hidden': 'true' }, ':'),
-          seg('mm', pad(draft.mm), 'Minute'),
-        ),
-        h(
-          'button',
-          {
-            type: 'button',
-            class: 'cal-nav',
-            'aria-label': 'One minute later',
-            dataset: { tk: 'plus' },
-            onClick: () => nudge(1),
-          },
-          '+1',
-        ),
-      ),
-      h('div', { class: 'tp-hint muted small' }, part === 'hh' ? 'Pick the hour' : 'Pick the minute'),
-      grid,
-      h(
-        'div',
-        { class: 'picker-foot' },
-        h('button', { type: 'button', class: 'picker-quick', onClick: () => commit(fmt(now())) }, 'Now'),
-        clearable && value
-          ? h('button', { type: 'button', class: 'picker-quick', onClick: () => commit(null) }, 'Clear')
-          : null,
-        h(
-          'button',
-          { type: 'button', class: 'picker-quick is-primary', onClick: () => commit(fmt(draft)) },
-          'Set',
+          `:${pad2(mm)}`,
         ),
       ),
     );
-    const target = keepFocus
-      ? panel.querySelector(`[data-tk="${keepFocus}"]`)
-      : focus
-        ? grid.querySelector('.is-selected') || grid.querySelector('button')
+
+    // ---- hint, clear, footer
+    const hintLine = h('p', { class: 'tp-hint', id: `${id}-hint`, 'aria-live': 'polite' });
+    const clear =
+      clearable && value
+        ? h('button', { type: 'button', class: 'tp-clear', onClick: () => close(null) }, 'Clear time')
         : null;
-    target?.focus({ preventScroll: true });
+    const cancelBtn = h('button', { type: 'button', class: 'tp-btn', onClick: () => close() }, 'Cancel');
+    const setBtn = h('button', {
+      type: 'button',
+      class: 'tp-btn is-primary',
+      onClick: () => {
+        endTyping();
+        if (!tooLate()) close(formatTime(draft));
+      },
+    });
+
+    const sheet = h(
+      'dialog',
+      { class: 'apl tp-sheet', 'aria-labelledby': title.id },
+      h('span', { class: 'tp-grab', 'aria-hidden': 'true' }),
+      head,
+      quickRow,
+      dial,
+      rounds,
+      hintLine,
+      clear,
+      h('div', { class: 'tp-foot' }, cancelBtn, setBtn),
+    );
+
+    function update() {
+      const t = formatTime(draft);
+      const [hh, mm] = t.split(':');
+      hourNum.textContent = hh;
+      hourNum.setAttribute('aria-valuenow', String(Number(hh)));
+      hourNum.setAttribute('aria-valuetext', `${Number(hh)} hours, ${t}`);
+      minuteNum.textContent = mm;
+      minuteNum.setAttribute('aria-valuenow', String(Number(mm)));
+      minuteNum.setAttribute('aria-valuetext', `${Number(mm)} minutes, ${t}`);
+      hourNum.hidden = typing;
+      minuteNum.hidden = typing;
+      colon.hidden = typing;
+      typed.hidden = !typing;
+      if (showQuick) {
+        quickTimes(t, now()).forEach((q, i) => {
+          quickBtns[i].setAttribute('aria-pressed', String(q.selected));
+          quickBtns[i].disabled = q.disabled;
+        });
+      }
+      const line = typedError
+        ? { text: 'Type a time like 15:45', warn: true }
+        : timeHint({ date, time: t, max: bound(), now: now(), timer });
+      if (hintLine.textContent !== line.text) hintLine.textContent = line.text;
+      hintLine.classList.toggle('is-warn', line.warn);
+      setBtn.textContent = `Set ${t}`;
+      setBtn.disabled = tooLate();
+    }
+
+    function close(picked) {
+      result = picked;
+      sheet.close();
+      done(); // at once: the 'close' event is queued, and late in a page running in the background
+    }
+
+    let finished = false;
+    /** Removes the sheet, returns focus to the field and reports the time picked (once). */
+    function done() {
+      if (finished) return;
+      finished = true;
+      sheet.remove();
+      trigger.setAttribute('aria-expanded', 'false');
+      // focus goes back to the field first, so the page's re-render keeps it there
+      const field = trigger.isConnected
+        ? trigger
+        : fk && document.querySelector(`[data-fk="${CSS.escape(fk)}"]`);
+      field?.focus({ preventScroll: true });
+      if (result !== undefined && result !== (value || null)) onChange(result);
+    }
+    sheet.addEventListener('close', done);
+    // Escape cancels (and is kept from the app's overlay layer, which may be open under the sheet)
+    sheet.addEventListener('cancel', (e) => {
+      e.preventDefault();
+      close();
+    });
+    sheet.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') e.stopPropagation();
+    });
+    // a tap on the scrim (outside the sheet's box) cancels
+    sheet.addEventListener('click', (e) => {
+      if (e.target !== sheet) return;
+      const r = sheet.getBoundingClientRect();
+      if (e.clientY < r.top || e.clientY > r.bottom || e.clientX < r.left || e.clientX > r.right) close();
+    });
+    swipeDown(sheet, () => close());
+
+    update();
+    document.body.append(sheet);
+    sheet.showModal();
+    trigger.setAttribute('aria-expanded', 'true');
+    hourNum.focus({ preventScroll: true });
   }
 
-  return wrap;
+  return h('div', { class: 'picker' }, trigger);
+}
+
+/** Drag the sheet's top area (the grab bar and the title) down to cancel it. */
+function swipeDown(sheet, cancel) {
+  let startY = null;
+  sheet.addEventListener('pointerdown', (e) => {
+    if (e.target.closest('button, input, [role="spinbutton"]')) return;
+    const fromTop = e.clientY - sheet.getBoundingClientRect().top;
+    if (fromTop < 0 || fromTop > 72) return; // the scrim, or below the title
+    startY = e.clientY;
+    sheet.setPointerCapture?.(e.pointerId);
+  });
+  sheet.addEventListener('pointermove', (e) => {
+    if (startY == null) return;
+    sheet.style.transform = `translateY(${Math.max(0, e.clientY - startY)}px)`;
+  });
+  const end = (e) => {
+    if (startY == null) return;
+    const dy = e.clientY - startY;
+    startY = null;
+    sheet.style.transform = '';
+    if (dy > SWIPE_CLOSE_PX) cancel();
+  };
+  sheet.addEventListener('pointerup', end);
+  sheet.addEventListener('pointercancel', end);
 }

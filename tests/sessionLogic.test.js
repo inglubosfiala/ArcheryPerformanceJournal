@@ -352,6 +352,28 @@ describe('session logged afterwards', () => {
   });
 });
 
+describe('the session timer starts from the picked start time', () => {
+  const now = new Date('2026-11-12T18:00:30');
+
+  it('starts at the picked time when that is a minute to a quarter of an hour ago', () => {
+    expect(L.timerStartAt('2026-11-12', '17:50', now)).toEqual(new Date('2026-11-12T17:50:00'));
+    expect(L.timerStartAt('2026-11-12', '17:59', now)).toEqual(new Date('2026-11-12T17:59:00'));
+  });
+
+  it('starts now for this minute, a later time, no time, or a start logged afterwards', () => {
+    expect(L.timerStartAt('2026-11-12', '18:00', now)).toBe(now);
+    expect(L.timerStartAt('2026-11-12', '18:05', now)).toBe(now);
+    expect(L.timerStartAt('2026-11-12', null, now)).toBe(now);
+    expect(L.timerStartAt('2026-11-12', '17:30', now)).toBe(now);
+  });
+
+  it('a scored session started 10 minutes ago shows 10:30 on its timer 30 s in', () => {
+    const s = L.createSession({ date: '2026-11-12', time: '17:50', distance: 18, face: '40t', arrowsPerEnd: 3, now });
+    expect(s.timer).toEqual({ running: true, startedAt: new Date('2026-11-12T17:50:00').toISOString(), elapsedMs: 0 });
+    expect(L.timerElapsed(s.timer, now)).toBe(10.5 * 60000);
+  });
+});
+
 describe('arrow positions', () => {
   it('keeps a position on the face, rounded to three places', () => {
     const a = L.enterScore(start(), 9, 0.123456, -0.2).current.arrows[0];

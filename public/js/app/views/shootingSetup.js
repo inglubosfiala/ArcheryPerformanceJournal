@@ -449,7 +449,7 @@ export function renderShootingSetup(ctx, kind) {
   const blank = kind === 'blank';
   const active = blank ? null : ctx.running.get();
 
-  const { section: when, whenDate, whenTime, past } = whenSection(ctx, st, { duration: !blank });
+  const { section: when, whenDate, whenTime, past, startTime } = whenSection(ctx, st, { duration: !blank });
   const equipment = equipmentSection(ctx, st, { kind, distance: blank ? null : fields.distance });
 
   const startScored = async () => {
@@ -457,7 +457,7 @@ export function renderShootingSetup(ctx, kind) {
     // only one session runs at a time: the running-session module asks about the one in progress
     const res = await ctx.running.start({
       date: whenDate,
-      time: whenTime,
+      time: past ? whenTime : startTime(),
       pastMinutes: past ? (setup.pastMinutes ?? 0) : null,
       type: kind,
       distance,
@@ -475,11 +475,14 @@ export function renderShootingSetup(ctx, kind) {
     if (res.status === 'started') ctx.navigate('log', { replace: true });
   };
 
-  // Start: the blank bale's timer starts now (nothing ran while the setup was open); one already
-  // open goes on as it is
+  // Start: the blank bale's timer starts now, or at the start time picked a few minutes ago (nothing
+  // ran while the setup was open); one already open goes on as it is
   const blankOpen = blank && ctx.openForms.list().some((f) => f.type === 'blank');
   const startBlank = () => {
-    if (!blankOpen) ctx.openForms.start('blank', { goal: fields.goal ?? null, gear: equipment.choice });
+    if (!blankOpen) {
+      const when = { date: whenDate, time: startTime() };
+      ctx.openForms.start('blank', { goal: fields.goal ?? null, gear: equipment.choice, when });
+    }
     ctx.ui.quietSet({ setup: null });
     ctx.navigate('blank', { replace: true });
   };

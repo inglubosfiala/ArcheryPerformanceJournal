@@ -14,7 +14,7 @@
 //   'saved' (with `session`) · 'discarded' · 'cancelled' (the archer said no)
 //   'failed' (the save was refused; the guarded save has told the archer)
 
-import { timerElapsed, pauseTimer, resumeTimer } from './sessionLogic.js';
+import { timerElapsed, pauseTimer, resumeTimer, timerStartAt } from './sessionLogic.js';
 import { SESSION_TYPES, isScored } from './sessionTypes.js';
 import { rememberSetup } from './lastSetup.js';
 
@@ -90,7 +90,9 @@ export function createOpenFormSessions({
   }
 
   /**
-   * Start a blank bale session (the Shooting page's Start): its timer starts now and its draft holds
+   * Start a blank bale session (the Shooting page's Start): its timer starts now, or at the start
+   * time picked in `when` ({ date, time }) when that was a few minutes ago (sessionLogic.timerStartAt),
+   * and its draft holds
    * the arrow goal and, in `meta` (not saved with the session), when it started and the equipment
    * choice. Remembered as the last blank bale setup. A blank bale already open is not started again:
    * it goes on as it is (`status: 'open'`).
@@ -103,17 +105,19 @@ export function createOpenFormSessions({
     const all = timers();
     if (isFormTimerLive(all[type], now())) return { status: 'open', timer: all[type], draft: drafts()[type] || null };
     const at = now().toISOString();
+    // the timer starts from the picked start time when that was a few minutes ago (timerStartAt)
+    const from = when?.date && when?.time ? timerStartAt(when.date, when.time, now()).toISOString() : at;
     if (type === 'gym') {
       const past = !!when?.past;
       const timer = past
         ? { running: false, startedAt: null, elapsedMs: 0, touchedAt: at }
-        : { running: true, startedAt: at, elapsedMs: 0, touchedAt: at };
-      const draft = { ...fields, meta: { startedAt: at, date: when?.date, time: when?.time, ...(past ? { past: true } : {}) } };
+        : { running: true, startedAt: from, elapsedMs: 0, touchedAt: at };
+      const draft = { ...fields, meta: { startedAt: from, date: when?.date, time: when?.time, ...(past ? { past: true } : {}) } };
       repo.saveSettings({ formTimers: { ...all, [type]: timer }, formDrafts: { ...drafts(), [type]: draft } });
       return { status: 'started', timer, draft };
     }
-    const timer = { running: true, startedAt: at, elapsedMs: 0, touchedAt: at };
-    const draft = { arrows: null, note: '', ...(goal ? { goal } : {}), meta: { startedAt: at, gear } };
+    const timer = { running: true, startedAt: from, elapsedMs: 0, touchedAt: at };
+    const draft = { arrows: null, note: '', ...(goal ? { goal } : {}), meta: { startedAt: from, gear } };
     repo.saveSettings({
       formTimers: { ...all, [type]: timer },
       formDrafts: { ...drafts(), [type]: draft },

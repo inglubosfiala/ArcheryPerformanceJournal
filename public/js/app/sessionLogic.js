@@ -53,7 +53,7 @@ export function createSession({
     // not a ticking counter) until it is paused
     timer:
       pastMinutes == null
-        ? { running: true, startedAt: now.toISOString(), elapsedMs: 0 }
+        ? { running: true, startedAt: timerStartAt(date, time, now).toISOString(), elapsedMs: 0 }
         : { running: false, startedAt: null, elapsedMs: pastMinutes * 60000 },
   };
 }
@@ -65,6 +65,17 @@ export const PAST_START_MS = 15 * 60 * 1000;
 export function isPastStart(date, time, now = new Date()) {
   const t = new Date(`${date}T${time || '00:00'}`).getTime();
   return Number.isFinite(t) && now.getTime() - t > PAST_START_MS;
+}
+
+/**
+ * When a session's timer starts: at the picked local `date` + `time` when that lies between a minute
+ * and PAST_START_MS before `now` (started 10 min ago: the timer shows 0:10), else `now` (started this
+ * minute, a later time, or a session logged afterwards, whose timer does not run).
+ */
+export function timerStartAt(date, time, now = new Date()) {
+  const t = time ? new Date(`${date}T${time}`).getTime() : NaN;
+  const ago = now.getTime() - t;
+  return Number.isFinite(t) && ago >= 60000 && ago <= PAST_START_MS ? new Date(t) : now;
 }
 
 const clone = (s) => structuredClone(s);

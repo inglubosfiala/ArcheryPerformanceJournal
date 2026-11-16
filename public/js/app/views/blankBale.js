@@ -1,12 +1,14 @@
 // The running blank bale session (#/blank): started from the Shooting page, counted with +1 / +3 / +6
-// while you shoot, finished or discarded here. The open form session (openFormSession.js) owns the
-// timer, the kept draft, saving and discarding; this page draws them and forwards the taps.
+// while you shoot; ended with Finish in the header (save, discard or continue, see formFinish.js),
+// as on the scoring screen. The open form session (openFormSession.js) owns the timer, the kept
+// draft, saving and discarding; this page draws them and forwards the taps.
 import { h, isoDate } from '../../core/dom.js';
 import * as APL from '../../ui/apl/index.js';
 import { hourMinute } from '../sessionTypes.js';
-import { timerElapsed } from '../sessionLogic.js';
+import { timerElapsed, formatClock } from '../sessionLogic.js';
 import { activeSetup, gearForChoice } from '../gearFields.js';
 import { sessionTimer } from './timer.js';
+import { formFinish } from './formFinish.js';
 
 
 /** Arrows per minute over the time on the timer; null before the first minute or the first arrow. */
@@ -48,6 +50,7 @@ export function renderBlankRunning(ctx, open) {
   const discard = async () => {
     const res = await ctx.openForms.discard('blank');
     if (res.status === 'discarded') ctx.navigate('home', { replace: true });
+    return res;
   };
   const finish = async () => {
     const res = await ctx.openForms.save('blank', {
@@ -57,10 +60,18 @@ export function renderBlankRunning(ctx, open) {
       gear: gearForChoice(gearChoice, { setups }) || { gear: null, gearSnapshotId: null },
     });
     if (res.status === 'saved') ctx.navigate(`history/${res.session.id}`, { replace: true });
+    return res;
   };
 
   const pace = arrowPace(count, timerElapsed(timer, now));
   const pct = goal ? Math.min(100, Math.round((count / goal) * 100)) : 0;
+
+  // Finish in the header: End the session (save · discard · continue), as on the scoring screen
+  const ending = formFinish(ctx, 'blank', {
+    summary: [`${count} ${count === 1 ? 'arrow' : 'arrows'}`, formatClock(timerElapsed(timer, now))].join(' · '),
+    save: finish,
+    discard,
+  });
 
   const header = h(
     'header',
@@ -78,6 +89,7 @@ export function renderBlankRunning(ctx, open) {
       h('span', { class: 'apl-cap' }, [`Started ${hourMinute(startedAt)}`, setupName].filter(Boolean).join(' · ')),
     ),
     sessionTimer(timer, toggleTimer),
+    ending.button,
   );
 
   const counter = h(
@@ -150,11 +162,8 @@ export function renderBlankRunning(ctx, open) {
           fk: 'form-note',
           onInput: (e) => keep({ note: e.target.value }, { rerender: false }),
         }),
-        h('button', { type: 'button', class: 'btn btn-text danger apl-discard', dataset: { fk: 'discard-form' }, onClick: discard }, 'Discard session'),
       ),
-      APL.BottomBar({
-        children: APL.Button({ children: `Finish session · ${count} ${count === 1 ? 'arrow' : 'arrows'}`, onClick: finish, fk: 'form-save' }),
-      }),
     ),
+    overlay: ending.overlay,
   };
 }
