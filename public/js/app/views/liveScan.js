@@ -14,7 +14,7 @@ import { createSteadyReading, createSpotReading, spotShares, nextLook } from '..
 const FRAME_MAX = 560; // frames are scaled to this many pixels on their long side for detection
 const VIEW_MAX = 1280; // the overlay and the kept picture: the whole frame, up to this size
 const TICK_MS = 120; // pause between analyses (each takes 0.2–0.6 s on a phone)
-const BANNER_MS = 1200; // spot by spot: the "move on" banner stays at least this long
+const BANNER_MS = 600; // spot by spot: how long the "move on" banner stays
 
 /** What the status line says for each kind of reading (see createSteadyReading). */
 const STATUS = {
@@ -165,7 +165,7 @@ export function liveScan({ face, maxArrows, spotHint = 0, bySpot = false }) {
               disabled: !shares[j],
               onClick: () => {
                 reading.goTo(j);
-                hideBanner(true);
+                hideBanner();
                 region = null;
                 renderChips(reading.chips);
                 status.textContent = SPOT_STATUS.lost(j + 1);
@@ -315,9 +315,9 @@ export function liveScan({ face, maxArrows, spotHint = 0, bySpot = false }) {
       const read = reading.results().filter((t) => tiles[t.spot]);
       finish(read.length ? { tiles: read.map((t) => ({ ...t, canvas: tiles[t.spot] })) } : null);
     }
-    // The banner shows what was read and which spot is next, for at least BANNER_MS and until the
-    // next spot is being read.
-    let bannerAt = 0;
+    // The banner shows what was read and which spot is next for BANNER_MS (the status line under
+    // the picture goes on saying which spot is next).
+    let bannerTimer = 0;
     function showBanner(text) {
       bannerRead.textContent = text;
       bannerNext.textContent = `Move to spot ${reading.spot + 1}`;
@@ -325,10 +325,12 @@ export function liveScan({ face, maxArrows, spotHint = 0, bySpot = false }) {
       banner.classList.remove('is-flash');
       void banner.offsetWidth; // restart the flash
       banner.classList.add('is-flash');
-      bannerAt = performance.now();
+      clearTimeout(bannerTimer);
+      bannerTimer = setTimeout(hideBanner, BANNER_MS);
     }
-    function hideBanner(force = false) {
-      if (!banner.hidden && (force || performance.now() - bannerAt >= BANNER_MS)) banner.hidden = true;
+    function hideBanner() {
+      clearTimeout(bannerTimer);
+      banner.hidden = true;
     }
     function afterSpotChange(text) {
       region = null; // the next spot is somewhere else: look at the whole frame again
