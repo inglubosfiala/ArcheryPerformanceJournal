@@ -631,9 +631,14 @@ export function timePicker({
     function close(picked) {
       result = picked;
       sheet.close();
+      done(); // at once: the 'close' event is queued, and late in a page running in the background
     }
 
-    sheet.addEventListener('close', () => {
+    let finished = false;
+    /** Removes the sheet, returns focus to the field and reports the time picked (once). */
+    function done() {
+      if (finished) return;
+      finished = true;
       sheet.remove();
       trigger.setAttribute('aria-expanded', 'false');
       // focus goes back to the field first, so the page's re-render keeps it there
@@ -642,7 +647,8 @@ export function timePicker({
         : fk && document.querySelector(`[data-fk="${CSS.escape(fk)}"]`);
       field?.focus({ preventScroll: true });
       if (result !== undefined && result !== (value || null)) onChange(result);
-    });
+    }
+    sheet.addEventListener('close', done);
     // Escape cancels (and is kept from the app's overlay layer, which may be open under the sheet)
     sheet.addEventListener('cancel', (e) => {
       e.preventDefault();
