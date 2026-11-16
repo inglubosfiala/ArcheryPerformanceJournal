@@ -227,7 +227,8 @@ export function detectArrows(img, face, maxArrows, { debug = false, spotHint = 0
   //    transform (every dark pixel votes for the lines through it), so old holes (scattered dots)
   //    and the ring lines (curved) do not count. The arrow is at the end of the line inside a face.
   const rejects = debug ? [] : null;
-  const shafts = findShafts({ width, height, data, nearest, spotPx, face, rejects, shaftGap });
+  const trace = debug ? {} : null;
+  const shafts = findShafts({ width, height, data, nearest, spotPx, face, rejects, trace, shaftGap });
 
   // 2) Nocks / fletchings seen head-on: big compact blobs of colour that does not belong to the ring
   //    under it (only used for arrows the shafts did not account for).
@@ -269,7 +270,11 @@ export function detectArrows(img, face, maxArrows, { debug = false, spotHint = 0
       const far = sh.tip === sh.a ? sh.b : sh.a;
       const len = Math.hypot(far.x - sh.tip.x, far.y - sh.tip.y) || 1;
       const lean = { x: (far.x - sh.tip.x) / len, y: (far.y - sh.tip.y) / len };
-      return { rank: 1e6 + sh.length, image: sh.tip, at: sh.tipAt, area: Math.round(sh.length), lean };
+      // The shaft's end in the picture is the far edge of its hole: the arrow (the hole's centre) is
+      // half the shaft's width back along it. Measured on real photos, this beats the end itself.
+      const image = sh.half ? { x: sh.tip.x + sh.half * lean.x, y: sh.tip.y + sh.half * lean.y } : sh.tip;
+      const at = sh.half ? nearest(image.x, image.y) : sh.tipAt;
+      return { rank: 1e6 + sh.length, image, at, area: Math.round(sh.length), lean };
     }),
     ...blobs,
   ];
@@ -310,7 +315,7 @@ export function detectArrows(img, face, maxArrows, { debug = false, spotHint = 0
       lean: c.lean ?? null, // for a shaft seen from the side; null for a nock seen head-on
     }));
 
-  return debug ? { spots, arrows, partial, debug: { odd, grown, shafts, blobs, rejects } } : { spots, arrows, partial };
+  return debug ? { spots, arrows, partial, debug: { odd, grown, shafts, blobs, rejects, dark: trace.dark } } : { spots, arrows, partial };
 }
 
 /** Merge blobs whose centres are close (pieces of one gold cut apart by a shaft). */
@@ -346,7 +351,7 @@ function distToSegment(x, y, a, b) {
  * Arrow shafts as straight dark lines near the spots. Returns [{ a, b, length, tip, tipAt }]: the
  * dark run along the line (a–b) and its end inside a face (the arrow's entry point).
  */
-function findShafts({ width, height, data, nearest, spotPx, face, rejects = null, shaftGap = null }) {
+function findShafts({ width, height, data, nearest, spotPx, face, rejects = null, trace = null, shaftGap = null }) {
   const bright = (i) => Math.max(data[i * 4], data[i * 4 + 1], data[i * 4 + 2]);
   // How bright each ring is in this photo (the median of the pixels where the ring should be, so
   // it does not depend on the light: a blue ring in a dim hall is not "blue" by its colour). A shaft
@@ -452,6 +457,7 @@ function findShafts({ width, height, data, nearest, spotPx, face, rejects = null
     dark[i] = 1;
     pts.push(x, y);
   }
+  if (trace) trace.dark = dark;
   if (pts.length < 4) return [];
 
   // Hough accumulator: angle in 1° steps, distance from the origin in 1 px steps
@@ -613,6 +619,77 @@ function findShafts({ width, height, data, nearest, spotPx, face, rejects = null
     return { x: mx, y: my, dx: Math.cos(angle), dy: Math.sin(angle) };
   };
 
+  /**
+   * Where the shaft really ends. The dark run often carries on a few px past it: onto a ring line, the
+   * shaft's shadow or an old hole next to the point. But the shaft is a band of one width, and those are
+   * not: walking from the shaft's solid part to its point, the shaft ends where less than half of
+   * the middle of that band is dark. Also gives the shaft's half width (px). The arrow's hole is that big.
+   */
+  const shaftEnd = (s) => {
+    const { px, py, dx, dy, u0, u1 } = s;
+    const darkAt = (u, side) => {
+      const xi = Math.round(px + u * dx - side * dy);
+      const yi = Math.round(py + u * dy + side * dx);
+      return xi >= 0 && yi >= 0 && xi < width && yi < height && dark[yi * width + xi] === 1;
+    };
+    const dAt = (u) => nearest(px + u * dx, py + u * dy).d;
+    const dir = dAt(u0) <= dAt(u1) ? 1 : -1; // from the point inwards (towards the nock)
+    const point = dir > 0 ? u0 : u1;
+    const len = u1 - u0;
+    // the shaft's width: the dark run across it, measured along its solid stretch
+    const widths = [];
+    for (let k = 0.2 * len; k <= 0.6 * len; k++) {
+      const u = point + dir * k;
+      const side = [0, -1, 1].find((o) => darkAt(u, o));
+      if (side == null) continue;
+      let lo = side;
+      let hi = side;
+      while (side - lo < maxThick && darkAt(u, lo - 1)) lo--;
+      while (hi - side < maxThick && darkAt(u, hi + 1)) hi++;
+      widths.push(hi - lo + 1);
+    }
+    if (widths.length < 5) return s;
+    widths.sort((p, q) => p - q);
+    const half = widths[widths.length >> 1] / 2;
+    const band = Math.max(1, Math.floor(0.6 * half));
+    const cover = (u) => {
+      let n = 0;
+      for (let o = -band; o <= band; o++) if (darkAt(u, o)) n++;
+      return n / (2 * band + 1);
+    };
+    // walk to the point and a little past it (the run may stop short at a pale stretch)
+    // A pale gap of up to half the shaft's width, at least 3 px (glare on the shaft), is crossed when
+    // solid shaft (3 half widths) follows it: a shorter dark bit after a gap is an old hole.
+    const bridge = Math.max(3, half);
+    const after = 3 * half;
+    let last = null; // the shaft's end so far (k: distance from the point inwards)
+    let gap = 0; // the pale stretch since then
+    let stretch = null; // solid again after a gap: from where (it counts once it is long enough)
+    for (let k = 0.2 * len; k >= -(maxGap + 2); k -= 0.5) {
+      if (cover(point + dir * k) >= 0.5) {
+        if (last == null || gap < 2) {
+          last = k;
+          gap = 0;
+          continue;
+        }
+        stretch ??= k;
+        if (stretch - k >= after) {
+          last = k;
+          gap = 0;
+          stretch = null;
+        }
+      } else if (last != null) {
+        if (stretch != null) break; // the stretch after the gap was too short (a hole)
+        gap += 0.5;
+        if (gap >= 2 && gap > bridge) break;
+      }
+    }
+    if (last == null) return s;
+    const end = point + dir * (last - 0.5); // the edge of the last covered pixel
+    const out = dir > 0 ? seg(px, py, dx, dy, end, u1) : seg(px, py, dx, dy, u0, end);
+    return { ...out, half };
+  };
+
   const found = [];
   for (let tries = 0; tries < 120 && found.length < 12; tries++) {
     // strongest remaining line
@@ -652,7 +729,8 @@ function findShafts({ width, height, data, nearest, spotPx, face, rejects = null
     const onShaft = fitted && longestRun(fitted.x, fitted.y, fitted.dx, fitted.dy);
     // the point is trimmed on a line that lies on the shaft (fitted to it), not on the grid line
     const isFitted = !!onShaft && onShaft.length >= 0.9 * line0.length;
-    const shaftSeg = isFitted ? trimPoint(onShaft) : line0;
+    const trimmed = isFitted ? trimPoint(onShaft) : line0;
+    const shaftSeg = isFitted ? shaftEnd(trimmed) : trimmed;
     if (!shaftSeg || shaftSeg.length < minRun) {
       rejects?.push({ why: 'short', votes: bestV, t, rho, run: shaftSeg ? shaftSeg.length : 0 });
       continue;
@@ -671,7 +749,7 @@ function findShafts({ width, height, data, nearest, spotPx, face, rejects = null
     // point, anywhere along it: of the lines along one shaft the longest is the shaft itself. (Not
     // the one ending nearest the middle of the spot: a shaft can cross the middle and enter on the
     // far side.)
-    const line = { a, b, length: run.u1 - run.u0, tip, tipAt, t, fitted: isFitted };
+    const line = { a, b, length: run.u1 - run.u0, tip, tipAt, t, fitted: isFitted, half: shaftSeg.half ?? null };
     const near = 0.15 * spotPx;
     const same = found.findIndex((f) => {
       // the angle between the two segments as they lie (a fitted line has left its grid angle)

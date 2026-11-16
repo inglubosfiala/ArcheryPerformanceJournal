@@ -53,7 +53,8 @@ function photo(face, arrows, { width = 360, height = 480, scale = 70, squash = 0
         for (const a of arrows) {
           if ((a.spot ?? 0) === k && Math.hypot(sx - cx - a.x, sy - cy - a.y) < nockR) colour = 'nock';
         }
-        // a shaft seen from the side: a thin dark line from its entry point (x, y) out along (dx, dy)
+        // a shaft seen from the side: a thin dark line from its entry point (x, y) out along (dx, dy),
+        // ending in its hole: a round end centred on the entry point, as on a real photo
         for (const sh of shafts) {
           if ((sh.spot ?? 0) !== k) continue;
           const px0 = sx - cx - sh.x;
@@ -61,7 +62,7 @@ function photo(face, arrows, { width = 360, height = 480, scale = 70, squash = 0
           const len = Math.hypot(sh.dx, sh.dy);
           const along = (px0 * sh.dx + py0 * sh.dy) / len;
           const across = Math.abs(px0 * sh.dy - py0 * sh.dx) / len;
-          if (along >= 0 && along <= len && across < 0.022) colour = 'shaft';
+          if ((along >= 0 && along <= len && across < 0.022) || Math.hypot(px0, py0) < 0.022) colour = 'shaft';
         }
       });
       const [r, g, b] = RGB[colour];
@@ -229,6 +230,22 @@ describe('photo arrow detection', () => {
     for (const sh of shafts) {
       const found = res.arrows.find((f) => Math.hypot(f.x - sh.x, f.y - sh.y) < 0.05);
       expect(found, `shaft entering at ${sh.x},${sh.y}`).toBeTruthy();
+    }
+  });
+
+  it('places a shaft at the centre of its hole, not at the end of the shaft in the picture', () => {
+    // the shaft's end in the picture is the far edge of its hole, half its width past the entry point
+    for (const sh of [
+      { x: 0.1, y: -0.25, dx: 0.9, dy: -1.3 },
+      { x: -0.15, y: 0.2, dx: -1.2, dy: 0.8 },
+      { x: 0.3, y: 0.05, dx: 1.4, dy: 0.5 },
+    ]) {
+      const img = photo('60s', [], { shafts: [sh], scale: 200, width: 480, height: 800, squash: 0.97, rot: 0.1 });
+      const [a] = detectArrows(img, '60s', 1).arrows;
+      // how far the found point is past the entry point, along the shaft away from the nock
+      const past = -((a.x - sh.x) * sh.dx + (a.y - sh.y) * sh.dy) / Math.hypot(sh.dx, sh.dy);
+      expect(past).toBeLessThan(0.005);
+      expect(past).toBeGreaterThan(-0.02);
     }
   });
 
