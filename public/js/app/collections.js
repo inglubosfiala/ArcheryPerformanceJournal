@@ -2,7 +2,8 @@
 import { FACE_IDS, ARROWS_PER_END_MAX, isValidArrowsPerEnd, isValidArrowValue } from './scoring.js';
 import { sightErrors, historyErrors } from './gearFields.js';
 import { defaultLastSetup, isGoal } from './lastSetup.js';
-import { SESSION_TYPES, DRILL_IDS, MENTAL_TECHNIQUES, EFFORT_MAX, FOCUS_MAX, isScored, countsArrows, isTime, emptyReview, emptyCompetition } from './sessionTypes.js';
+import { SESSION_TYPES, DRILL_IDS, MENTAL_TECHNIQUES, GYM_FOCUS, EFFORT_MAX, FOCUS_MAX, isScored, countsArrows, isTime, emptyReview, emptyCompetition } from './sessionTypes.js';
+import { GYM_UNITS, REPS_MAX, KG_MAX } from './gym.js';
 
 const isStr = (v) => typeof v === 'string';
 const isGrade = (g) => g == null || (Number.isInteger(g) && g >= 1 && g <= 5);
@@ -35,7 +36,27 @@ function validateEnd(e, where, n, requireValues) {
 
 const isOptInt = (n, min, max) => n == null || (Number.isInteger(n) && n >= min && n <= max);
 
-/** Blank bale, strength and mental sessions: a saved form, never active. */
+/** A gym session's focus and exercises (one with only a note, or with nothing, is valid). */
+function validateGym(r) {
+  const errs = [];
+  if (!Array.isArray(r.focus) || r.focus.some((f) => !GYM_FOCUS.includes(f))) errs.push('invalid focus');
+  if (!Array.isArray(r.exercises)) return [...errs, 'exercises must be a list'];
+  r.exercises.forEach((e, i) => {
+    const where = `exercise ${i + 1}`;
+    if (!e || !isStr(e.name) || !e.name.trim() || e.name.length > 80) errs.push(`${where}: invalid name`);
+    else if (!GYM_UNITS.includes(e.unit)) errs.push(`${where}: invalid unit`);
+    else if (!Array.isArray(e.sets)) errs.push(`${where}: sets must be a list`);
+    else
+      e.sets.forEach((st, k) => {
+        const kgOk = typeof st?.kg === 'number' && Number.isFinite(st.kg) && st.kg >= 0 && st.kg <= KG_MAX;
+        if (!st || st.reps == null || !isOptInt(st.reps, 0, REPS_MAX) || !kgOk || typeof st.done !== 'boolean')
+          errs.push(`${where} set ${k + 1}: invalid set`);
+      });
+  });
+  return errs;
+}
+
+/** Blank bale, strength, gym and mental sessions: a saved form, never active. */
 function validateForm(r) {
   const errs = [];
   if (r.status !== 'finished') errs.push(`${r.type} sessions are saved as finished`);
@@ -55,6 +76,8 @@ function validateForm(r) {
           errs.push(`drill ${i + 1}: invalid numbers`);
         else if (d.done != null && typeof d.done !== 'boolean') errs.push(`drill ${i + 1}: invalid done mark`);
       });
+  } else if (r.type === 'gym') {
+    errs.push(...validateGym(r));
   } else {
     if (!isOptInt(r.focus, 1, FOCUS_MAX)) errs.push('invalid focus');
     if (!Array.isArray(r.techniques) || r.techniques.some((t) => !MENTAL_TECHNIQUES.includes(t))) errs.push('invalid techniques');

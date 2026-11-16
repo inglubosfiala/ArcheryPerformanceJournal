@@ -1,7 +1,8 @@
-// Session types (training, blank bale, competition, strength, mental) and the fields of the non-scored ones.
+// Session types (training, blank bale, competition, strength, mental, gym) and the fields of the non-scored ones.
 import { faceLabel } from './scoring.js';
+import { gymSummary } from './gym.js';
 
-export const SESSION_TYPES = ['training', 'blank', 'competition', 'strength', 'mental', 'manual'];
+export const SESSION_TYPES = ['training', 'blank', 'competition', 'strength', 'mental', 'manual', 'gym'];
 
 export const TYPE_LABELS = {
   training: 'Training',
@@ -10,6 +11,7 @@ export const TYPE_LABELS = {
   strength: 'SPT', // specific physical training: the bow-strength drills
   mental: 'Mental',
   manual: 'Logged afterwards', // shown as "Log afterwards" on the New session page
+  gym: 'Gym', // with SPT, the "Strength" choice on the New session page
 };
 
 /** Session types that record a number of arrows instead of scoring them. */
@@ -81,6 +83,25 @@ export const DRILL_LIMITS = {
 
 export const MENTAL_TECHNIQUES = ['Visualisation', 'Breathing', 'Shot routine', 'Relaxation', 'Blank boss', 'Self-talk'];
 
+/** What a gym session works on: chips on the Gym setup page, any number picked. */
+export const GYM_FOCUS = ['Full body', 'Upper body', 'Lower body', 'Core', 'Cardio', 'Mobility', 'Shoulder prehab'];
+
+/**
+ * Exercises offered as "+ …" chips on the running gym session. `unit` 's': a set is held for
+ * seconds (a plank) instead of counted in reps.
+ */
+export const GYM_EXERCISES = [
+  { name: 'Face pulls', unit: 'reps' },
+  { name: 'Shoulder press', unit: 'reps' },
+  { name: 'Rotator cuff', unit: 'reps' },
+  { name: 'Deadlift', unit: 'reps' },
+  { name: 'Squat', unit: 'reps' },
+  { name: 'Push-ups', unit: 'reps' },
+  { name: 'Pull-ups', unit: 'reps' },
+  { name: 'Seated row', unit: 'reps' },
+  { name: 'Plank', unit: 's' },
+];
+
 export const EFFORT_MAX = 10;
 export const FOCUS_MAX = 5;
 
@@ -139,8 +160,9 @@ export function setupSummary(session, ...more) {
   return [`${session.distance} m`, faceLabel(session.face), ...more].filter(Boolean).join(' · ');
 }
 
-/** One line describing a strength or mental session (History list, Dashboard). */
+/** One line describing a strength, gym or mental session (History list, Dashboard). */
 export function formSummary(session) {
+  if (session.type === 'gym') return gymSummary(session);
   const parts = [];
   if (countsArrows(session.type) && session.arrows != null) parts.push(`${session.arrows} arrows`);
   if (session.type === 'blank' && session.goal) parts.push(`goal ${session.goal}`);
