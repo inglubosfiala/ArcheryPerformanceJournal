@@ -29,7 +29,7 @@ const plural = (n, one, many) => `${n} ${n === 1 ? one : many}`;
 /**
  * One line saying what the drill is: "10 holds of 10 s, 10 s rest", "2 sets × 5 holds of 30 s,
  * 30 s rest", "3 sets × 12 draws". `short` leaves out the unit noun of a drill without a hold
- * ("3 sets × 12").
+ * when there is more than one set ("3 sets × 12"; one set stays "10 draws").
  */
 export function drillSummary(drill, { short = false } = {}) {
   const sets = drill.sets ?? 1;
@@ -39,7 +39,7 @@ export function drillSummary(drill, { short = false } = {}) {
     const rest = drill.restSec ? `, ${drill.restSec} s rest` : ', no rest';
     return `${lead}${plural(reps, 'hold', 'holds')} of ${drill.holdSec ?? 0} s${rest}`;
   }
-  if (short) return `${lead}${reps}`;
+  if (short && sets > 1) return `${lead}${reps}`;
   return `${lead}${plural(reps, 'draw', 'draws')}`;
 }
 

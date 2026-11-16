@@ -580,11 +580,6 @@
   padding-top: var(--space-5);
 }
 
-.apl-timer-row {
-  display: flex;
-  justify-content: flex-end;
-}
-
 .apl-discard {
   align-self: center;
 }

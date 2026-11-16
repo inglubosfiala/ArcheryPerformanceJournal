@@ -18,7 +18,7 @@ import { SESSION_TYPES, TYPE_LABELS, hourMinute, setupSummary, emptyCompetition 
 import { gearChoices, gearForChoice } from '../gearFields.js';
 import { sessionDates, gearCards } from './common.js';
 import { datePicker, timePicker } from './pickers.js';
-import { emptyForm, formSections } from './sessionForms.js';
+import { emptyForm, formSections, showsStartTimer } from './sessionForms.js';
 import { sessionTimer } from './timer.js';
 import { faceParts, faceId, FACE_SIZES, kindsForSize, faceForSize } from './setupFaces.js';
 
@@ -410,12 +410,11 @@ export function renderFormSetup(ctx, type) {
 
   // a timed form whose start is not in the past: its timer runs, it is a running session
   const running = timed && !past;
-  // blank bale: the timer sits beside the arrow count (in the form); SPT: the same timer, on its own
-  // at the right; mental, manual: a "Timer" row
+  // blank bale: the timer sits beside the arrow count (in the form); SPT: in the page header, next
+  // to the title; mental, manual: a "Timer" row
+  const sptRunning = running && type === 'strength';
   const timerRow =
-    running && type === 'strength'
-      ? h('div', { class: 'apl-timer-row' }, sessionTimer(formTimer, toggleFormTimer, { size: 'lg' }))
-      : running && type !== 'blank'
+    running && type !== 'blank' && !sptRunning
         ? h(
             'div',
             { class: 'apl-section-head' },
@@ -425,10 +424,11 @@ export function renderFormSetup(ctx, type) {
         : null;
 
   // no back button on a running SPT or blank bale session (Save or Discard end it; the tab bar
-  // leaves it running); no title on the SPT page and a running blank bale session: the room goes
-  // to the form
+  // leaves it running); no title on a running blank bale session: the room goes to the form
   const back = !(running && (type === 'strength' || type === 'blank'));
-  const title = type === 'strength' || (running && type === 'blank') ? '' : `${TYPE_LABELS[type]} session`;
+  const title = running && type === 'blank' ? '' : `${TYPE_LABELS[type]} session`;
+  // a drill card's own green "Start timer" is the primary action while it shows: Save steps down
+  const saveVariant = type === 'strength' && showsStartTimer(form.drills) ? 'secondary' : 'primary';
 
   return {
     content: h(
@@ -439,6 +439,7 @@ export function renderFormSetup(ctx, type) {
             title,
             onBack: back ? () => ctx.navigate('new') : null,
             backLabel: 'Back to session type',
+            trailing: sptRunning ? sessionTimer(formTimer, toggleFormTimer) : null,
           })
         : null,
       h(
@@ -466,7 +467,7 @@ export function renderFormSetup(ctx, type) {
           : null,
       ),
       APL.BottomBar({
-        children: APL.Button({ children: 'Save session', onClick: saveForm, fk: 'form-save' }),
+        children: APL.Button({ children: 'Save session', variant: saveVariant, onClick: saveForm, fk: 'form-save' }),
       }),
     ),
   };

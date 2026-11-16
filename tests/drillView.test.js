@@ -35,6 +35,7 @@ describe('SPT drill card helpers', () => {
     expect(drillSummary(spt(1, 10, 10, 10))).toBe('10 holds of 10 s, 10 s rest');
     expect(drillSummary(spt(2, 5, 30, 30))).toBe('2 sets × 5 holds of 30 s, 30 s rest');
     expect(drillSummary(spt(1, 1, 20, 0))).toBe('1 hold of 20 s, no rest');
+    expect(drillSummary({ kind: 'draw', sets: 1, reps: 10 }, { short: true })).toBe('10 draws');
     expect(drillSummary({ kind: 'draw', sets: 3, reps: 12 })).toBe('3 sets × 12 draws');
     expect(drillSummary({ kind: 'band', sets: 1, reps: 1 })).toBe('1 draw');
     expect(drillSummary({ kind: 'draw', sets: 3, reps: 12 }, { short: true })).toBe('3 sets × 12');
