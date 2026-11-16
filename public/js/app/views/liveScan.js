@@ -14,6 +14,7 @@ import { createSteadyReading, createSpotReading, spotShares, nextLook } from '..
 const FRAME_MAX = 560; // frames are scaled to this many pixels on their long side for detection
 const VIEW_MAX = 1280; // the overlay and the kept picture: the whole frame, up to this size
 const TICK_MS = 120; // pause between analyses (each takes 0.2–0.6 s on a phone)
+const BANNER_MS = 1200; // spot by spot: the "move on" banner stays at least this long
 
 /** What the status line says for each kind of reading (see createSteadyReading). */
 const STATUS = {
@@ -113,7 +114,12 @@ export function liveScan({ face, maxArrows, spotHint = 0, bySpot = false }) {
     const video = h('video', { class: 'live-video', playsinline: true, muted: true, autoplay: true });
     video.muted = true;
     const overlay = h('canvas', { class: 'live-overlay', 'aria-hidden': 'true' });
-    const stage = h('div', { class: 'live-stage' }, video, overlay);
+    // spot by spot: once a spot is read the picture dims under a big "move on" banner, so the
+    // archer sees it from arm's length (the status line under the picture is easy to miss)
+    const bannerRead = h('strong', { class: 'live-banner-read' });
+    const bannerNext = h('span', { class: 'live-banner-next' });
+    const banner = h('div', { class: 'live-banner', hidden: true, 'aria-hidden': 'true' }, bannerRead, bannerNext);
+    const stage = h('div', { class: 'live-stage' }, video, overlay, bySpot ? banner : null);
     const status = h('p', { class: 'live-status', role: 'status', 'aria-live': 'polite' }, 'Starting the camera…');
     const bar = h('div', { class: 'live-progress-bar' });
     const progress = h('div', { class: 'live-progress', 'aria-hidden': 'true' }, bar);
@@ -159,6 +165,7 @@ export function liveScan({ face, maxArrows, spotHint = 0, bySpot = false }) {
               disabled: !shares[j],
               onClick: () => {
                 reading.goTo(j);
+                hideBanner(true);
                 region = null;
                 renderChips(reading.chips);
                 status.textContent = SPOT_STATUS.lost(j + 1);
@@ -300,21 +307,47 @@ export function liveScan({ face, maxArrows, spotHint = 0, bySpot = false }) {
       c.height = shot.height;
       c.getContext('2d').drawImage(shot, 0, 0);
       tiles[j] = c;
-      if (navigator.vibrate) navigator.vibrate(40);
+      // two firm buzzes: felt with the phone held up (phones that cannot vibrate, like iPhones,
+      // have the banner)
+      if (navigator.vibrate) navigator.vibrate([80, 60, 80]);
     }
     function finishSpots() {
       const read = reading.results().filter((t) => tiles[t.spot]);
       finish(read.length ? { tiles: read.map((t) => ({ ...t, canvas: tiles[t.spot] })) } : null);
     }
-    function afterSpotChange() {
+    // The banner shows what was read and which spot is next, for at least BANNER_MS and until the
+    // next spot is being read.
+    let bannerAt = 0;
+    function showBanner(text) {
+      bannerRead.textContent = text;
+      bannerNext.textContent = `Move to spot ${reading.spot + 1}`;
+      banner.hidden = false;
+      banner.classList.remove('is-flash');
+      void banner.offsetWidth; // restart the flash
+      banner.classList.add('is-flash');
+      bannerAt = performance.now();
+    }
+    function hideBanner(force = false) {
+      if (!banner.hidden && (force || performance.now() - bannerAt >= BANNER_MS)) banner.hidden = true;
+    }
+    function afterSpotChange(text) {
       region = null; // the next spot is somewhere else: look at the whole frame again
       renderChips(reading.chips);
-      if (reading.spot < 0) finishSpots();
-      else status.textContent = SPOT_STATUS.move(reading.spot + 1);
+      if (reading.spot < 0) {
+        finishSpots();
+        return;
+      }
+      status.textContent = SPOT_STATUS.move(reading.spot + 1);
+      showBanner(text);
     }
+    const readText = (j) => {
+      const scores = reading.chips[j].scores;
+      return `✓ Spot ${j + 1}: ${scores.length ? scores.join(' · ') : 'empty'}`;
+    };
     function skip() {
+      const j = reading.spot;
       reading.skip();
-      afterSpotChange();
+      afterSpotChange(`Spot ${j + 1} skipped`);
     }
 
     function take() {
@@ -322,7 +355,7 @@ export function liveScan({ face, maxArrows, spotHint = 0, bySpot = false }) {
         const j = reading.take();
         if (j < 0) return;
         keepTile(j);
-        afterSpotChange();
+        afterSpotChange(readText(j));
         return;
       }
       const res = reading.take();
@@ -345,10 +378,14 @@ export function liveScan({ face, maxArrows, spotHint = 0, bySpot = false }) {
       if (bySpot) {
         if (r.locked >= 0) {
           keepTile(r.locked);
-          afterSpotChange();
+          afterSpotChange(readText(r.locked));
           return;
         }
-        if (r.kind !== 'move') renderChips(r.spots);
+        if (r.kind !== 'move') {
+          renderChips(r.spots);
+          // the next spot is being read (or the camera is too far): the banner has done its job
+          if (r.kind !== 'lost') hideBanner();
+        }
         status.textContent = SPOT_STATUS[r.kind](r.spot + 1, r);
         return;
       }

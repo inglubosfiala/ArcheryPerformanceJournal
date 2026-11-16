@@ -1848,6 +1848,62 @@ button.arrow-count:hover {
   font: var(--type-body-strong);
 }
 
+/* spot by spot: a spot was read. The picture dims under a big banner (what was read, which spot
+   is next) that flashes green once, readable from arm's length. Always on the dark camera
+   picture, so fixed light-on-dark colours in both themes. */
+.live-banner {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 16px;
+  background: rgba(0, 0, 0, 0.62);
+  color: #ffffff;
+  text-align: center;
+  pointer-events: none;
+}
+
+.live-banner[hidden] {
+  display: none;
+}
+
+.live-banner-read {
+  font-size: 30px;
+  font-weight: 800;
+  line-height: 1.15;
+}
+
+.live-banner-next {
+  padding: 10px 18px;
+  border-radius: 999px;
+  background: #ffffff;
+  color: #111111;
+  font-size: 22px;
+  font-weight: 800;
+}
+
+.live-banner.is-flash {
+  animation: live-banner-flash 700ms ease-out;
+}
+
+@keyframes live-banner-flash {
+  0% {
+    background: rgba(22, 163, 74, 0.85);
+  }
+  100% {
+    background: rgba(0, 0, 0, 0.62);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .live-banner.is-flash {
+    animation: none;
+  }
+}
+
 /* spot by spot: one chip per spot of the sheet, in the order of the target page; the spot being
    read in accent, a spot read with its score, a skipped one dimmed. A chip reads its spot again. */
 .live-spots {
