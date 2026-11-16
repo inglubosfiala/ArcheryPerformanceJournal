@@ -1,6 +1,5 @@
 // What the app stores (ARCHITECTURE §6.4). The repository validates before every save and on import.
 import { FACE_IDS, ARROWS_PER_END_MAX, isValidArrowsPerEnd, isValidArrowValue } from './scoring.js';
-import { sightErrors } from './gearFields.js';
 import { SESSION_TYPES, DRILL_IDS, MENTAL_TECHNIQUES, EFFORT_MAX, FOCUS_MAX, isScored, countsArrows, isTime, emptyReview, emptyCompetition } from './sessionTypes.js';
 
 const isStr = (v) => typeof v === 'string';
@@ -101,8 +100,13 @@ export const collections = {
       const errs = [];
       if (!isStr(r.name) || !r.name.trim()) errs.push('name is required');
       if (!r.fields || typeof r.fields !== 'object') errs.push('fields must be an object');
-      else errs.push(...sightErrors(r.fields.sights));
       return errs;
+    },
+  },
+  sightMarks: {
+    defaults: () => ({ distance: '', elevation: '', windage: '', note: '' }),
+    validate(r) {
+      return ['distance', 'elevation', 'windage', 'note'].filter((k) => !isStr(r[k])).map((k) => `${k} must be text`);
     },
   },
   competitions: {
@@ -123,19 +127,20 @@ export const defaultSettings = {
   theme: 'system',
   defaultInput: 'target',
   askGrades: true,
-  // the current setup: the GEAR_KEYS fields and its sight marks (`sights`, see gearFields.js)
   gear: {},
   activeSnapshotId: null,
   // the saved setup the Gear tab was last loaded from (kept while editing, so it can be updated)
   loadedSnapshotId: null,
   lastSetup: { distance: 18, face: '40t', arrowsPerEnd: 3 },
+  sightsSeeded: false,
 };
 
 /** Settings shared between devices by Google Drive sync; all others stay on the device. */
-// Only the gear setup (its sight marks included): lastSetup changes on its own (starting a session)
+// Only the gear setup: lastSetup / sightsSeeded change on their own (starting a session, first launch)
 // and would otherwise make a fresh device's settings look newer than the real gear setup.
 export const SYNCED_SETTING_KEYS = ['gear', 'activeSnapshotId', 'loadedSnapshotId'];
 
 /** The Ink accent follows the text colour, so it is light in dark mode (see applyTheme in main.js). */
 export const INK_ACCENT = '#14181C';
 export const ACCENTS = ['#0B6E4F', INK_ACCENT, '#1D4ED8', '#B45309'];
+export const DEFAULT_SIGHT_DISTANCES = ['18', '30', '50', '60', '70', '90'];

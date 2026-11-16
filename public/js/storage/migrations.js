@@ -39,32 +39,6 @@ export const migrations = [
       return { ...doc };
     },
   },
-  {
-    // v6: sight marks belong to a gear setup (1:1). The sightMarks collection becomes the `sights`
-    // list of the current setup (settings.gear.sights); every saved setup gets a copy of it, since
-    // the marks applied to all of them until now. Blank rows are dropped; sessions are unchanged.
-    from: 5,
-    to: 6,
-    up(doc) {
-      const { sightMarks, ...collections } = doc.collections || {};
-      const { sightsSeeded: _seeded, ...settings } = doc.settings || {};
-      const text = (v) => (typeof v === 'string' ? v : v == null ? '' : String(v));
-      const dist = (m) => {
-        const n = parseInt(m.distance, 10);
-        return Number.isFinite(n) ? n : 9999;
-      };
-      const marks = (sightMarks || [])
-        .filter((m) => m && !m.deleted && !m.trashedAt)
-        .map((m) => ({ id: String(m.id), distance: text(m.distance), elevation: text(m.elevation), windage: text(m.windage), note: text(m.note) }))
-        .filter((m) => [m.distance, m.elevation, m.windage, m.note].some((v) => v.trim()))
-        .sort((a, b) => dist(a) - dist(b));
-      // none typed in: the setups show the default distances, as on a fresh install
-      if (!marks.length) return { ...doc, settings, collections };
-      const withMarks = (fields) => (Array.isArray(fields?.sights) ? fields : { ...(fields || {}), sights: structuredClone(marks) });
-      collections.gearSnapshots = (collections.gearSnapshots || []).map((sn) => (sn.deleted ? sn : { ...sn, fields: withMarks(sn.fields) }));
-      return { ...doc, settings: { ...settings, gear: withMarks(settings.gear) }, collections };
-    },
-  },
 ];
 
 export class NewerVersionError extends Error {
