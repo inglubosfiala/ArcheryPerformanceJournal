@@ -100,9 +100,12 @@ class ShotDelegate extends KeyedDelegate {
         if (v == 0) { return; }
         if (st.step == EndState.STEP_ARROW) {
             st.chooseArrow(v, app().heartRate());
+            app().recorder.markArrow(v);
         } else if (st.step == EndState.STEP_M) {
+            if (st.pendingT < 0) { app().recorder.markArrow(st.pendingNo); } // picked by itself
             st.chooseM(v, app().heartRate());
         } else {
+            app().recorder.markGrade(st.pendingM, v);
             st.chooseS(v);
             buzz();
             if (st.isComplete()) {

@@ -162,6 +162,19 @@ class EndState {
         save();
     }
 
+    // The end's average M and S (0.0 when nothing is graded), for the activity's lap.
+    function averages() as Array<Float> {
+        var m = 0;
+        var s = 0;
+        var nm = 0;
+        var ns = 0;
+        for (var i = 0; i < shots.size(); i++) {
+            if (shots[i][1] > 0) { m += shots[i][1]; nm++; }
+            if (shots[i][2] > 0) { s += shots[i][2]; ns++; }
+        }
+        return [nm > 0 ? m.toFloat() / nm : 0.0, ns > 0 ? s.toFloat() / ns : 0.0] as Array<Float>;
+    }
+
     function nextEnd() as Void {
         endNo++;
         shots = [] as Array<Array<Number>>;

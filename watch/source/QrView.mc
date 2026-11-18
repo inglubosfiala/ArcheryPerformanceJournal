@@ -105,7 +105,7 @@ class QrDelegate extends KeyedDelegate {
     }
 
     hidden function next() as Void {
-        endState().nextEnd();
+        lapAndNextEnd();
         buzz();
         showShots();
     }

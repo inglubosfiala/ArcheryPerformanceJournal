@@ -9,6 +9,7 @@ function openMenu() as Void {
     menu.addItem(new WatchUi.MenuItem("Undo last shot", null, :undo, {}));
     menu.addItem(new WatchUi.MenuItem("Next end", "Clears this end", :next, {}));
     menu.addItem(new WatchUi.MenuItem("New round", st.perEnd.toString() + " per end, arrows 1-" + st.owned.toString(), :round, {}));
+    menu.addItem(new WatchUi.MenuItem("Finish round", "Save the activity", :finish, {}));
     WatchUi.pushView(menu, new GradesMenuDelegate(), WatchUi.SLIDE_UP);
 }
 
@@ -28,10 +29,15 @@ class GradesMenuDelegate extends WatchUi.Menu2InputDelegate {
             WatchUi.popView(WatchUi.SLIDE_IMMEDIATE);
             showShots();
         } else if (id == :next) {
-            st.nextEnd();
+            lapAndNextEnd();
             WatchUi.popView(WatchUi.SLIDE_IMMEDIATE);
             showShots();
         } else if (id == :round) {
+            WatchUi.popView(WatchUi.SLIDE_IMMEDIATE);
+            showSetup();
+        } else if (id == :finish) {
+            app().recorder.finish();
+            buzz();
             WatchUi.popView(WatchUi.SLIDE_IMMEDIATE);
             showSetup();
         }

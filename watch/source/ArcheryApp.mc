@@ -8,6 +8,7 @@ import Toybox.WatchUi;
 
 class ArcheryApp extends Application.AppBase {
     var state as EndState?;
+    var recorder as Recorder = new Recorder();
     hidden var _hr as Number = 0;
     hidden var _ticker as Timer.Timer? = null;
 
@@ -26,12 +27,15 @@ class ArcheryApp extends Application.AppBase {
     }
 
     function onSecond() as Void {
+        recorder.tick();
         if (self.state != null) { (self.state as EndState).sample(heartRate()); }
     }
 
     function onStop(state as Dictionary?) as Void {
         Sensor.enableSensorEvents(null);
         if (_ticker != null) { (_ticker as Timer.Timer).stop(); }
+        // leaving the app ends the activity; it is saved, not lost
+        recorder.finish();
         if (self.state != null) { (self.state as EndState).save(); }
     }
 
@@ -49,6 +53,7 @@ class ArcheryApp extends Application.AppBase {
 
     function getInitialView() as [WatchUi.Views] or [WatchUi.Views, WatchUi.InputDelegates] {
         if ((state as EndState).isComplete()) {
+            recorder.start();
             var q = new QrView();
             return [q, new QrDelegate(q)];
         }
@@ -58,6 +63,7 @@ class ArcheryApp extends Application.AppBase {
             var sv = new SetupView();
             return [sv, new SetupDelegate(sv)];
         }
+        recorder.start();
         var v = new ShotView();
         return [v, new ShotDelegate(v)];
     }
@@ -83,6 +89,7 @@ function showCode() as Void {
 }
 
 function showShots() as Void {
+    app().recorder.start(); // no-op while the round is recorded
     var v = new ShotView();
     WatchUi.switchToView(v, new ShotDelegate(v), WatchUi.SLIDE_RIGHT);
 }
@@ -90,4 +97,12 @@ function showShots() as Void {
 function showSetup() as Void {
     var v = new SetupView();
     WatchUi.switchToView(v, new SetupDelegate(v), WatchUi.SLIDE_UP);
+}
+
+// The end is done: its averages go on the activity lap, then the next end starts.
+function lapAndNextEnd() as Void {
+    var st = endState();
+    var avg = st.averages();
+    app().recorder.lap(avg[0], avg[1]);
+    st.nextEnd();
 }
