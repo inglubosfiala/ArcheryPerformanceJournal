@@ -60,6 +60,7 @@ const SHELL = [
   './js/app/views/tabataTimer.js',
   './js/app/views/liveScan.js',
   './js/app/watchCode.js',
+  './js/app/hrTrace.js',
   './js/app/views/watchScan.js',
   './js/vendor/jsQR.js',
   './js/app/runningSession.js',

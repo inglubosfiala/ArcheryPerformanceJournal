@@ -2711,6 +2711,43 @@ a.apl-sessionrow:hover {
   font-variant-numeric: tabular-nums;
   text-align: right;
 }
+/* the heart rate while the end was shot (watch): under the arrows, across the row */
+.ov-end-trace {
+  grid-column: 2 / 4;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+.ov-end-trace-chart {
+  flex: 1;
+  min-width: 0;
+  height: 28px;
+  overflow: visible;
+}
+.ov-end-trace-line {
+  fill: none;
+  stroke: var(--accent-bright);
+  stroke-width: 1.6;
+  stroke-linejoin: round;
+  vector-effect: non-scaling-stroke;
+}
+.ov-end-trace-shot {
+  stroke: var(--ink);
+  stroke-width: 3;
+  stroke-linecap: round;
+  vector-effect: non-scaling-stroke;
+}
+.ov-end-trace-shot.is-low {
+  stroke: #e5484d;
+}
+.ov-end-trace-range {
+  flex: none;
+  font-size: 11px;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
 .ov-more {
   min-height: 48px;
   border: none;

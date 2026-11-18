@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { parseWatchCode } from '../public/js/app/watchCode.js';
+import { hrChart } from '../public/js/app/hrTrace.js';
 import * as L from '../public/js/app/sessionLogic.js';
 import { collections } from '../public/js/app/collections.js';
 
@@ -57,13 +58,75 @@ describe('parseWatchCode', () => {
   });
 
   it('refuses a newer format version', () => {
-    expect(parseWatchCode('APJ2.E1.0143092')).toEqual({ ok: false, error: 'version' });
+    expect(parseWatchCode('APJ3.E1.0143092')).toEqual({ ok: false, error: 'version' });
   });
 
   it('refuses damaged codes: wrong length, grade over 5, arrow 0, repeated arrow', () => {
     for (const bad of ['APJ1.E1.014309', 'APJ1.E1.0163092', 'APJ1.E1.0043092', 'APJ1.E1.0143092.0154090', 'APJ1.1.0143092', 'APJ1.E1.01A3092']) {
       expect(parseWatchCode(bad)).toEqual({ ok: false, error: 'bad' });
     }
+  });
+});
+
+describe('parseWatchCode, format 2 (heart-rate trace)', () => {
+  // trace: bins of 2 s, first 80, then changes 0, +1, +2 ('L' = 0, 'M' = +1, 'N' = +2)
+  const CODE = 'APJ2.E2.0143004.0254006.H2080LMN';
+
+  it('reads the arrows with their shot time and the trace', () => {
+    expect(parseWatchCode(CODE)).toEqual({
+      ok: true,
+      end: 2,
+      arrows: [
+        { no: 1, m: 4, s: 3, t: 4, hr: 81 },
+        { no: 2, m: 5, s: 4, t: 6, hr: 83 },
+      ],
+      trace: { step: 2, hr: [80, 80, 81, 83] },
+    });
+  });
+
+  it('a shot after the end of the trace takes its last value', () => {
+    expect(parseWatchCode('APJ2.E1.0143099.H1100LK').arrows[0].hr).toBe(99);
+  });
+
+  it('decodes falling changes and the largest steps', () => {
+    // '0' = -21, ':' = +21
+    expect(parseWatchCode('APJ2.E1.0143000.H1120:0').trace.hr).toEqual([120, 141, 120]);
+  });
+
+  it('without a trace the arrows have no heart rate', () => {
+    expect(parseWatchCode('APJ2.E1.0143004')).toEqual({ ok: true, end: 1, arrows: [{ no: 1, m: 4, s: 3, t: 4, hr: null }], trace: null });
+  });
+
+  it('refuses a damaged trace', () => {
+    for (const bad of ['APJ2.E1.0143004.H0080L', 'APJ2.E1.0143004.H2020L', 'APJ2.E1.0143004.H2080 L', 'APJ2.E1.0143004.H2240:::', 'APJ2.E1.0143004.H2080L.0254006']) {
+      expect(parseWatchCode(bad)).toEqual({ ok: false, error: 'bad' });
+    }
+  });
+
+  it('fills the end: shot times, heart rates and the trace on the end', () => {
+    const s = L.applyWatchGrades(start(2), parseWatchCode(CODE));
+    expect(s.current.arrows.map((a) => [a.no, a.t, a.hr])).toEqual([
+      [1, 4, 81],
+      [2, 6, 83],
+    ]);
+    expect(s.current.hrTrace).toEqual({ step: 2, hr: [80, 80, 81, 83] });
+    const v = collections.sessions.validate({ ...L.nextEnd(L.enterScore(L.enterScore(s, 9), 8)), id: 'x', status: 'finished' });
+    expect(v.filter((e) => /trace|shot time/.test(e))).toEqual([]);
+  });
+
+  it('a code without a trace removes an older trace from the end', () => {
+    let s = L.applyWatchGrades(start(2), parseWatchCode(CODE));
+    s = L.applyWatchGrades(s, parseWatchCode('APJ2.E2.0143004'));
+    expect(s.current.hrTrace).toBeUndefined();
+  });
+
+  it('the validator refuses a broken trace', () => {
+    let s = L.applyWatchGrades(start(1), parseWatchCode('APJ2.E1.0143004.H2080LMN'));
+    s = L.nextEnd(L.enterScore(s, 10));
+    s.ends[0].hrTrace = { step: 0, hr: [80, 20] };
+    s.ends[0].arrows[0].t = -1;
+    const v = collections.sessions.validate({ ...s, id: 'x', status: 'finished' });
+    expect(v.filter((e) => /trace|shot time/.test(e))).toEqual(['end 1 arrow 1: invalid shot time', 'end 1: invalid heart-rate trace']);
   });
 });
 
@@ -126,5 +189,23 @@ describe('applyWatchGrades', () => {
     s.ends[0].arrows[1].hr = 20;
     const bad = collections.sessions.validate({ ...s, id: 'x', status: 'finished', ends: s.ends });
     expect(bad.filter((e) => /arrow number|heart rate/.test(e))).toEqual(['end 1 arrow 1: invalid arrow number', 'end 1 arrow 2: invalid heart rate']);
+  });
+});
+
+describe('hrChart', () => {
+  it('draws the trace across the box and puts each shot on the line', () => {
+    const c = hrChart({ step: 2, hr: [80, 90, 100] }, [{ t: 2, m: 4 }, { t: 9, m: 2 }, { v: 9 }], { w: 100, h: 20, pad: 0 });
+    expect(c.points).toBe('0,20 50,10 100,0');
+    expect(c.shots).toEqual([
+      { x: 50, y: 10, hr: 90, m: 4 },
+      { x: 100, y: 0, hr: 100, m: 2 },
+    ]);
+    expect([c.min, c.max, c.seconds]).toEqual([80, 100, 4]);
+  });
+
+  it('a flat curve stays in the middle; no trace, no chart', () => {
+    expect(hrChart({ step: 1, hr: [70, 70] }, [], { w: 10, h: 20, pad: 0 }).points).toBe('0,10 10,10');
+    expect(hrChart(null)).toBeNull();
+    expect(hrChart({ step: 1, hr: [] })).toBeNull();
   });
 });

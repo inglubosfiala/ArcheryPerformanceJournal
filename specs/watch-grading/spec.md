@@ -98,3 +98,10 @@ There is no server, no Garmin Connect account link and no phone companion app. T
 - **Arrow number on the slot:** `#n` replaces the slot number only while the slot is empty (that is when the archer needs to know which hole to score); once scored the slot shows the score and grades as before.
 - **History:** each arrow's heart rate shows as `♥92` under its grades in the ends list. A per-end average heart rate was not added.
 - Checked in the browser by feeding the camera the QR code from the watch simulator: the end filled with #1 M3 S4 … #6 M2 S3 and kept the grades when scored.
+
+## Heart rate while shooting (watch 0.3.0, journal)
+
+- **What is recorded:** one heart-rate sample per second while the app runs, kept only for the shooting part of an end: from 30 s before the first arrow's tap to the last arrow's grade. Walking to the target and back is not in it (sampling stops when the end is complete and restarts with the next end).
+- **Watch code format 2** (`APJ2`): each arrow carries its shot time `t` (the second of the trace at the arrow tap) instead of a heart rate, and a trailing `.H<step><first><changes>` holds the trace in bins of 1–9 s (at most ~60 points), the first value in 3 digits and one character per further bin for its change (−21..+21, the QR alphanumeric set without space and `.`). The journal still reads format 1 codes.
+- **QR encoder:** level L (more capacity; the code is read off a crisp screen), versions 1–10 (up to ~395 characters): unequal block groups, several alignment patterns and version information from version 7. A 6-arrow end with a 3-minute trace is ~110 characters (version 5). Checked by a JS port decoded with jsQR for every version 1–10.
+- **Journal:** the end keeps `hrTrace: { step, hr: [...] }`, each arrow `t` and `hr` (read from the trace at its shot). History shows the curve under each end with a tick at every shot (red for M 1–2) and the range and duration (`♥ 85–125 · 2:57`).
