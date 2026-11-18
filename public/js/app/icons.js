@@ -54,6 +54,7 @@ export const icons = {
   pencil: () => icon(18, p('M4 20h4L19 9l-4-4L4 16z'), p('M13.5 6.5l4 4')),
   check: () => icon(18, p('M5 12.5l4.5 4.5L19 7.5')),
   clock: () => icon(18, c(12, 12, 9), p('M12 7v5l3 2')),
+  watch: () => icon(18, c(12, 12, 6), p('M12 9.5V12l1.5 1.5'), p('M9 6.6 9.6 3h4.8l.6 3.6'), p('M9 17.4l.6 3.6h4.8l.6-3.6')),
   close: () => icon(18, p('M6 6l12 12M18 6 6 18')),
   trash: () => icon(18, p('M3 6h18'), p('M8 6V4h8v2'), p('M19 6l-1 14H6L5 6')),
   // Clear (an arrow): a bin with its lid and two ribs

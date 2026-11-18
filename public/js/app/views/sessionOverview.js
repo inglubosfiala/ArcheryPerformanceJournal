@@ -361,13 +361,15 @@ export function groupSection(ss, { filter = 'all', onFilter }) {
 
 const ENDS_SHOWN = 5;
 const gradesText = (a) => [a.m != null && `M${a.m}`, a.s != null && `S${a.s}`].filter(Boolean).join(' ');
+// the heart rate at the shot, when the arrow was graded on the watch
+const hrText = (a) => (a.hr != null ? `♥${a.hr}` : '');
 const chip = (v, cls = '') =>
   h('span', { class: `score-chip z-${zoneOf(v)} ${cls}`, 'aria-hidden': 'true' }, v == null ? '–' : String(v));
 
 /** One row per end: its score chips with the grades under each, and its total. Tap = Edit end. */
 export function endsSection(ss, { all = false, onShowAll, onEdit }) {
   const ends = all ? ss.ends : ss.ends.slice(0, ENDS_SHOWN);
-  const said = (a) => (a.v == null ? 'empty' : [a.v, gradesText(a)].filter(Boolean).join(' '));
+  const said = (a) => (a.v == null ? 'empty' : [a.v, gradesText(a), a.hr != null && `heart rate ${a.hr}`].filter(Boolean).join(' '));
   return h(
     'section',
     { class: 'ov-card ov-list', 'aria-labelledby': 'ov-ends' },
@@ -392,7 +394,7 @@ export function endsSection(ss, { all = false, onShowAll, onEdit }) {
         h(
           'span',
           { class: 'ov-end-arrows' },
-          e.arrows.map((a) => h('span', { class: 'ov-end-arrow' }, chip(a.v), h('span', { class: 'ov-end-grades' }, gradesText(a) || ' '))),
+          e.arrows.map((a) => h('span', { class: 'ov-end-arrow' }, chip(a.v), h('span', { class: 'ov-end-grades' }, gradesText(a) || ' '), hrText(a) ? h('span', { class: 'ov-end-grades ov-end-hr' }, hrText(a)) : null)),
         ),
         h('span', { class: 'ov-end-sum' }, String(sumArrows(e.arrows))),
         h('span', { class: 'ov-row-go', 'aria-hidden': 'true' }, icons.chevron()),
