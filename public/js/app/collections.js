@@ -4,9 +4,19 @@ import { sightErrors, historyErrors } from './gearFields.js';
 import { defaultLastSetup, isGoal } from './lastSetup.js';
 import { SESSION_TYPES, DRILL_IDS, MENTAL_TECHNIQUES, GYM_FOCUS, EFFORT_MAX, FOCUS_MAX, isScored, countsArrows, isTime, emptyReview, emptyCompetition } from './sessionTypes.js';
 import { GYM_UNITS, REPS_MAX, KG_MAX } from './gym.js';
-import { ARROW_NO_MAX, HR_MIN, HR_MAX } from './watchCode.js';
+import { ARROW_NO_MAX, HR_MIN, HR_MAX, SHOT_TIME_MAX, TRACE_STEP_MAX, TRACE_MAX } from './watchCode.js';
 
 const isStr = (v) => typeof v === 'string';
+// the heart rate while an end was shot, from the watch: { step: seconds per value, hr: [...] }
+const isTrace = (t) =>
+  !!t &&
+  Number.isInteger(t.step) &&
+  t.step >= 1 &&
+  t.step <= TRACE_STEP_MAX &&
+  Array.isArray(t.hr) &&
+  t.hr.length >= 1 &&
+  t.hr.length <= TRACE_MAX &&
+  t.hr.every((v) => Number.isInteger(v) && v >= HR_MIN && v <= HR_MAX);
 const isGrade = (g) => g == null || (Number.isInteger(g) && g >= 1 && g <= 5);
 const isCount = (n) => Number.isInteger(n) && n >= 0;
 const isUnit = (n) => n == null || (typeof n === 'number' && Number.isFinite(n) && Math.abs(n) <= 2);
@@ -24,6 +34,7 @@ function validateArrow(a, where, requireValue) {
   // from the watch (watchCode.js): which numbered arrow it was, and the heart rate at the shot
   if (a.no != null && !(Number.isInteger(a.no) && a.no >= 1 && a.no <= ARROW_NO_MAX)) errs.push(`${where}: invalid arrow number`);
   if (a.hr != null && !(Number.isInteger(a.hr) && a.hr >= HR_MIN && a.hr <= HR_MAX)) errs.push(`${where}: invalid heart rate`);
+  if (a.t != null && !(Number.isInteger(a.t) && a.t >= 0 && a.t <= SHOT_TIME_MAX)) errs.push(`${where}: invalid shot time`);
   return errs;
 }
 
@@ -32,6 +43,7 @@ function validateEnd(e, where, n, requireValues) {
   const errs = [];
   if (e.arrows.length !== n) errs.push(`${where}: expected ${n} arrows`);
   e.arrows.forEach((a, i) => errs.push(...validateArrow(a, `${where} arrow ${i + 1}`, requireValues)));
+  if (e.hrTrace != null && !isTrace(e.hrTrace)) errs.push(`${where}: invalid heart-rate trace`);
   if (!isCount(e.ld) || !isCount(e.cld)) errs.push(`${where}: invalid let-downs`);
   else if (e.cld > e.ld) errs.push(`${where}: correct let-downs exceed let-downs`);
   if (e.note != null && !isStr(e.note)) errs.push(`${where}: invalid note`);

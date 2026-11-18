@@ -1,18 +1,20 @@
 import Toybox.Lang;
 
-// A small QR code encoder: alphanumeric mode, versions 1-6, error correction level M, mask 0.
-// Enough for one end of the watch code (up to ~120 characters). Follows ISO/IEC 18004;
-// the module placement mirrors Nayuki's reference implementation.
+// A small QR code encoder: alphanumeric mode, versions 1-10, error correction level L, mask 0.
+// Enough for one end of the watch code with its heart-rate curve (up to ~390 characters).
+// Follows ISO/IEC 18004; the module placement mirrors Nayuki's reference implementation.
+// Level L: the code is read off a crisp screen, so capacity counts more than damage tolerance.
 //
 // The work is split into stages (step()), each well under the watch's execution watchdog;
 // the view runs one stage per timer tick.
 module Qr {
     const ALNUM = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ $%*+-./:";
-    // per version, level M: data codewords, EC codewords per block, blocks, alignment centre
-    const DATA = [0, 16, 28, 44, 64, 86, 108];
-    const EC = [0, 10, 16, 26, 18, 24, 16];
-    const BLOCKS = [0, 1, 1, 1, 2, 2, 4];
-    const ALIGN = [0, 0, 18, 22, 26, 30, 34];
+    const MAX_VERSION = 10;
+    // per version, level L: data codewords, EC codewords per block, blocks, last alignment centre
+    const DATA = [0, 19, 34, 55, 80, 108, 136, 156, 194, 232, 274];
+    const EC = [0, 7, 10, 15, 20, 26, 18, 20, 24, 30, 18];
+    const BLOCKS = [0, 1, 1, 1, 1, 1, 2, 2, 2, 2, 4];
+    const ALIGN = [0, 0, 18, 22, 26, 30, 34, 38, 42, 46, 50];
 
     const ST_DATA = 0;
     const ST_TABLES = 1;
@@ -61,11 +63,9 @@ module Qr {
                 _gen = generator(EC[_v]);
                 _stage = ST_BLOCKS;
             } else if (_stage == ST_BLOCKS) {
-                var nb = BLOCKS[_v];
-                var len = DATA[_v] / nb;
                 var b = _ecs.size();
-                _ecs.add(remainder(_data.slice(b * len, (b + 1) * len), EC[_v]));
-                if (_ecs.size() == nb) { _stage = ST_INTERLEAVE; }
+                _ecs.add(remainder(_data.slice(blockStart(b), blockStart(b) + blockLen(b)), EC[_v]));
+                if (_ecs.size() == BLOCKS[_v]) { _stage = ST_INTERLEAVE; }
             } else if (_stage == ST_INTERLEAVE) {
                 interleave();
                 _stage = ST_PATTERNS;
@@ -85,9 +85,8 @@ module Qr {
         hidden function buildData() as Void {
             var chars = _text.toUpper().toCharArray();
             var n = chars.size();
-            var bitsNeeded = 4 + 9 + 11 * (n / 2) + 6 * (n % 2);
-            for (var i = 1; i <= 6; i++) {
-                if (bitsNeeded <= DATA[i] * 8) { _v = i; break; }
+            for (var i = 1; i <= MAX_VERSION; i++) {
+                if (4 + countBits(i) + 11 * (n / 2) + 6 * (n % 2) <= DATA[i] * 8) { _v = i; break; }
             }
             if (_v == 0) {
                 failed = true;
@@ -97,7 +96,7 @@ module Qr {
             _data = new [cap]b;
             var pos = 0;
             pos = put(pos, 2, 4);
-            pos = put(pos, n, 9);
+            pos = put(pos, n, countBits(_v));
             var k = 0;
             while (k + 1 < n) {
                 pos = put(pos, idx(chars[k]) * 45 + idx(chars[k + 1]), 11);
@@ -112,6 +111,26 @@ module Qr {
                 _data[b] = pad;
                 pad = pad == 0xEC ? 0x11 : 0xEC;
             }
+        }
+
+        // bits of the character count in alphanumeric mode
+        hidden function countBits(v as Number) as Number {
+            return v <= 9 ? 9 : 11;
+        }
+
+        // Blocks: the short ones first, the long ones one data codeword longer.
+        hidden function blockLen(b as Number) as Number {
+            var nb = BLOCKS[_v];
+            var shortLen = DATA[_v] / nb;
+            var numShort = nb - DATA[_v] % nb;
+            return b < numShort ? shortLen : shortLen + 1;
+        }
+
+        hidden function blockStart(b as Number) as Number {
+            var nb = BLOCKS[_v];
+            var shortLen = DATA[_v] / nb;
+            var numShort = nb - DATA[_v] % nb;
+            return b < numShort ? b * shortLen : numShort * shortLen + (b - numShort) * (shortLen + 1);
         }
 
         hidden function idx(c as Char) as Number {
@@ -183,11 +202,16 @@ module Qr {
         hidden function interleave() as Void {
             var nb = BLOCKS[_v];
             var ec = EC[_v];
-            var len = DATA[_v] / nb;
+            var longest = blockLen(nb - 1);
             _cw = new [DATA[_v] + ec * nb]b;
             var o = 0;
-            for (var i = 0; i < len; i++) {
-                for (var b = 0; b < nb; b++) { _cw[o] = _data[b * len + i]; o++; }
+            for (var i = 0; i < longest; i++) {
+                for (var b = 0; b < nb; b++) {
+                    if (i < blockLen(b)) {
+                        _cw[o] = _data[blockStart(b) + i];
+                        o++;
+                    }
+                }
             }
             for (var i = 0; i < ec; i++) {
                 for (var b = 0; b < nb; b++) { _cw[o] = _ecs[b][i]; o++; }
@@ -203,12 +227,14 @@ module Qr {
                 set(i, 6, i % 2 == 0);
             }
             if (_v >= 2) {
-                var a = ALIGN[_v];
-                for (var dr = -2; dr <= 2; dr++) {
-                    for (var dc = -2; dc <= 2; dc++) {
-                        var ar = dr < 0 ? -dr : dr;
-                        var ac = dc < 0 ? -dc : dc;
-                        set(a + dr, a + dc, (ar > ac ? ar : ac) != 1);
+                // centres: 6, (the middle one from version 7), the last one
+                var pos = _v >= 7 ? [6, (6 + ALIGN[_v]) / 2, ALIGN[_v]] : [6, ALIGN[_v]];
+                var na = pos.size();
+                for (var i = 0; i < na; i++) {
+                    for (var j = 0; j < na; j++) {
+                        // not where a finder is
+                        if ((i == 0 && j == 0) || (i == 0 && j == na - 1) || (i == na - 1 && j == 0)) { continue; }
+                        align(pos[i], pos[j]);
                     }
                 }
             }
@@ -217,6 +243,30 @@ module Qr {
             finder(0, size - 7);
             finder(size - 7, 0);
             format(0);
+            if (_v >= 7) { versionInfo(); }
+        }
+
+        hidden function align(r as Number, c as Number) as Void {
+            for (var dr = -2; dr <= 2; dr++) {
+                for (var dc = -2; dc <= 2; dc++) {
+                    var ar = dr < 0 ? -dr : dr;
+                    var ac = dc < 0 ? -dc : dc;
+                    set(r + dr, c + dc, (ar > ac ? ar : ac) != 1);
+                }
+            }
+        }
+
+        // Version information (versions 7 and up): 18 bits, two copies.
+        hidden function versionInfo() as Void {
+            var rem = _v;
+            for (var i = 0; i < 12; i++) { rem = (rem << 1) ^ ((rem >> 11) * 0x1F25); }
+            var bits = (_v << 12) | rem;
+            for (var i = 0; i < 18; i++) {
+                var a = size - 11 + i % 3;
+                var b = i / 3;
+                set(b, a, bitOf(bits, i));
+                set(a, b, bitOf(bits, i));
+            }
         }
 
         // One pair of columns of the zigzag, from the bottom right; mask 0 applied.
@@ -260,9 +310,9 @@ module Qr {
             }
         }
 
-        // Format bits for level M (00) and the mask, both copies, plus the dark module.
+        // Format bits for level L (01) and the mask, both copies, plus the dark module.
         hidden function format(mask as Number) as Void {
-            var data = mask; // level M = 00
+            var data = (1 << 3) | mask; // level L = 01
             var rem = data;
             for (var i = 0; i < 10; i++) { rem = (rem << 1) ^ ((rem >> 9) * 0x537); }
             var bits = ((data << 10) | rem) ^ 0x5412;

@@ -216,7 +216,8 @@ export function gradeArrow(session, kind, g) {
 /**
  * The grades of one end made on the watch (a parsed watch code, see watchCode.js) into the shown
  * end: slot 1 gets the lowest arrow number, slot 2 the next, and so on. Each filled slot gets M, S,
- * the arrow number and the heart rate; its score and position stay. The archer then scores the
+ * the arrow number, the heart rate and the shot time; its score and position stay. The end keeps the
+ * heart-rate trace of the code. The archer then scores the
  * slots in that order, each showing which numbered arrow it is. A code with more arrows than the
  * end has slots changes nothing.
  */
@@ -225,9 +226,12 @@ export function applyWatchGrades(session, code) {
   if (arrows.length > shownEnd(session).arrows.length) return session;
   return withShown(session, (end, s) => {
     arrows.forEach((w, i) => {
-      const { no: _no, hr: _hr, ...rest } = end.arrows[i];
-      end.arrows[i] = { ...rest, m: w.m, s: w.s, no: w.no, ...(w.hr != null ? { hr: w.hr } : {}) };
+      const { no: _no, hr: _hr, t: _t, ...rest } = end.arrows[i];
+      end.arrows[i] = { ...rest, m: w.m, s: w.s, no: w.no, ...(w.hr != null ? { hr: w.hr } : {}), ...(w.t != null ? { t: w.t } : {}) };
     });
+    // the heart rate while the end was shot (watch app 0.3 on); a code without one removes an older one
+    if (code.trace) end.hrTrace = { step: code.trace.step, hr: [...code.trace.hr] };
+    else delete end.hrTrace;
     s.cursor = 0;
     s.pinned = false;
   });

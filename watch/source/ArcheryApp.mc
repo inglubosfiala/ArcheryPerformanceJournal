@@ -3,11 +3,13 @@ import Toybox.Application;
 import Toybox.Attention;
 import Toybox.Lang;
 import Toybox.Sensor;
+import Toybox.Timer;
 import Toybox.WatchUi;
 
 class ArcheryApp extends Application.AppBase {
     var state as EndState?;
     hidden var _hr as Number = 0;
+    hidden var _ticker as Timer.Timer? = null;
 
     function initialize() {
         AppBase.initialize();
@@ -17,10 +19,19 @@ class ArcheryApp extends Application.AppBase {
         self.state = new EndState();
         Sensor.setEnabledSensors([Sensor.SENSOR_HEARTRATE] as Array<Sensor.SensorType>);
         Sensor.enableSensorEvents(method(:onSensor));
+        // one heart-rate sample per second for the end's trace
+        var t = new Timer.Timer();
+        t.start(method(:onSecond), 1000, true);
+        _ticker = t;
+    }
+
+    function onSecond() as Void {
+        if (self.state != null) { (self.state as EndState).sample(heartRate()); }
     }
 
     function onStop(state as Dictionary?) as Void {
         Sensor.enableSensorEvents(null);
+        if (_ticker != null) { (_ticker as Timer.Timer).stop(); }
         if (self.state != null) { (self.state as EndState).save(); }
     }
 

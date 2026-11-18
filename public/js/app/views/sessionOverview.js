@@ -39,6 +39,7 @@ import { isMultiSpot, keypadValues, zoneOf } from '../scoring.js';
 import { sumArrows } from '../stats.js';
 import { rescoreEnd } from '../sessionLogic.js';
 import { faceRings } from './face.js';
+import { hrChart } from '../hrTrace.js';
 import { whenCard, gearCard } from './common.js';
 
 // ---------------------------------------------------------------- state of the page (ui `ov`)
@@ -366,6 +367,29 @@ const hrText = (a) => (a.hr != null ? `♥${a.hr}` : '');
 const chip = (v, cls = '') =>
   h('span', { class: `score-chip z-${zoneOf(v)} ${cls}`, 'aria-hidden': 'true' }, v == null ? '–' : String(v));
 
+/**
+ * The heart rate while the end was shot (from the watch): the curve, a tick at each shot (red for a
+ * low mental grade) and the range. Nothing for an end without a trace.
+ */
+function hrSparkline(end) {
+  const c = hrChart(end.hrTrace, end.arrows, { w: 200, h: 36 });
+  if (!c) return null;
+  const mins = Math.floor(c.seconds / 60);
+  const secs = String(c.seconds % 60).padStart(2, '0');
+  return h(
+    'span',
+    { class: 'ov-end-trace', 'aria-label': `Heart rate while shooting: ${c.min} to ${c.max}, over ${mins}:${secs}` },
+    s(
+      'svg',
+      { class: 'ov-end-trace-chart', viewBox: '0 0 200 36', preserveAspectRatio: 'none', 'aria-hidden': 'true', focusable: 'false' },
+      s('polyline', { class: 'ov-end-trace-line', points: c.points }),
+      // a short upright tick at each shot (stays crisp while the chart stretches to the row)
+      ...c.shots.map((p) => s('line', { class: ['ov-end-trace-shot', p.m != null && p.m <= 2 && 'is-low'], x1: p.x, x2: p.x, y1: p.y - 4, y2: p.y + 4 })),
+    ),
+    h('span', { class: 'ov-end-trace-range', 'aria-hidden': 'true' }, `♥ ${c.min}–${c.max} · ${mins}:${secs}`),
+  );
+}
+
 /** One row per end: its score chips with the grades under each, and its total. Tap = Edit end. */
 export function endsSection(ss, { all = false, onShowAll, onEdit }) {
   const ends = all ? ss.ends : ss.ends.slice(0, ENDS_SHOWN);
@@ -398,6 +422,7 @@ export function endsSection(ss, { all = false, onShowAll, onEdit }) {
         ),
         h('span', { class: 'ov-end-sum' }, String(sumArrows(e.arrows))),
         h('span', { class: 'ov-row-go', 'aria-hidden': 'true' }, icons.chevron()),
+        hrSparkline(e),
       ),
     ),
     !all && ss.ends.length > ENDS_SHOWN
