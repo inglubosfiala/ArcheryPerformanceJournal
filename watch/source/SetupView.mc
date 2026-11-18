@@ -95,6 +95,7 @@ class SetupDelegate extends KeyedDelegate {
     }
 
     hidden function start(owned as Number) as Void {
+        app().recorder.finish(); // a round being recorded is saved; the new one gets its own activity
         endState().newRound(_view.perEnd, owned);
         buzz();
         showShots();
