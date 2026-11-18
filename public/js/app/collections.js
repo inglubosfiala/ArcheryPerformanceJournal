@@ -4,6 +4,7 @@ import { sightErrors, historyErrors } from './gearFields.js';
 import { defaultLastSetup, isGoal } from './lastSetup.js';
 import { SESSION_TYPES, DRILL_IDS, MENTAL_TECHNIQUES, GYM_FOCUS, EFFORT_MAX, FOCUS_MAX, isScored, countsArrows, isTime, emptyReview, emptyCompetition } from './sessionTypes.js';
 import { GYM_UNITS, REPS_MAX, KG_MAX } from './gym.js';
+import { ARROW_NO_MAX, HR_MIN, HR_MAX } from './watchCode.js';
 
 const isStr = (v) => typeof v === 'string';
 const isGrade = (g) => g == null || (Number.isInteger(g) && g >= 1 && g <= 5);
@@ -20,6 +21,9 @@ function validateArrow(a, where, requireValue) {
   if (!isGrade(a.s)) errs.push(`${where}: invalid S grade`);
   if (!isUnit(a.x) || !isUnit(a.y)) errs.push(`${where}: invalid position`);
   if (a.spot != null && !(Number.isInteger(a.spot) && a.spot >= 0 && a.spot <= 2)) errs.push(`${where}: invalid spot`);
+  // from the watch (watchCode.js): which numbered arrow it was, and the heart rate at the shot
+  if (a.no != null && !(Number.isInteger(a.no) && a.no >= 1 && a.no <= ARROW_NO_MAX)) errs.push(`${where}: invalid arrow number`);
+  if (a.hr != null && !(Number.isInteger(a.hr) && a.hr >= HR_MIN && a.hr <= HR_MAX)) errs.push(`${where}: invalid heart rate`);
   return errs;
 }
 

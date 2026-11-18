@@ -29,6 +29,7 @@ import { sessionTimer } from './timer.js';
 import * as APL from '../../ui/apl/index.js';
 import { detectArrows } from '../photoDetect.js';
 import { drawArrowMarks, liveScan } from './liveScan.js';
+import { watchScan } from './watchScan.js';
 import { PREVIEW_MARGIN, spotsBox, resultOnCrop } from '../scanGeometry.js';
 import { PREVIEW_MAX, canScan, createScan } from '../scan.js';
 import { loupeCorner, loupeBox } from '../loupePlacement.js';
@@ -245,6 +246,8 @@ function renderActive(ctx, session) {
       // "M1 S2" once the arrow has a score or a grade ("–" for a grade not given yet); none when
       // the session is scored without grading
       const grades = graded && (a.v != null || a.m != null || a.s != null) ? `M${a.m ?? '–'} S${a.s ?? '–'}` : '';
+      // graded on the watch: which numbered arrow this slot is (#3), shown until the slot is scored
+      const no = a.no != null ? `#${a.no}` : '';
       return h(
         'div',
         { class: ['slot-card', active && 'is-active', active && editing && 'is-moving'] },
@@ -253,12 +256,12 @@ function renderActive(ctx, session) {
           {
             type: 'button',
             class: 'slot-pick',
-            'aria-label': `${T.arrowN(i + 1)}${a.v == null ? ', empty' : `, ${a.v}`}${a.m ? `, M${a.m}` : ''}${a.s ? `, S${a.s}` : ''}${active ? ', selected' : ''}`,
+            'aria-label': `${T.arrowN(i + 1)}${no ? ` (arrow ${no})` : ''}${a.v == null ? ', empty' : `, ${a.v}`}${a.m ? `, M${a.m}` : ''}${a.s ? `, S${a.s}` : ''}${active ? ', selected' : ''}`,
             'aria-pressed': String(active),
             dataset: { fk: `slot-${i}` },
             onClick: () => update(ctx, (cur) => L.selectArrow(cur, i)),
           },
-          h('span', { class: `score-chip z-${zoneOf(a.v)}`, 'aria-hidden': 'true' }, a.v == null ? String(i + 1) : String(a.v)),
+          h('span', { class: `score-chip z-${zoneOf(a.v)}`, 'aria-hidden': 'true' }, a.v == null ? no || String(i + 1) : String(a.v)),
           grades ? h('span', { class: 'slot-card-grades', 'aria-hidden': 'true' }, grades) : null,
         ),
         // only the selected, scored arrow: × empties its score, position and grades (today's Clear)
@@ -324,6 +327,21 @@ function renderActive(ctx, session) {
       h('strong', null, `${current.ld} · ${current.cld}`),
     ),
     chip(`${T.noteForEnd}${current.note ? ' (written)' : ''}. ${T.endDetails(endNo)}`, 'details-note', icons.pencil(), 'Note', current.note ? h('span', { class: 'score-chip-dot', 'aria-hidden': 'true' }) : null),
+    // the grades made on the watch: scan its code into this end
+    graded
+      ? h(
+          'button',
+          {
+            type: 'button',
+            class: 'score-chip-btn',
+            'aria-label': `Scan the watch grades into ${T.endN(endNo).toLowerCase()}`,
+            onClick: () => scanWatch(ctx),
+            dataset: { fk: 'watch-scan' },
+          },
+          icons.watch(),
+          'Watch',
+        )
+      : null,
   );
 
   // --- bottom bar, in thumb reach: Previous (end), Next (end), and Scan (the most used, the largest)
@@ -588,6 +606,45 @@ function finishSheet(ctx, session, close) {
       ),
     }),
   };
+}
+
+// ---------------------------------------------------------------- the watch code
+
+/**
+ * Scan the watch code of an end (Arrow Grades on the archer's watch) into the shown end: the slots
+ * get M, S, heart rate and the arrow number in arrow-number order, ready to be scored in that order.
+ * Grades or scores already in the end are only replaced after a yes.
+ */
+async function scanWatch(ctx) {
+  const code = await watchScan();
+  if (!code) return;
+  const session = ctx.running.get();
+  if (!session) return;
+  const end = L.shownEnd(session);
+  const n = code.arrows.length;
+  if (!n) {
+    ctx.toast('The watch code has no graded arrows yet.');
+    return;
+  }
+  if (n > end.arrows.length) {
+    ctx.toast(`The watch code has ${n} arrows; this end has ${end.arrows.length} slots.`);
+    return;
+  }
+  const touched = end.arrows.slice(0, n).some((a) => a.v != null || a.m != null || a.s != null);
+  if (
+    touched &&
+    !(await confirmDialog({
+      title: 'Replace the grades?',
+      message: `The watch grades go into slots 1–${n} in arrow-number order (#${code.arrows.map((a) => a.no).join(', #')}). Grades already there are replaced; scores stay.`,
+      confirmLabel: 'Replace',
+    }))
+  ) {
+    return;
+  }
+  if (update(ctx, (cur) => L.applyWatchGrades(cur, code))) {
+    announce(`Watch grades for ${n} ${n === 1 ? 'arrow' : 'arrows'}: score them in the order #${code.arrows.map((a) => a.no).join(', #')}.`);
+    ctx.toast(`${n} ${n === 1 ? 'arrow' : 'arrows'} graded from the watch. Score them in the order shown.`);
+  }
 }
 
 // ---------------------------------------------------------------- the Scan

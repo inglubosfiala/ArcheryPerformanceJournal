@@ -1,0 +1,130 @@
+import { describe, it, expect } from 'vitest';
+import { parseWatchCode } from '../public/js/app/watchCode.js';
+import * as L from '../public/js/app/sessionLogic.js';
+import { collections } from '../public/js/app/collections.js';
+
+// The code the watch app showed for end 1 in the simulator (no heart-rate sensor there: 000)
+const SIM = 'APJ1.E1.0134000.0245000.0354000.0433000.0544000.0623000';
+
+describe('parseWatchCode', () => {
+  it('reads the end number and each arrow: number, M, S, heart rate', () => {
+    const r = parseWatchCode('APJ1.E3.0143092.0254088');
+    expect(r).toEqual({
+      ok: true,
+      end: 3,
+      arrows: [
+        { no: 1, m: 4, s: 3, hr: 92 },
+        { no: 2, m: 5, s: 4, hr: 88 },
+      ],
+    });
+  });
+
+  it('reads the simulator code; heart rate 000 is none', () => {
+    const r = parseWatchCode(SIM);
+    expect(r.ok).toBe(true);
+    expect(r.arrows.map((a) => [a.no, a.m, a.s, a.hr])).toEqual([
+      [1, 3, 4, null],
+      [2, 4, 5, null],
+      [3, 5, 4, null],
+      [4, 3, 3, null],
+      [5, 4, 4, null],
+      [6, 2, 3, null],
+    ]);
+  });
+
+  it('a 0 grade is a grade not given', () => {
+    expect(parseWatchCode('APJ1.E1.0700101').arrows[0]).toEqual({ no: 7, m: null, s: null, hr: 101 });
+  });
+
+  it('sorts the arrows by number and accepts lower case and spaces around', () => {
+    const r = parseWatchCode('  apj1.e2.1234080.0355090 ');
+    expect(r.ok).toBe(true);
+    expect(r.arrows.map((a) => a.no)).toEqual([3, 12]);
+  });
+
+  it('an end with no arrows yet is valid and empty', () => {
+    expect(parseWatchCode('APJ1.E4')).toEqual({ ok: true, end: 4, arrows: [] });
+  });
+
+  it('heart rate outside 30-250 is dropped, the grades kept', () => {
+    expect(parseWatchCode('APJ1.E1.0145999').arrows[0]).toEqual({ no: 1, m: 4, s: 5, hr: null });
+  });
+
+  it('refuses codes that are not from the watch app', () => {
+    expect(parseWatchCode('https://example.com')).toEqual({ ok: false, error: 'not-watch' });
+    expect(parseWatchCode('')).toEqual({ ok: false, error: 'not-watch' });
+    expect(parseWatchCode(null)).toEqual({ ok: false, error: 'not-watch' });
+  });
+
+  it('refuses a newer format version', () => {
+    expect(parseWatchCode('APJ2.E1.0143092')).toEqual({ ok: false, error: 'version' });
+  });
+
+  it('refuses damaged codes: wrong length, grade over 5, arrow 0, repeated arrow', () => {
+    for (const bad of ['APJ1.E1.014309', 'APJ1.E1.0163092', 'APJ1.E1.0043092', 'APJ1.E1.0143092.0154090', 'APJ1.1.0143092', 'APJ1.E1.01A3092']) {
+      expect(parseWatchCode(bad)).toEqual({ ok: false, error: 'bad' });
+    }
+  });
+});
+
+const start = (n = 6) => L.createSession({ date: '2026-11-18', distance: 18, face: '40s', arrowsPerEnd: n });
+
+describe('applyWatchGrades', () => {
+  it('fills the shown end in arrow-number order with M, S, heart rate and arrow number', () => {
+    const code = parseWatchCode('APJ1.E1.0543092.0254088.0333000');
+    const s = L.applyWatchGrades(start(4), code);
+    expect(s.current.arrows).toEqual([
+      { v: null, m: 5, s: 4, x: null, y: null, no: 2, hr: 88 },
+      { v: null, m: 3, s: 3, x: null, y: null, no: 3 },
+      { v: null, m: 4, s: 3, x: null, y: null, no: 5, hr: 92 },
+      { v: null, m: null, s: null, x: null, y: null },
+    ]);
+    expect(s.cursor).toBe(0);
+    expect(s.pinned).toBe(false);
+  });
+
+  it('then the scores go into the slots one after another, keeping the grades', () => {
+    let s = L.applyWatchGrades(start(3), parseWatchCode('APJ1.E1.0143092.0254088.0333090'));
+    s = L.enterScore(s, 10);
+    s = L.enterScore(s, 9);
+    s = L.enterScore(s, 8);
+    expect(s.current.arrows.map((a) => [a.no, a.v, a.m, a.s])).toEqual([
+      [1, 10, 4, 3],
+      [2, 9, 5, 4],
+      [3, 8, 3, 3],
+    ]);
+  });
+
+  it('keeps scores already entered and replaces their grades', () => {
+    let s = L.enterScore(start(2), 10, 0.1, 0.1);
+    s = L.gradeArrow(s, 'm', 1);
+    s = L.applyWatchGrades(s, parseWatchCode('APJ1.E1.0145080'));
+    expect(s.current.arrows[0]).toEqual({ v: 10, m: 4, s: 5, x: 0.1, y: 0.1, no: 1, hr: 80 });
+  });
+
+  it('applies to a saved end when one is shown', () => {
+    let s = L.enterScore(start(1), 9);
+    s = L.nextEnd(s);
+    s = L.prevEnd(s);
+    s = L.applyWatchGrades(s, parseWatchCode('APJ1.E1.0322070'));
+    expect(s.ends[0].arrows[0]).toMatchObject({ v: 9, m: 2, s: 2, no: 3, hr: 70 });
+  });
+
+  it('more arrows than slots changes nothing', () => {
+    const s = start(2);
+    expect(L.applyWatchGrades(s, parseWatchCode('APJ1.E1.0143092.0254088.0333090'))).toBe(s);
+  });
+
+  it('arrow number and heart rate pass the session validator', () => {
+    let s = L.applyWatchGrades(start(2), parseWatchCode('APJ1.E1.0143092.0254088'));
+    s = L.enterScore(s, 10);
+    s = L.enterScore(s, 9);
+    s = L.nextEnd(s);
+    const v = collections.sessions.validate({ ...s, id: 'x', status: 'finished', ends: s.ends });
+    expect(v.filter((e) => /arrow number|heart rate/.test(e))).toEqual([]);
+    s.ends[0].arrows[0].no = 0;
+    s.ends[0].arrows[1].hr = 20;
+    const bad = collections.sessions.validate({ ...s, id: 'x', status: 'finished', ends: s.ends });
+    expect(bad.filter((e) => /arrow number|heart rate/.test(e))).toEqual(['end 1 arrow 1: invalid arrow number', 'end 1 arrow 2: invalid heart rate']);
+  });
+});
