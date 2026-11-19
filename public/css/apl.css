@@ -2713,7 +2713,7 @@ a.apl-sessionrow:hover {
 }
 /* the heart rate while the end was shot (watch): under the arrows, across the row */
 .ov-end-trace {
-  grid-column: 2 / 4;
+  flex: 1;
   display: flex;
   align-items: center;
   gap: 8px;
@@ -3204,4 +3204,154 @@ a.apl-sessionrow:hover {
   flex-direction: column;
   gap: 10px;
   padding: 14px;
+}
+
+/* The watch timeline of an end (views/watchEnd.js): after the Watch scan and from History */
+.apl-dialog.wt-dialog {
+  width: min(560px, calc(100vw - 24px));
+  max-width: none;
+}
+.wt {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  text-align: left;
+}
+.wt-chart {
+  width: 100%;
+  height: auto;
+  display: block;
+  overflow: visible;
+}
+.wt-area {
+  fill: var(--accent-bright);
+  opacity: 0.12;
+}
+.wt-line {
+  fill: none;
+  stroke: var(--accent-bright);
+  stroke-width: 2;
+  stroke-linejoin: round;
+}
+.wt-base,
+.wt-tick {
+  stroke: var(--border-soft);
+  stroke-width: 1;
+}
+.wt-axis {
+  fill: var(--muted);
+  font-size: 10px;
+  font-variant-numeric: tabular-nums;
+}
+.wt-shot {
+  stroke-width: 1.5;
+  stroke-dasharray: 3 3;
+  opacity: 0.7;
+}
+.wt-dot {
+  stroke: var(--surface);
+  stroke-width: 1.5;
+}
+.wt-no {
+  font-size: 11px;
+  font-weight: 700;
+}
+.wt-gapline {
+  stroke: var(--muted);
+  stroke-width: 1;
+  marker-start: none;
+}
+.wt-gap {
+  fill: var(--ink-soft);
+  font-size: 11px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+/* the shot's M grade: 4-5 good, 3 middle, 1-2 low, none */
+.wt-shot.is-good, .wt-dot.is-good { stroke: #2ecc71; fill: #2ecc71; }
+.wt-shot.is-mid, .wt-dot.is-mid { stroke: #f5a623; fill: #f5a623; }
+.wt-shot.is-low, .wt-dot.is-low { stroke: #e5484d; fill: #e5484d; }
+.wt-shot.is-none, .wt-dot.is-none { stroke: var(--muted); fill: var(--muted); }
+.wt-dot.is-good, .wt-dot.is-mid, .wt-dot.is-low, .wt-dot.is-none { stroke: var(--surface); }
+.wt-no.is-good { fill: #2ecc71; }
+.wt-no.is-mid { fill: #f5a623; }
+.wt-no.is-low { fill: #e5484d; }
+.wt-no.is-none { fill: var(--muted); }
+.wt-details {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.wt-tiles {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 6px;
+}
+.wt-tile {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 8px;
+  border-radius: 10px;
+  background: var(--surface-sunken);
+  min-width: 0;
+}
+.wt-tile-label {
+  font-size: 11px;
+  color: var(--muted);
+}
+.wt-tile strong {
+  font-size: 15px;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.wt-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+}
+.wt-table th {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--muted);
+  text-align: left;
+  padding: 2px 4px;
+}
+.wt-table td {
+  padding: 5px 4px;
+  border-top: 1px solid var(--border-soft);
+}
+.wt-badge {
+  display: inline-block;
+  min-width: 30px;
+  padding: 1px 6px;
+  border-radius: 8px;
+  font-weight: 700;
+  text-align: center;
+  color: #000;
+  background: var(--muted);
+}
+.wt-badge.is-good { background: #2ecc71; }
+.wt-badge.is-mid { background: #f5a623; }
+.wt-badge.is-low { background: #e5484d; color: #fff; }
+.wt-empty {
+  font-size: 13px;
+  color: var(--muted);
+}
+/* History: the end's watch curve under its row opens the timeline */
+.ov-end-watch {
+  display: flex;
+  width: 100%;
+  padding: 0 12px 8px 44px;
+  border: none;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.ov-end-watch-text {
+  font-size: 12px;
+  color: var(--accent-bright);
 }

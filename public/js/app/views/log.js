@@ -30,6 +30,7 @@ import * as APL from '../../ui/apl/index.js';
 import { detectArrows } from '../photoDetect.js';
 import { drawArrowMarks, liveScan } from './liveScan.js';
 import { watchScan } from './watchScan.js';
+import { showWatchEnd } from './watchEnd.js';
 import { PREVIEW_MARGIN, spotsBox, resultOnCrop } from '../scanGeometry.js';
 import { PREVIEW_MAX, canScan, createScan } from '../scan.js';
 import { loupeCorner, loupeBox } from '../loupePlacement.js';
@@ -642,14 +643,11 @@ async function scanWatch(ctx) {
     return;
   }
   // grading on the watch is optional: an end closed without grades still brings its heart rate
-  if (!n) {
-    if (update(ctx, (cur) => L.applyWatchGrades(cur, code))) ctx.toast('Heart rate of this end taken from the watch (no grades on the watch).');
-    return;
-  }
-  if (update(ctx, (cur) => L.applyWatchGrades(cur, code))) {
-    announce(`Watch grades for ${n} ${n === 1 ? 'arrow' : 'arrows'}: score them in the order #${code.arrows.map((a) => a.no).join(', #')}.`);
-    ctx.toast(`${n} ${n === 1 ? 'arrow' : 'arrows'} graded from the watch. Score them in the order shown.`);
-  }
+  if (!update(ctx, (cur) => L.applyWatchGrades(cur, code))) return;
+  if (n) announce(`Watch grades for ${n} ${n === 1 ? 'arrow' : 'arrows'}: score them in the order #${code.arrows.map((a) => a.no).join(', #')}.`);
+  // what the watch recorded through the end; OK goes on to scoring it
+  const shown = ctx.running.get();
+  if (shown) await showWatchEnd(L.shownEnd(shown), { title: `${T.endN(L.viewIndex(shown) + 1)} · from the watch` });
 }
 
 // ---------------------------------------------------------------- the Scan
