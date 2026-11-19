@@ -144,3 +144,9 @@ The app now works like Garmin's own activity apps:
 
 - The start screen shows the app version (`APP_VERSION` in `ArcheryApp.mc`, e.g. `v0.7.0`). Keep it equal to the version typed in the store upload; the store page shows a new version only some time after the upload, so the watch screen is the reliable check.
 - **First real file (activity 25128161340, a 2-minute test on 0.6.0):** the SensorLogger records calibrated milli-g at ~100 Hz in `accelerometer_data` fields 5/6/7 (the tools now read those and resample to 25 Hz). A still hand shows a jitter of 3-10 mg (threshold 30). No release was detected: the one strong snap (1.2 g) was not preceded by stillness, as expected for a test away from the shooting line.
+
+## Detector at 100 Hz (watch 0.8.0)
+
+- **Why:** on the second test file (activity 25128394973, 0.7.0) the watch marked no release, although offline the same detector found a 950 mg snap after a still stretch. The watch's own 25 Hz stream is smoothed and flattens such short peaks; the activity file has the raw 100 Hz motion.
+- **Now:** the detector reads the accelerometer at 100 Hz, the same data the activity logs, so tuning offline matches the watch. Times stay the same in seconds (sample constants x4). The jitter is not scaled up (sensor noise is per sample): measured on the real file, a still hand is 2-14 mg and moving up to ~170 mg, so `QUIET` is 15 mg and the smoothing `ALPHA` 1/16 per sample (~0.16 s, as before).
+- **Checked:** synthetic shots all found (draw and hold within 0.1-0.3 s, set-up within 0.1 s); watch and Python give identical shots on the same 100 Hz data; 800 samples per tick ran without hitting the watchdog. On the test files the detector now finds snaps after still stretches; one coincides with an arrow tap on the watch, so a tap while the draw hand is still may look like a release (to check on real shots).

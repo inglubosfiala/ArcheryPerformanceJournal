@@ -1,7 +1,8 @@
 import Toybox.Lang;
 import Toybox.Math;
 
-// Finds the shots of an end in the draw hand's accelerometer (25 samples a second, milli-g):
+// Finds the shots of an end in the draw hand's accelerometer (100 samples a second, milli-g; the
+// watch's 25 Hz stream is smoothed and flattens the short release snap):
 //   set-up  the hand rising with the bow and settling (from the last rest up to the draw)
 //   draw    the hand moving back (after a pause, up to the anchor)
 //   anchor  the hand still: aiming and expansion (the "hold")
@@ -13,17 +14,18 @@ import Toybox.Math;
 // activity file, so they can be tuned on real shots (watch/tools/detect_shots.py runs the same
 // algorithm on an exported FIT file).
 class ShotDetector {
-    static const RATE = 25;            // samples per second
-    static const QUIET = 30;           // jitter (mg) below which the hand counts as still
+    static const RATE = 100;           // samples per second
+    static const ALPHA = 0.0625;       // jitter smoothing per sample (~0.16 s)
+    static const QUIET = 15;           // jitter (mg) below which the hand counts as still (still: 2-14)
     static const RELEASE = 900;        // |magnitude - 1 g| (mg) of the release snap
-    static const MIN_HOLD = 25;        // stillness (samples) needed right before a release: 1.0 s
-    static const GAP_AFTER_HOLD = 10;  // the snap must come within 0.4 s of the stillness ending
-    static const PAUSE = 13;           // a pause (samples) that marks the start of the draw: 0.5 s
-    static const MAX_DRAW = 200;       // look back at most 8 s for the draw's start
-    static const REST = 25;            // a rest (samples) before the set-up: 1.0 s
-    static const MAX_SETUP = 200;      // look back at most 8 s for the set-up's start
-    static const REFRACTORY = 75;      // 3 s between two releases
-    static const HISTORY = 750;        // 30 s of quiet flags kept for looking back
+    static const MIN_HOLD = 100;       // stillness (samples) needed right before a release: 1.0 s
+    static const GAP_AFTER_HOLD = 40;  // the snap must come within 0.4 s of the stillness ending
+    static const PAUSE = 50;           // a pause (samples) that marks the start of the draw: 0.5 s
+    static const MAX_DRAW = 800;       // look back at most 8 s for the draw's start
+    static const REST = 100;           // a rest (samples) before the set-up: 1.0 s
+    static const MAX_SETUP = 800;      // look back at most 8 s for the set-up's start
+    static const REFRACTORY = 300;     // 3 s between two releases
+    static const HISTORY = 3000;       // 30 s of quiet flags kept for looking back
 
     var shots as Array<Array<Number>> = [] as Array<Array<Number>>;
     var lastShot as Array<Number>? = null;
@@ -64,7 +66,7 @@ class ShotDetector {
             var d = m - _prev;
             if (d < 0) { d = -d; }
             _prev = m;
-            _jitter = _jitter * 0.75 + d * 0.25;
+            _jitter = _jitter * (1.0 - ALPHA) + d * ALPHA;
             var still = _jitter < QUIET;
             var slot = _n % HISTORY;
             _quiet[slot] = still ? 1 : 0;
