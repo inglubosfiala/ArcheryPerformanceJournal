@@ -329,21 +329,20 @@ function renderActive(ctx, session) {
       h('strong', null, `${current.ld} · ${current.cld}`),
     ),
     chip(`${T.noteForEnd}${current.note ? ' (written)' : ''}. ${T.endDetails(endNo)}`, 'details-note', icons.pencil(), 'Note', current.note ? h('span', { class: 'score-chip-dot', 'aria-hidden': 'true' }) : null),
-    // the grades made on the watch: scan its code into this end
-    graded
-      ? h(
-          'button',
-          {
-            type: 'button',
-            class: 'score-chip-btn',
-            'aria-label': `Scan the watch grades into ${T.endN(endNo).toLowerCase()}`,
-            onClick: () => scanWatch(ctx),
-            dataset: { fk: 'watch-scan' },
-          },
-          icons.watch(),
-          'Watch',
-        )
-      : null,
+    // what the watch recorded: scan its code into this end (grades in a graded session; shot
+    // timing and heart rate in every session)
+    h(
+      'button',
+      {
+        type: 'button',
+        class: 'score-chip-btn',
+        'aria-label': `Scan the watch code into ${T.endN(endNo).toLowerCase()}`,
+        onClick: () => scanWatch(ctx),
+        dataset: { fk: 'watch-scan' },
+      },
+      icons.watch(),
+      'Watch',
+    ),
   );
 
   // --- bottom bar, in thumb reach: Previous (end), Next (end), and Scan (the most used, the largest)
@@ -623,9 +622,13 @@ async function scanWatch(ctx) {
   const session = ctx.running.get();
   if (!session) return;
   const end = L.shownEnd(session);
+  // a session without grading takes the shot timing and the heart rate only
+  const ungraded = !isGraded(session);
+  const dropped = ungraded && code.arrows.length > 0;
+  if (ungraded) code.arrows = [];
   const n = code.arrows.length;
-  if (!n && !code.trace) {
-    ctx.toast('The watch code has no arrows and no heart rate yet.');
+  if (!n && !code.trace && !code.detected?.length) {
+    ctx.toast('The watch code has no arrows, no shots and no heart rate yet.');
     return;
   }
   if (n > end.arrows.length) {
@@ -645,6 +648,7 @@ async function scanWatch(ctx) {
   }
   // grading on the watch is optional: an end closed without grades still brings its heart rate
   if (!update(ctx, (cur) => L.applyWatchGrades(cur, code))) return;
+  if (dropped) ctx.toast('This session is without grading: the watch’s shot timing and heart rate were taken, its grades were not.');
   if (n) announce(`Watch grades for ${n} ${n === 1 ? 'arrow' : 'arrows'}: score them in the order #${code.arrows.map((a) => a.no).join(', #')}.`);
   // what the watch recorded through the end; OK goes on to scoring it
   const shown = ctx.running.get();
