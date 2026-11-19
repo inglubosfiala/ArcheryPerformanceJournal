@@ -3342,7 +3342,8 @@ a.apl-sessionrow:hover {
 .wt-badge.is-good { background: #2ecc71; }
 .wt-badge.is-mid { background: #f5a623; }
 .wt-badge.is-low { background: #e5484d; color: #fff; }
-.wt-empty {
+.wt-empty,
+.wt-note {
   font-size: 13px;
   color: var(--muted);
 }
@@ -3368,6 +3369,7 @@ a.apl-sessionrow:hover {
 /* shot cycle phases: set-up, draw, hold (timeline band and per-shot bars) */
 .wt-ph-setup { fill: #8e9aa8; }
 .wt-ph-draw { fill: #3987e5; }
+.wt-ph-settle { fill: #e3bd6c; }
 .wt-ph-hold { fill: #c98500; }
 .wt-ph-text {
   fill: #fff;
@@ -3397,6 +3399,7 @@ a.apl-sessionrow:hover {
 }
 .wt-key-setup::before { background: #8e9aa8; }
 .wt-key-draw::before { background: #3987e5; }
+.wt-key-settle::before { background: #e3bd6c; }
 .wt-key-hold::before { background: #c98500; }
 .wt-table th,
 .wt-table td {

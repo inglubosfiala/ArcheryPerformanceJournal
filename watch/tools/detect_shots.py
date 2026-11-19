@@ -23,6 +23,14 @@ REST = RATE                # a rest before the set-up: 1.0 s
 MAX_SETUP = RATE * 8       # look back at most 8 s for the set-up's start
 REFRACTORY = RATE * 3      # 3 s between two releases
 HISTORY = RATE * 30        # 30 s of quiet flags kept for looking back
+BLOCK = RATE // 10         # the wrist's tilt is followed in means of 0.1 s
+BLOCKS = HISTORY // BLOCK
+TILT_COS2 = math.cos(math.radians(2)) ** 2   # at anchor: the tilt within 2 degrees of its last 0.5 s
+RAW = 64                   # raw samples kept for the follow-through
+FT_BEFORE = 8              # the follow-through path starts 0.08 s before the snap is seen ...
+FT_AFTER = 9               # ... and ends 0.1 s after it
+FT_REST = (40, 10)         # gravity: the mean reading from 0.4 to 0.1 s before the snap
+G = 9.80665
 
 
 class ShotDetector:
@@ -38,6 +46,11 @@ class ShotDetector:
         self.last_run = 0
         self.since_run = 9999
         self.refractory = 0
+        self.bsum = [0.0, 0.0, 0.0]
+        self.blocks = [[0.0] * BLOCKS, [0.0] * BLOCKS, [0.0] * BLOCKS]
+        self.raw = [[0.0] * RAW, [0.0] * RAW, [0.0] * RAW]
+        self.pend = None   # the release whose follow-through is still coming in
+        self.rel = 0
 
     def feed(self, xs, ys, zs):
         found = False
@@ -50,6 +63,13 @@ class ShotDetector:
             slot = self.n % HISTORY
             self.quiet[slot] = 1 if still else 0
             self.jit[slot] = min(255, int(self.jitter / 2))
+            for c, v in enumerate((x, y, z)):
+                self.raw[c][self.n % RAW] = v
+                self.bsum[c] += v
+            if self.n % BLOCK == BLOCK - 1:
+                for c in range(3):
+                    self.blocks[c][(self.n // BLOCK) % BLOCKS] = self.bsum[c] / BLOCK
+                    self.bsum[c] = 0.0
             if still:
                 if 0 < self.burst <= BRIDGE and self.quiet_run > 0:
                     self.quiet_run += self.burst  # a short tremor inside the hold
@@ -77,6 +97,9 @@ class ShotDetector:
                 self.last_run = 0
                 self.quiet_run = 0
                 self.burst = BRIDGE + 1
+            if self.pend is not None and self.n == self.rel + FT_AFTER:
+                self.shots.append(self.pend + self.follow_through())
+                self.pend = None
                 found = True
             self.n += 1
         return found
@@ -121,7 +144,49 @@ class ShotDetector:
                 setup = draw_start - setup_start
         total = sum(self.jit[s % HISTORY] for s in range(anchor, i))
         steady = min(9, (total * 2) // hold // 5) if hold > 0 else 0
-        self.shots.append([i // RATE, tenths(draw), tenths(hold), steady, tenths(setup)])
+        settle, drift = self.anchor(i, hold)
+        self.pend = [i // RATE, tenths(draw), tenths(hold), steady, tenths(setup), tenths(settle), drift]
+        self.rel = i
+
+    def block_sum(self, a, b):
+        return [sum(self.blocks[c][k % BLOCKS] for k in range(a, b + 1)) for c in range(3)]
+
+    def anchor(self, i, hold):
+        """The hold split by the wrist's tilt: (samples of settling before the tilt stays within
+        2 degrees of its last 0.5 s, the tilt's change at anchor in 0.1 degrees)."""
+        last = (i - 15) // BLOCK - 1          # the last whole 0.1 s ending 0.15 s before the snap
+        first = max((i - hold) // BLOCK + 1, last - BLOCKS + 2, 0)
+        if last - 4 < first:
+            return 0, 0
+        fin = self.block_sum(last - 4, last)
+        ff = sum(v * v for v in fin)
+        b = last
+        while b - 1 >= first:
+            u = [self.blocks[c][(b - 1) % BLOCKS] for c in range(3)]
+            dot = sum(p * q for p, q in zip(u, fin))
+            if dot <= 0 or dot * dot < TILT_COS2 * sum(v * v for v in u) * ff:
+                break
+            b -= 1
+        drift = 0
+        if last - b >= 5:
+            u = self.block_sum(b, b + 4)
+            cos = sum(p * q for p, q in zip(u, fin)) / math.sqrt(sum(v * v for v in u) * ff)
+            drift = int(math.degrees(math.acos(min(1.0, cos))) * 10 + 0.5)
+        return max(0, b * BLOCK - (i - hold)), drift
+
+    def follow_through(self):
+        """The hand's path over the 0.1 s after the snap, in mm along the watch's x, y and z
+        (acceleration = gravity - reading, gravity as read just before the snap)."""
+        i = self.rel
+        if i < FT_REST[0]:
+            return [0, 0, 0]
+        g0 = [sum(self.raw[c][k % RAW] for k in range(i - FT_REST[0], i - FT_REST[1])) / (FT_REST[0] - FT_REST[1]) for c in range(3)]
+        v, p = [0.0, 0.0, 0.0], [0.0, 0.0, 0.0]
+        for k in range(i - FT_BEFORE, i + FT_AFTER + 1):
+            for c in range(3):
+                v[c] += (g0[c] - self.raw[c][k % RAW]) * G / 1000 / RATE
+                p[c] += v[c] * 1000 / RATE
+        return [int(math.floor(c + 0.5)) for c in p]
 
 
 def tenths(samples):
@@ -228,7 +293,7 @@ def run_fit(path):
     mags = [math.sqrt(x * x + y * y + z * z) for x, y, z in zip(xs, ys, zs)]
     peaks = sorted(((abs(v - 1000), i / RATE) for i, v in enumerate(mags)), reverse=True)[:8]
     print(f'samples at {RATE}/s: {len(xs)} ({len(xs) / RATE:.0f} s); motion starts {acc0 - t0} s after the first record')
-    print('snaps found [t s, draw/10, hold/10, steady, set-up/10]:', det.shots)
+    print('snaps found [t s, draw/10, hold/10, steady, set-up/10, settle/10, tilt change/10 deg, follow-through x, y, z mm]:', det.shots)
     print('releases kept (no tap next to them):', kept)
     print('arrow taps (s, arrow):', taps)
     print('largest |magnitude - 1 g| (mg, at s):', [(round(p), round(t, 1)) for p, t in peaks])

@@ -48,6 +48,12 @@ const avg1 = (xs) => (xs.length ? Math.round((xs.reduce((t, v) => t + v, 0) / xs
  * keeps the time of its tap; a release without a graded arrow stays, unnamed.
  *   { seconds, shots: [{ no, t, gap, m, s, hr, v, setup, draw, hold, steady, detected }],
  *     avgGap, avg: { setup, draw, hold } | null, firstShot, lastShot, hr: { min, avg, max } | null }
+ *
+ * From watch app 0.10 a release also has `settle` (the first part of the hold, while the wrist's
+ * tilt still moves), `anchor` (the rest of the hold), `drift` (the tilt's change at anchor,
+ * degrees), `follow` (the length of the hand's path over the 0.1 s after the release, mm) and
+ * `followOff` (how far that path ends from the end's average one, mm; null with fewer than two);
+ * `avg` then also has `anchor` and `follow`.
  */
 export function endTimeline(end) {
   const trace = end?.hrTrace?.hr?.length ? end.hrTrace : null;
@@ -61,8 +67,26 @@ export function endTimeline(end) {
   const arrowFor = (r, next) =>
     r.no != null
       ? (end.arrows ?? []).find((a) => a && a.no === r.no && !used.has(a))
-      : timed.find((a) => !used.has(a) && a.t >= r.t - 2 && a.t - r.t <= TAP_WINDOW && (next == null || a.t < next.t));
+      : timed.find(
+          (a) => !used.has(a) && a.t >= r.t - 2 && a.t - r.t <= TAP_WINDOW && (next == null || a.t < next.t),
+        );
   const fromArrow = (a) => ({ no: a.no ?? null, m: a.m ?? null, s: a.s ?? null, v: a.v ?? null });
+  // the follow-through of each release against the end's average one
+  const followed = releases.filter((r) => r.fx != null);
+  const mean = ['fx', 'fy', 'fz'].map((k) => followed.reduce((t, r) => t + r[k], 0) / (followed.length || 1));
+  const more = (r) =>
+    r.settle == null
+      ? {}
+      : {
+          settle: Math.min(r.settle, r.hold),
+          anchor: Math.round(Math.max(0, r.hold - r.settle) * 10) / 10,
+          drift: r.drift,
+          follow: Math.round(Math.hypot(r.fx, r.fy, r.fz)),
+          followOff:
+            followed.length > 1
+              ? Math.round(Math.hypot(r.fx - mean[0], r.fy - mean[1], r.fz - mean[2]))
+              : null,
+        };
   const list = releases.map((r, i) => {
     const a = arrowFor(r, releases[i + 1]);
     if (a) used.add(a);
@@ -74,11 +98,13 @@ export function endTimeline(end) {
       draw: r.draw,
       hold: r.hold,
       steady: r.steady,
+      ...more(r),
       detected: true,
     };
   });
   for (const a of timed) {
-    if (!used.has(a)) list.push({ ...fromArrow(a), t: a.t, hr: a.hr ?? traceAt(trace, a.t), detected: false });
+    if (!used.has(a))
+      list.push({ ...fromArrow(a), t: a.t, hr: a.hr ?? traceAt(trace, a.t), detected: false });
   }
   list.sort((a, b) => a.t - b.t);
   const shots = list.map((x, i) => ({ ...x, gap: i ? x.t - list[i - 1].t : null }));
@@ -98,7 +124,19 @@ export function endTimeline(end) {
     shots,
     avgGap: gaps.length ? Math.round(gaps.reduce((t, g) => t + g, 0) / gaps.length) : null,
     avg: releases.length
-      ? { setup: avg1(releases.map((r) => r.setup)), draw: avg1(releases.map((r) => r.draw)), hold: avg1(releases.map((r) => r.hold)) }
+      ? {
+          setup: avg1(releases.map((r) => r.setup)),
+          draw: avg1(releases.map((r) => r.draw)),
+          hold: avg1(releases.map((r) => r.hold)),
+          ...(followed.length
+            ? {
+                anchor: avg1(followed.map((r) => Math.max(0, r.hold - r.settle))),
+                follow: Math.round(
+                  followed.reduce((t, r) => t + Math.hypot(r.fx, r.fy, r.fz), 0) / followed.length,
+                ),
+              }
+            : {}),
+        }
       : null,
     firstShot: shots.length ? shots[0].t : null,
     lastShot: shots.length ? lastT : null,

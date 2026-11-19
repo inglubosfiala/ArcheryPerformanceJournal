@@ -11,6 +11,7 @@ import Toybox.Lang;
 class EndState {
     static const TRACE_MAX = 900; // 15 minutes
     // trace characters: a change of -21..+21 beats; the QR alphanumeric set without space and '.'
+    static const PAYLOAD_MAX = 390; // what the QR code (version 10, level L) holds
     static const DELTAS = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ$%*+-/:";
 
     static const STEP_ARROW = 0;
@@ -100,10 +101,12 @@ class EndState {
         trace.add(hr);
     }
 
-    // A release the app kept, for the arrow selected at it (0: the next one picked).
+    // A release the app kept, for the arrow selected at it (0: the next one picked). The arrow
+    // goes in at [5], before the detector's settle, tilt change and follow-through.
     function addDetected(shot as Array<Number>, arrowNo as Number) as Void {
-        var d = shot.slice(0, null);
+        var d = shot.slice(0, 5);
         d.add(arrowNo);
+        d.addAll(shot.slice(5, null));
         detected.add(d);
     }
 
@@ -268,11 +271,17 @@ class EndState {
     }
 
     // The watch code (journal: public/js/app/watchCode.js):
-    //   APJ4.E<end>.<arrow>...[.D<release>...][.H<step><first hr><changes>]
+    //   APJ5.E<end>.<arrow>...[.D<release>...][.H<step><first hr><changes>]
     // arrow: number (2) . M (1) . S (1) . t (3, the second of the trace at the shot), in arrow-number
     // order. H: the trace in bins of <step> seconds (1 digit), the first bin's heart rate (3 digits)
     // and one character per further bin: its change, -21..+21 (see DELTAS).
     function payload() as String {
+        var text = payloadText(true);
+        // too long for the code (many arrows): without the releases' anchor and follow-through
+        return text.length() > PAYLOAD_MAX ? payloadText(false) : text;
+    }
+
+    hidden function payloadText(extras as Boolean) as String {
         var sorted = shots.slice(0, null);
         for (var i = 1; i < sorted.size(); i++) {
             var cur = sorted[i];
@@ -283,7 +292,7 @@ class EndState {
             }
             sorted[j + 1] = cur;
         }
-        var text = "APJ4.E" + endNo.toString();
+        var text = "APJ5.E" + endNo.toString();
         for (var k = 0; k < sorted.size(); k++) {
             var a = sorted[k];
             var t = a.size() > 4 ? a[4] : 0;
@@ -292,7 +301,8 @@ class EndState {
             text += "." + a[0].format("%02d") + a[1].toString() + a[2].toString() + t.format("%03d");
         }
         // the releases kept: D, t (3), arrow (2, 00 none), set-up (2, 0.1 s), draw (2, 0.1 s),
-        // hold (3, 0.1 s), steadiness (1)
+        // hold (3, 0.1 s), steadiness (1); then, when they fit, one character each (DELTAS, 0-42):
+        // settle (0.2 s), tilt change at anchor (0.1 degrees), follow-through x, y, z (3 mm, 21 = 0)
         for (var d = 0; d < detected.size(); d++) {
             var x = detected[d];
             var su = x[4] > 99 ? 99 : x[4];
@@ -301,8 +311,22 @@ class EndState {
             var tt = x[0] > 999 ? 999 : x[0];
             var no = x.size() > 5 ? x[5] : 0;
             text += ".D" + tt.format("%03d") + no.format("%02d") + su.format("%02d") + dr.format("%02d") + ho.format("%03d") + x[3].toString();
+            if (extras && x.size() > 10) {
+                text += code43((x[6] + 1) / 2) + code43(x[7]);
+                for (var c = 8; c <= 10; c++) {
+                    var mm = x[c];
+                    text += code43((mm >= 0 ? mm + 1 : mm - 1) / 3 + 21);
+                }
+            }
         }
         return text + traceText();
+    }
+
+    // One character for 0-42 (clamped).
+    hidden function code43(v as Number) as String {
+        if (v < 0) { v = 0; }
+        if (v > 42) { v = 42; }
+        return DELTAS.substring(v, v + 1);
     }
 
     // The trace binned to at most about 60 points (bins of 1-9 s); "" when there is no heart rate.
