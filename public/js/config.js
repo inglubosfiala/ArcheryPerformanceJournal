@@ -1,7 +1,31 @@
 export const APP_NAME = 'Archery Performance Journal';
 export const APP_ID = 'archery-performance-journal';
 export const SCHEMA_VERSION = 9;
+// Stamped by the deploy workflow (unstamped, in local development, they keep the placeholder text):
+//   APP_VERSION   major.minor from package.json, then the number of commits on the deployed branch
+//                 (first parent only, so it goes up by one with every merge): '0.1.158'
+//   APP_COMMIT    the short commit SHA the build was made from, for tracing a bug back to the code
+//   APP_BUILT_AT  when the build was made (ISO time)
 export const APP_VERSION = '__APP_VERSION__';
+export const APP_COMMIT = '__APP_COMMIT__';
+export const APP_BUILT_AT = '__APP_BUILT_AT__';
+
+/**
+ * The version as the archer reads it: 'Version 0.1.158 · 19 Nov 2026', or 'Version dev' for an
+ * unstamped local build. `long` adds the commit and the environment, for Settings › Storage & app.
+ */
+export function versionLabel(
+  { version = APP_VERSION, commit = APP_COMMIT, builtAt = APP_BUILT_AT, env = APP_ENV } = {},
+  { long = false } = {},
+) {
+  const stamped = (v) => v && !v.startsWith('__');
+  if (!stamped(version)) return long ? `Version dev · ${env} environment` : 'Version dev';
+  const time = stamped(builtAt) ? new Date(builtAt) : null;
+  const date = time && !Number.isNaN(time.getTime()) ? time.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) : null;
+  const parts = [`Version ${version}`, date];
+  if (long) parts.push(stamped(commit) ? `build ${commit}` : null, `${env} environment`);
+  return parts.filter(Boolean).join(' · ');
+}
 export const BACKUP_REMINDER_DAYS = 30;
 // deleted sessions stay in Recently deleted (History) this long before they are removed for good
 export const TRASH_DAYS = 7;
