@@ -164,29 +164,52 @@ def run_synthetic():
     return ok
 
 
-def run_fit(path):
+def fit_motion(path):
+    """The FIT file's accelerometer resampled to RATE: (xs, ys, zs) in milli-g, and its messages.
+    The SensorLogger writes calibrated milli-g in fields 5/6/7 (raw counts 2/3/4), ~100 Hz."""
     import os
-    sys.path.insert(0, os.path.dirname(__file__))
+    sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
     import fit_read
     msgs = fit_read.read(path)
-    xs, ys, zs = [], [], []
+    samples = []
     for m in msgs:
         if m['_mesg'] != 'accelerometer_data':
             continue
-        # raw counts; the watch reports milli-g (calibration factors are in the FIT's
-        # three_d_sensor_calibration message; assume 1 count = 1 mg until checked on real data)
-        for key, out in ((2, xs), (3, ys), (4, zs)):
-            v = m.get(key)
-            out.extend(v if isinstance(v, list) else [v])
+        base = (m.get(253) or 0) * 1000 + (m.get(0) or 0)
+        offs = m.get(1)
+        cols = [m.get(k) if m.get(k) is not None else m.get(k - 3) for k in (5, 6, 7)]
+        if not isinstance(offs, list):
+            offs, cols = [offs], [[c] for c in cols]
+        for o, x, y, z in zip(offs, *cols):
+            if x is not None:
+                samples.append((base + (o or 0), x, y, z))
+    samples.sort()
+    xs, ys, zs = [], [], []
+    if samples:
+        t, k, step = samples[0][0], 0, 1000 / RATE
+        while t <= samples[-1][0]:
+            while k + 1 < len(samples) and samples[k + 1][0] <= t:
+                k += 1
+            xs.append(samples[k][1]); ys.append(samples[k][2]); zs.append(samples[k][3])
+            t += step
+    return xs, ys, zs, msgs
+
+
+def run_fit(path):
+    xs, ys, zs, msgs = fit_motion(path)
     det = ShotDetector()
     for k in range(0, len(xs), RATE):
         det.feed(xs[k:k + RATE], ys[k:k + RATE], zs[k:k + RATE])
     recs = [m for m in msgs if m['_mesg'] == 'record']
     t0 = recs[0][253] if recs else 0
+    acc0 = next((m[253] for m in msgs if m['_mesg'] == 'accelerometer_data'), t0)
     taps = [(m[253] - t0, m.get('shot')) for m in recs if m.get('shot')]
-    print('samples', len(xs), '(', len(xs) / RATE, 's )')
+    mags = [math.sqrt(x * x + y * y + z * z) for x, y, z in zip(xs, ys, zs)]
+    peaks = sorted(((abs(v - 1000), i / RATE) for i, v in enumerate(mags)), reverse=True)[:8]
+    print(f'samples at {RATE}/s: {len(xs)} ({len(xs) / RATE:.0f} s); motion starts {acc0 - t0} s after the first record')
     print('shots found [t s, draw/10, hold/10, steady, set-up/10]:', det.shots)
     print('arrow taps (s, arrow):', taps)
+    print('largest |magnitude - 1 g| (mg, at s):', [(round(p), round(t, 1)) for p, t in peaks])
 
 
 if __name__ == '__main__':
