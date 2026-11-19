@@ -622,8 +622,8 @@ async function scanWatch(ctx) {
   if (!session) return;
   const end = L.shownEnd(session);
   const n = code.arrows.length;
-  if (!n) {
-    ctx.toast('The watch code has no graded arrows yet.');
+  if (!n && !code.trace) {
+    ctx.toast('The watch code has no arrows and no heart rate yet.');
     return;
   }
   if (n > end.arrows.length) {
@@ -639,6 +639,11 @@ async function scanWatch(ctx) {
       confirmLabel: 'Replace',
     }))
   ) {
+    return;
+  }
+  // grading on the watch is optional: an end closed without grades still brings its heart rate
+  if (!n) {
+    if (update(ctx, (cur) => L.applyWatchGrades(cur, code))) ctx.toast('Heart rate of this end taken from the watch (no grades on the watch).');
     return;
   }
   if (update(ctx, (cur) => L.applyWatchGrades(cur, code))) {

@@ -5,10 +5,10 @@ import Toybox.Lang;
 // A shot is [arrowNo, m, s, hr, t]: t is the second of the heart-rate trace at the arrow tap.
 // Saved on every change, so leaving the app loses nothing.
 //
-// The trace: one heart-rate sample per second while the end is shot, from PRE_ROLL seconds
-// before the first arrow's tap to the last arrow's grade. Walking to the target is not in it.
+// The trace: one heart-rate sample per second while the end is shot, from its start (START, or LAP
+// after the rest) to its close (LAP, or the last arrow's grade). Resting and walking to the target
+// are not in it. Grading is optional: an end closed without grades still has its trace.
 class EndState {
-    static const PRE_ROLL = 30;
     static const TRACE_MAX = 900; // 15 minutes
     // trace characters: a change of -21..+21 beats; the QR alphanumeric set without space and '.'
     static const DELTAS = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ$%*+-/:";
@@ -26,6 +26,12 @@ class EndState {
     var perEnd as Number = 6;
     var owned as Number = 6;
     var trace as Array<Number> = [] as Array<Number>;
+    var closed as Boolean = false; // the end was closed (LAP or its last arrow)
+    // the round so far, for the stop screen: closed ends' arrows and grade sums
+    var roundEnds as Number = 0;
+    var roundArrows as Number = 0;
+    var roundM as Array<Number> = [0, 0] as Array<Number>; // sum, count
+    var roundS as Array<Number> = [0, 0] as Array<Number>;
     var pendingT as Number = -1;
 
     function initialize() {
@@ -85,16 +91,10 @@ class EndState {
         return out;
     }
 
-    // True from the first arrow's tap on: the trace keeps everything from then.
-    hidden function started() as Boolean {
-        return shots.size() > 0 || pendingT >= 0;
-    }
-
     // One heart-rate sample (0: none), called every second while the app runs.
     function sample(hr as Number) as Void {
-        if (isComplete() || trace.size() >= TRACE_MAX) { return; }
+        if (closed || trace.size() >= TRACE_MAX) { return; }
         trace.add(hr);
-        if (!started() && trace.size() > PRE_ROLL) { trace = trace.slice(trace.size() - PRE_ROLL, null); }
     }
 
     function chooseArrow(no as Number, hr as Number) as Void {
@@ -175,7 +175,41 @@ class EndState {
         return [nm > 0 ? m.toFloat() / nm : 0.0, ns > 0 ? s.toFloat() / ns : 0.0] as Array<Float>;
     }
 
+    // LAP: the end is done; its arrows count into the round.
+    function closeEnd() as Void {
+        if (closed) { return; }
+        // an arrow picked but not (fully) graded keeps its number and time, without the missing grades
+        if (pendingT >= 0 && pendingNo != 0) {
+            shots.add([pendingNo, step == STEP_S ? pendingM : 0, 0, pendingHr, pendingT]);
+        }
+        resetPending();
+        closed = true;
+        roundEnds++;
+        roundArrows += shots.size();
+        for (var i = 0; i < shots.size(); i++) {
+            if (shots[i][1] > 0) { roundM[0] += shots[i][1]; roundM[1]++; }
+            if (shots[i][2] > 0) { roundS[0] += shots[i][2]; roundS[1]++; }
+        }
+        save();
+    }
+
+    // Average M and S of the round, the end being shot included (0.0 when nothing is graded).
+    function roundAverages() as Array<Float> {
+        var m = roundM[0];
+        var nm = roundM[1];
+        var s = roundS[0];
+        var ns = roundS[1];
+        if (!closed) {
+            for (var i = 0; i < shots.size(); i++) {
+                if (shots[i][1] > 0) { m += shots[i][1]; nm++; }
+                if (shots[i][2] > 0) { s += shots[i][2]; ns++; }
+            }
+        }
+        return [nm > 0 ? m.toFloat() / nm : 0.0, ns > 0 ? s.toFloat() / ns : 0.0] as Array<Float>;
+    }
+
     function nextEnd() as Void {
+        closed = false;
         endNo++;
         shots = [] as Array<Array<Number>>;
         trace = [] as Array<Number>;
@@ -189,6 +223,11 @@ class EndState {
         perEnd = arrowsPerEnd;
         owned = numbered < perEnd ? perEnd : numbered;
         endNo = 1;
+        closed = false;
+        roundEnds = 0;
+        roundArrows = 0;
+        roundM = [0, 0] as Array<Number>;
+        roundS = [0, 0] as Array<Number>;
         shots = [] as Array<Array<Number>>;
         trace = [] as Array<Number>;
         resetPending();
