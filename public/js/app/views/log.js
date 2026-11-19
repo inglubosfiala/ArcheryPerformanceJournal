@@ -28,6 +28,7 @@ import { SHOOTING_KINDS } from '../lastSetup.js';
 import { sessionTimer } from './timer.js';
 import * as APL from '../../ui/apl/index.js';
 import { detectArrows } from '../photoDetect.js';
+import { keepsScanPhotos, saveScanPhoto } from '../scanPhoto.js';
 import { drawArrowMarks, liveScan } from './liveScan.js';
 import { watchScan } from './watchScan.js';
 import { showWatchEnd } from './watchEnd.js';
@@ -655,7 +656,8 @@ async function scanWatch(ctx) {
 /**
  * Camera button: scan the target with the live camera (or take / pick a photo from there); arrows
  * found fill the end after a preview. Best effort: wrong ones are dragged on the picture
- * afterwards. Pictures are only used in memory and are never stored.
+ * afterwards. Pictures are never stored in the journal; the raw one is saved to the phone as a
+ * file when Settings › Scan says so (scanPhoto.js).
  */
 function photoButton(ctx, session) {
   // the scoring screen's most used button: outlined in accent, next to Undo in the bottom bar
@@ -685,6 +687,8 @@ async function scanTarget(ctx) {
     // the live camera locks by itself (or Take now); its frame is previewed cut to the sheet
     camera: async (room) => {
       const got = await liveScan({ face: room.face, maxArrows: room.empty, spotHint: room.spotHint });
+      // the raw picture the arrows are read from is kept on the phone (a gallery photo is there already)
+      if (got && (got.canvas || got.taken) && keepsScanPhotos(ctx.repo.getSettings())) saveScanPhoto(got, { face: room.face });
       return got && !got.file ? cropToSpots(got.canvas, got.res) : got;
     },
     openPhoto,
