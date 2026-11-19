@@ -63,7 +63,7 @@ class ShotView extends WatchUi.View {
             var a = st.shots[st.shots.size() - 1];
             line = "#" + a[0].toString() + " M" + a[1].toString() + " S" + a[2].toString();
         }
-        var timed = app().detector.lastShot;
+        var timed = app().lastTimed;
         if (timed != null) {
             var ts = timed as Array<Number>;
             line += (line.length() > 0 ? " · " : "") + secs(ts[1]) + "+" + secs(ts[2]) + "s";
@@ -114,7 +114,7 @@ class ShotDelegate extends KeyedDelegate {
         WatchUi.requestUpdate();
     }
 
-    function onTap(evt as WatchUi.ClickEvent) as Boolean {
+    function onTouch(evt as WatchUi.ClickEvent) as Boolean {
         var xy = evt.getCoordinates();
         // the header ("End 2 · 1/6 · 0:42") opens the menu
         if (xy[1] < (System.getDeviceSettings().screenHeight * 22) / 100) {

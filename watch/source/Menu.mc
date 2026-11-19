@@ -15,6 +15,7 @@ class GradesMenuDelegate extends WatchUi.Menu2InputDelegate {
     }
 
     function onSelect(item as WatchUi.MenuItem) as Void {
+        app().noteInput();
         var st = endState();
         var id = item.getId();
         if (id == :back) {

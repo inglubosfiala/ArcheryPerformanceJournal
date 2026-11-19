@@ -135,7 +135,7 @@ const sec = (v) => (v == null ? '–' : v.toFixed(1));
  * One row per detected shot: its set-up, draw and hold as a stacked bar (seconds written in the
  * segments that are wide enough), so each shot's cycle can be compared with the others.
  */
-export function shotCycleChart(tl) {
+export function shotCycleChart(tl, { max: span = null, legend = true } = {}) {
   const shots = tl.shots.filter((sh) => sh.detected);
   if (!shots.length) return null;
   const rowH = 22;
@@ -143,9 +143,22 @@ export function shotCycleChart(tl) {
   const left = 44;
   const right = 296; // room for the total after the longest bar
   const total = (sh) => sh.setup + sh.draw + sh.hold;
-  const max = Math.max(6, ...shots.map(total));
+  // a linear seconds axis: the same for every shot of the end (or, given `max`, of the session)
+  const longest = Math.max(6, span ?? 0, ...shots.map(total));
+  const tick = longest <= 8 ? 1 : longest <= 16 ? 2 : 5;
+  const max = Math.ceil(longest / tick) * tick;
   const w = (secs) => (secs / max) * (right - left);
+  const rowsBottom = top + shots.length * rowH - 4;
   const parts = [];
+  for (let t = 0; t <= max + 0.001; t += tick) {
+    const x = left + w(t);
+    parts.push(
+      s('line', { class: t ? 'wt-grid' : 'wt-base', x1: x, x2: x, y1: top - 2, y2: rowsBottom + 2 }),
+    );
+    parts.push(
+      s('text', { class: 'wt-axis', x, y: rowsBottom + 14, 'text-anchor': 'middle' }, t ? `${t}` : '0 s'),
+    );
+  }
   shots.forEach((sh, i) => {
     const y = top + i * rowH;
     const tone = mTone(sh.m);
@@ -174,17 +187,19 @@ export function shotCycleChart(tl) {
     }
     parts.push(s('text', { class: 'wt-axis', x: x0 + 4, y: y + 12 }, `${sec(total(sh))} s`));
   });
-  const height = top + shots.length * rowH + 2;
+  const height = rowsBottom + 18;
   return h(
     'div',
     { class: 'wt-cycle' },
-    h(
-      'div',
-      { class: 'wt-legend', 'aria-hidden': 'true' },
-      h('span', { class: 'wt-key wt-key-setup' }, 'Set-up'),
-      h('span', { class: 'wt-key wt-key-draw' }, 'Draw'),
-      h('span', { class: 'wt-key wt-key-hold' }, 'Hold'),
-    ),
+    legend
+      ? h(
+          'div',
+          { class: 'wt-legend', 'aria-hidden': 'true' },
+          h('span', { class: 'wt-key wt-key-setup' }, 'Set-up'),
+          h('span', { class: 'wt-key wt-key-draw' }, 'Draw'),
+          h('span', { class: 'wt-key wt-key-hold' }, 'Hold'),
+        )
+      : null,
     s(
       'svg',
       {

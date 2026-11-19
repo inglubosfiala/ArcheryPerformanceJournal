@@ -105,7 +105,7 @@ class RestDelegate extends KeyedDelegate {
     }
 
     // a tap below the code also starts the next end; a touch on the code while scanning does nothing
-    function onTap(evt as WatchUi.ClickEvent) as Boolean {
+    function onTouch(evt as WatchUi.ClickEvent) as Boolean {
         var xy = evt.getCoordinates();
         if (_view.bottom > 0 && xy[1] > _view.bottom) { app().nextEnd(); }
         return true;

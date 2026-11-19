@@ -13,7 +13,7 @@ import Toybox.WatchUi;
 //   rest          the end's code for the journal and a rest timer; LAP starts the next end
 //   START         stop screen at any time: Resume, Save, Discard
 // The version shown on the start screen; keep it the same as the version typed in the store upload.
-const APP_VERSION = "0.8.0";
+const APP_VERSION = "0.9.0";
 
 const PHASE_IDLE = 0;
 const PHASE_END = 1;
@@ -27,6 +27,9 @@ class ArcheryApp extends Application.AppBase {
     var paused as Boolean = false;
     var phaseStart as Number = 0; // System.getTimer() when the end or the rest began
     hidden var _hr as Number = 0;
+    var lastTimed as Array<Number>? = null;      // the last release kept: for the shot screen
+    hidden var _inputs as Array<Number> = [] as Array<Number>; // System.getTimer() of recent taps/keys
+    hidden var _pending as Array? = null;         // [shot, snap ms, arrow selected at the snap]
     hidden var _ticker as Timer.Timer? = null;
 
     function initialize() {
@@ -44,6 +47,7 @@ class ArcheryApp extends Application.AppBase {
 
     // Every second: the heart-rate trace of the end, the activity markers, the timers on screen.
     function onSecond() as Void {
+        settleRelease(false);
         recorder.tick();
         if (phase == PHASE_END && !paused && self.state != null) {
             (self.state as EndState).sample(heartRate());
@@ -104,10 +108,36 @@ class ArcheryApp extends Application.AppBase {
         var acc = data.accelerometerData;
         if (acc == null) { return; }
         if (detector.feed(acc.x as Array<Number>, acc.y as Array<Number>, acc.z as Array<Number>)) {
-            var shot = detector.lastShot as Array<Number>;
-            recorder.markRelease(shot[2]);
-            WatchUi.requestUpdate();
+            // kept pending until it is clear the archer did not touch the watch around it
+            var snapMs = System.getTimer() - detector.lastBack * 1000 / ShotDetector.RATE;
+            _pending = [detector.lastShot, snapMs, (state as EndState).pendingNo];
         }
+    }
+
+    // A tap or a button press: a snap from 0.5 s before it to 1.5 s after it was the archer's
+    // own hand, not a release.
+    function noteInput() as Void {
+        _inputs.add(System.getTimer());
+        if (_inputs.size() > 12) { _inputs = _inputs.slice(_inputs.size() - 12, null); }
+    }
+
+    // The pending release, once 1.5 s have passed (or now, when the end closes): kept for the
+    // arrow selected at the snap (or the next one picked), or dropped when the watch was touched.
+    hidden function settleRelease(now as Boolean) as Void {
+        if (_pending == null) { return; }
+        var p = _pending as Array;
+        var snapMs = p[1] as Number;
+        if (!now && System.getTimer() - snapMs < 1500) { return; }
+        _pending = null;
+        for (var i = 0; i < _inputs.size(); i++) {
+            var dt = _inputs[i] - snapMs;
+            if (dt >= -500 && dt <= 1500) { return; }
+        }
+        var shot = p[0] as Array<Number>;
+        (state as EndState).addDetected(shot, p[2] as Number);
+        recorder.markRelease(shot[2]);
+        lastTimed = shot;
+        WatchUi.requestUpdate();
     }
 
     // Seconds since the end or the rest began.
@@ -123,6 +153,8 @@ class ArcheryApp extends Application.AppBase {
         recorder.start();
         recorder.setLap(PHASE_END, 0.0, 0.0);
         detector.reset();
+        _pending = null;
+        lastTimed = null;
         startMotion();
         phase = PHASE_END;
         paused = false;
@@ -136,7 +168,7 @@ class ArcheryApp extends Application.AppBase {
     function closeEnd() as Void {
         var st = state as EndState;
         if (phase != PHASE_END) { return; } // grading is optional: an end without grades closes too
-        st.detected = detector.shots;
+        settleRelease(true);
         st.closeEnd();
         var avg = st.averages();
         recorder.setLap(PHASE_END, avg[0], avg[1]);
@@ -155,6 +187,8 @@ class ArcheryApp extends Application.AppBase {
         recorder.setLap(PHASE_END, 0.0, 0.0);
         (state as EndState).nextEnd();
         detector.reset();
+        _pending = null;
+        lastTimed = null;
         phase = PHASE_END;
         phaseStart = System.getTimer();
         buzz();

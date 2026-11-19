@@ -316,3 +316,38 @@ describe('format 3: shots the watch detected (set-up, draw, hold)', () => {
     expect(collections.sessions.validate({ ...s, id: 'x', status: 'finished' }).filter((e) => /detected/.test(e))).toEqual(['end 1: invalid detected shots']);
   });
 });
+
+describe('format 4: the watch names the arrow of each release', () => {
+  // picked arrow #2 at 3 s, released at 12 s, graded; picked #1 at 20 s, released at 31 s
+  const CODE = 'APJ4.E1.0143020.0254003.D0120220140431.D0310124140662';
+
+  it('reads the arrow of each release', () => {
+    const r = parseWatchCode(CODE);
+    expect(r.detected).toEqual([
+      { t: 12, no: 2, setup: 2, draw: 1.4, hold: 4.3, steady: 1 },
+      { t: 31, no: 1, setup: 2.4, draw: 1.4, hold: 6.6, steady: 2 },
+    ]);
+  });
+
+  it('a release before any arrow was picked has no arrow (00)', () => {
+    expect(parseWatchCode('APJ4.E1.D0120020140431').detected[0]).toEqual({ t: 12, setup: 2, draw: 1.4, hold: 4.3, steady: 1 });
+  });
+
+  it('the timeline joins each release with the arrow the watch named, even when picked before the shot', () => {
+    const s = L.applyWatchGrades(start(2), parseWatchCode(CODE));
+    const tl = endTimeline(s.current);
+    expect(tl.shots.map((x) => [x.t, x.no, x.m, x.hold])).toEqual([
+      [12, 2, 5, 4.3],
+      [31, 1, 4, 6.6],
+    ]);
+  });
+
+  it('refuses an arrow number over 24 and validates the named arrow', () => {
+    expect(parseWatchCode('APJ4.E1.D0122520140431')).toEqual({ ok: false, error: 'bad' });
+    let s = L.applyWatchGrades(start(2), parseWatchCode(CODE));
+    s = L.nextEnd(L.enterScore(L.enterScore(s, 9), 8));
+    expect(collections.sessions.validate({ ...s, id: 'x', status: 'finished' }).filter((e) => /detected/.test(e))).toEqual([]);
+    s.ends[0].watchShots[0].no = 0;
+    expect(collections.sessions.validate({ ...s, id: 'x', status: 'finished' }).filter((e) => /detected/.test(e))).toEqual(['end 1: invalid detected shots']);
+  });
+});

@@ -3349,6 +3349,8 @@ a.apl-sessionrow:hover {
 /* History: the end's watch curve under its row opens the timeline */
 .ov-end-watch {
   display: flex;
+  flex-direction: column;
+  gap: 4px;
   width: 100%;
   padding: 0 12px 8px 44px;
   border: none;
@@ -3400,4 +3402,13 @@ a.apl-sessionrow:hover {
 .wt-table td {
   padding-left: 3px;
   padding-right: 3px;
+}
+/* the shot-cycle axis: faint second lines */
+.wt-grid {
+  stroke: var(--border-soft);
+  stroke-width: 1;
+  stroke-dasharray: 2 3;
+}
+.ov-ends-legend {
+  padding: 0 14px 6px 44px;
 }

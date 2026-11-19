@@ -13,8 +13,9 @@ import sys
 RATE = 100                 # samples per second (the watch's raw rate; its 25 Hz stream is smoothed)
 ALPHA = 1 / 16             # jitter smoothing per sample (~0.16 s)
 QUIET = 15                 # jitter (mg) below which the hand counts as still (still: 2-14 mg)
-RELEASE = 900              # |magnitude - 1 g| (mg) of the release snap
-MIN_HOLD = RATE            # stillness right before a release: 1.0 s
+RELEASE = 550              # |magnitude - 1 g| (mg) of the release snap (real ones: 620-1850 mg)
+MIN_HOLD = RATE * 3 // 2   # stillness right before a release: 1.5 s (real holds: 3.5-5 s)
+BRIDGE = RATE // 10        # a tremor up to 0.1 s inside a hold does not end it
 GAP_AFTER_HOLD = RATE * 2 // 5   # the snap within 0.4 s of the stillness ending
 PAUSE = RATE // 2          # a pause that marks the start of the draw: 0.5 s
 MAX_DRAW = RATE * 8        # look back at most 8 s for the draw's start
@@ -33,6 +34,7 @@ class ShotDetector:
         self.quiet = [0] * HISTORY
         self.jit = [0] * HISTORY
         self.quiet_run = 0
+        self.burst = 0
         self.last_run = 0
         self.since_run = 9999
         self.refractory = 0
@@ -49,25 +51,38 @@ class ShotDetector:
             self.quiet[slot] = 1 if still else 0
             self.jit[slot] = min(255, int(self.jitter / 2))
             if still:
+                if 0 < self.burst <= BRIDGE and self.quiet_run > 0:
+                    self.quiet_run += self.burst  # a short tremor inside the hold
+                self.burst = 0
                 self.quiet_run += 1
             else:
-                if self.quiet_run > 0:
-                    self.last_run = self.quiet_run
-                    self.since_run = 0
-                self.quiet_run = 0
-                self.since_run += 1
+                self.burst += 1
+                if self.burst == BRIDGE + 1:
+                    if self.quiet_run > 0:
+                        self.last_run = self.quiet_run
+                        self.since_run = self.burst
+                    else:
+                        self.since_run += self.burst
+                    self.quiet_run = 0
+                elif self.burst > BRIDGE + 1:
+                    self.since_run += 1
             if self.refractory > 0:
                 self.refractory -= 1
-            if self.refractory == 0 and abs(m - 1000.0) > RELEASE and self.last_run >= MIN_HOLD and self.since_run <= GAP_AFTER_HOLD:
-                self.record(self.n)
+            bridging = 0 < self.burst <= BRIDGE
+            run = self.quiet_run if bridging else self.last_run
+            since = self.burst if bridging else self.since_run
+            if self.refractory == 0 and abs(m - 1000.0) > RELEASE and run >= MIN_HOLD and since <= GAP_AFTER_HOLD:
+                self.record(self.n, run, since)
                 self.refractory = REFRACTORY
                 self.last_run = 0
+                self.quiet_run = 0
+                self.burst = BRIDGE + 1
                 found = True
             self.n += 1
         return found
 
-    def record(self, i):
-        anchor = max(0, i - self.since_run - self.last_run)
+    def record(self, i, run, since):
+        anchor = max(0, i - since - run)
         hold = i - anchor
         draw_start = -1
         run = 0
@@ -206,10 +221,15 @@ def run_fit(path):
     t0 = recs[0][253] if recs else 0
     acc0 = next((m[253] for m in msgs if m['_mesg'] == 'accelerometer_data'), t0)
     taps = [(m[253] - t0, m.get('shot')) for m in recs if m.get('shot')]
+    # as on the watch: a snap within 0.5 s before to 1.5 s after a tap is the archer's own hand
+    # (the FIT marks taps only to the second; LAP / START presses are not marked)
+    inputs = sorted({m[253] - t0 for m in recs if m.get('shot') or m.get('grade')})
+    kept = [s for s in det.shots if not any(-0.5 <= i - s[0] <= 2.5 for i in inputs)]
     mags = [math.sqrt(x * x + y * y + z * z) for x, y, z in zip(xs, ys, zs)]
     peaks = sorted(((abs(v - 1000), i / RATE) for i, v in enumerate(mags)), reverse=True)[:8]
     print(f'samples at {RATE}/s: {len(xs)} ({len(xs) / RATE:.0f} s); motion starts {acc0 - t0} s after the first record')
-    print('shots found [t s, draw/10, hold/10, steady, set-up/10]:', det.shots)
+    print('snaps found [t s, draw/10, hold/10, steady, set-up/10]:', det.shots)
+    print('releases kept (no tap next to them):', kept)
     print('arrow taps (s, arrow):', taps)
     print('largest |magnitude - 1 g| (mg, at s):', [(round(p), round(t, 1)) for p, t in peaks])
 

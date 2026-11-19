@@ -1,7 +1,10 @@
 // The watch code: the text in the QR code the Arrow Grades watch app shows after an end
 // (watch/source/EndState.mc payload()). One end's grades, made on the wrist right after each shot.
 //
-// Format 3 (watch app 0.6.0 on): format 2 plus the shots the watch's motion detector found, before
+// Format 4 (watch app 0.9.0 on): as format 3, each release also carries the arrow it belongs to
+// (the arrow selected at the release, or the next one picked): .D<t 3><arrow 2><set-up 2>...,
+// arrow 00 = none.
+// Format 3 (watch app 0.6.0-0.8.0): format 2 plus the shots the watch's motion detector found, before
 // the trace: .D<t 3><set-up 2><draw 2><hold 3><steadiness 1> (times in 0.1 s; steadiness 0-9, 0 =
 // stillest), t the second of the release.
 // Format 2 (watch app 0.3.0 on):
@@ -29,6 +32,7 @@ const DELTAS = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ$%*+-/:';
 const ARROW = /^(\d{2})([0-5])([0-5])(\d{3})$/;
 const TRACE = /^H([1-9])(\d{3})([0-9A-Z$%*+\-/:]*)$/;
 const DETECTED = /^D(\d{3})(\d{2})(\d{2})(\d{3})(\d)$/;
+const DETECTED_4 = /^D(\d{3})(\d{2})(\d{2})(\d{2})(\d{3})(\d)$/;
 export const DETECTED_MAX = 30;
 
 const bad = { ok: false, error: 'bad' };
@@ -62,7 +66,7 @@ export function parseWatchCode(text) {
   if (typeof text !== 'string') return { ok: false, error: 'not-watch' };
   const parts = text.trim().toUpperCase().split('.');
   if (!/^APJ\d+$/.test(parts[0])) return { ok: false, error: 'not-watch' };
-  const format = { APJ1: 1, APJ2: 2, APJ3: 3 }[parts[0]] ?? 0;
+  const format = { APJ1: 1, APJ2: 2, APJ3: 3, APJ4: 4 }[parts[0]] ?? 0;
   if (!format) return { ok: false, error: 'version' };
   const endMatch = /^E(\d{1,3})$/.exec(parts[1] ?? '');
   if (!endMatch) return bad;
@@ -74,10 +78,26 @@ export function parseWatchCode(text) {
     rest = rest.slice(0, -1);
   }
   const detected = [];
-  while (format === 3 && rest.length && rest[rest.length - 1].startsWith('D')) {
-    const m = DETECTED.exec(rest[rest.length - 1]);
-    if (!m) return bad;
-    detected.unshift({ t: Number(m[1]), setup: Number(m[2]) / 10, draw: Number(m[3]) / 10, hold: Number(m[4]) / 10, steady: Number(m[5]) });
+  while (format >= 3 && rest.length && rest[rest.length - 1].startsWith('D')) {
+    const part = rest[rest.length - 1];
+    if (format === 3) {
+      const m = DETECTED.exec(part);
+      if (!m) return bad;
+      detected.unshift({ t: Number(m[1]), setup: Number(m[2]) / 10, draw: Number(m[3]) / 10, hold: Number(m[4]) / 10, steady: Number(m[5]) });
+    } else {
+      const m = DETECTED_4.exec(part);
+      if (!m) return bad;
+      const no = Number(m[2]);
+      if (no > ARROW_NO_MAX) return bad;
+      detected.unshift({
+        t: Number(m[1]),
+        ...(no ? { no } : {}),
+        setup: Number(m[3]) / 10,
+        draw: Number(m[4]) / 10,
+        hold: Number(m[5]) / 10,
+        steady: Number(m[6]),
+      });
+    }
     rest = rest.slice(0, -1);
   }
   if (detected.length > DETECTED_MAX) return bad;

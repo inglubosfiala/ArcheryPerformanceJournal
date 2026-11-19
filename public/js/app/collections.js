@@ -23,7 +23,16 @@ const isDetected = (list) =>
   Array.isArray(list) &&
   list.length <= DETECTED_MAX &&
   list.every(
-    (d) => d && Number.isInteger(d.t) && inRange(d.t, 0, SHOT_TIME_MAX) && inRange(d.setup, 0, 9.9) && inRange(d.draw, 0, 9.9) && inRange(d.hold, 0, 99.9) && Number.isInteger(d.steady) && inRange(d.steady, 0, 9),
+    (d) =>
+      d &&
+      Number.isInteger(d.t) &&
+      inRange(d.t, 0, SHOT_TIME_MAX) &&
+      (d.no == null || (Number.isInteger(d.no) && inRange(d.no, 1, ARROW_NO_MAX))) &&
+      inRange(d.setup, 0, 9.9) &&
+      inRange(d.draw, 0, 9.9) &&
+      inRange(d.hold, 0, 99.9) &&
+      Number.isInteger(d.steady) &&
+      inRange(d.steady, 0, 9),
   );
 const isGrade = (g) => g == null || (Number.isInteger(g) && g >= 1 && g <= 5);
 const isCount = (n) => Number.isInteger(n) && n >= 0;

@@ -40,7 +40,7 @@ import { sumArrows } from '../stats.js';
 import { rescoreEnd } from '../sessionLogic.js';
 import { faceRings } from './face.js';
 import { hrChart, endTimeline } from '../hrTrace.js';
-import { showWatchEnd } from './watchEnd.js';
+import { showWatchEnd, shotCycleChart } from './watchEnd.js';
 import { whenCard, gearCard } from './common.js';
 
 // ---------------------------------------------------------------- state of the page (ui `ov`)
@@ -393,10 +393,12 @@ function hrSparkline(end) {
 
 /**
  * Under an end's row, when the watch recorded it: its heart-rate curve (or just "Watch timeline"
- * without a heart rate); a tap opens the end's timeline (shot timing, heart rate, grades).
+ * without a heart rate) and, below it, one bar per shot (set-up, draw, hold) on a seconds axis
+ * shared by the whole session, so shots compare across ends; a tap opens the end's timeline.
  */
-function watchRow(end, i) {
-  if (!endTimeline(end)) return null;
+function watchRow(end, i, span) {
+  const tl = endTimeline(end);
+  if (!tl) return null;
   return h(
     'button',
     {
@@ -408,12 +410,17 @@ function watchRow(end, i) {
       dataset: { fk: `end-watch-${i}` },
     },
     hrSparkline(end) ?? h('span', { class: 'ov-end-watch-text' }, '⏱ Watch timeline'),
+    shotCycleChart(tl, { max: span, legend: false }),
   );
 }
 
 /** One row per end: its score chips with the grades under each, and its total. Tap = Edit end. */
 export function endsSection(ss, { all = false, onShowAll, onEdit }) {
   const ends = all ? ss.ends : ss.ends.slice(0, ENDS_SHOWN);
+  // the longest shot cycle (set-up + draw + hold) of the session: one seconds axis for all ends
+  const cycles = ss.ends.flatMap((e) => (e.watchShots ?? []).map((d) => d.setup + d.draw + d.hold));
+  const span = cycles.length ? Math.max(...cycles) : null;
+  const anyCycles = cycles.length > 0;
   const said = (a) => (a.v == null ? 'empty' : [a.v, gradesText(a), a.hr != null && `heart rate ${a.hr}`].filter(Boolean).join(' '));
   return h(
     'section',
@@ -424,6 +431,15 @@ export function endsSection(ss, { all = false, onShowAll, onEdit }) {
       h('h2', { class: 'apl-label', id: 'ov-ends' }, T.ends),
       h('span', { class: 'apl-cap' }, 'Tap an end to edit'),
     ),
+    anyCycles
+      ? h(
+          'div',
+          { class: 'wt-legend ov-ends-legend', 'aria-hidden': 'true' },
+          h('span', { class: 'wt-key wt-key-setup' }, 'Set-up'),
+          h('span', { class: 'wt-key wt-key-draw' }, 'Draw'),
+          h('span', { class: 'wt-key wt-key-hold' }, 'Hold'),
+        )
+      : null,
     ends.map((e, i) => [
       h(
         'button',
@@ -444,7 +460,7 @@ export function endsSection(ss, { all = false, onShowAll, onEdit }) {
         h('span', { class: 'ov-end-sum' }, String(sumArrows(e.arrows))),
         h('span', { class: 'ov-row-go', 'aria-hidden': 'true' }, icons.chevron()),
       ),
-      watchRow(e, i),
+      watchRow(e, i, span),
     ]),
     !all && ss.ends.length > ENDS_SHOWN
       ? h('button', { type: 'button', class: 'ov-more', onClick: onShowAll, dataset: { fk: 'ends-all' } }, `Show all ${ss.ends.length} ends`)

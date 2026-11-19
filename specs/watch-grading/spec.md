@@ -150,3 +150,17 @@ The app now works like Garmin's own activity apps:
 - **Why:** on the second test file (activity 25128394973, 0.7.0) the watch marked no release, although offline the same detector found a 950 mg snap after a still stretch. The watch's own 25 Hz stream is smoothed and flattens such short peaks; the activity file has the raw 100 Hz motion.
 - **Now:** the detector reads the accelerometer at 100 Hz, the same data the activity logs, so tuning offline matches the watch. Times stay the same in seconds (sample constants x4). The jitter is not scaled up (sensor noise is per sample): measured on the real file, a still hand is 2-14 mg and moving up to ~170 mg, so `QUIET` is 15 mg and the smoothing `ALPHA` 1/16 per sample (~0.16 s, as before).
 - **Checked:** synthetic shots all found (draw and hold within 0.1-0.3 s, set-up within 0.1 s); watch and Python give identical shots on the same 100 Hz data; 800 samples per tick ran without hitting the watchdog. On the test files the detector now finds snaps after still stretches; one coincides with an arrow tap on the watch, so a tap while the draw hand is still may look like a release (to check on real shots).
+
+## Tuned on real shots (watch 0.9.0, journal)
+
+- **Data:** activity 25128610129, 2 ends x 6 arrows. Each release is the one snap after a long still hold (3.5-5 s); the release snaps were 620-1850 mg (the old 900 mg threshold found 3 of 12). Other jolts (lowering the bow, tapping the watch, LAP) follow shorter stillness and can be as strong.
+- **Detector:** `RELEASE` 550 mg, `MIN_HOLD` 1.5 s, and a tremor of up to 0.1 s inside a hold no longer ends it (`BRIDGE`). Scored against the 12 known releases: 11 found and no false ones; the 12th candidate is a snap at the moment of grading the last arrow, most likely the tap itself.
+- **Own taps ignored:** the app notes every tap and button press; a snap from 0.5 s before to 1.5 s after one is dropped. A release stays pending 1.5 s before it is kept (and marked in the activity).
+- **Arrow matching on the watch:** the archer picks the arrow before shooting and grades after, so a release now belongs to the arrow selected at the release; with none selected, the next arrow picked within 30 s takes it. Watch code **format 4** (`APJ4`) carries it: `.D<t 3><arrow 2><set-up 2><draw 2><hold 3><steadiness 1>` (arrow 00 = none). The journal joins each release with that arrow (format 3 and older still use the time matching).
+- **Phases found in that session** (set-up / draw / hold, s): end 1 #1 3.0/0.9/3.7, #2 3.1/3.0/4.3, #3 4.4/2.5/3.8, #4 1.5/2.9/4.2, #5 3.5/2.5/4.2; end 2 #1 2.5/2.0/3.6, #2 5.8/3.6/2.9, #3 3.8/4.1/4.5, #4 2.6/2.1/3.9, #5 4.6/2.7/5.1, #6 4.2/3.7/7.7.
+- **Checked:** watch and Python detectors give identical snaps on the first 80 s of the real session at 100 Hz; synthetic shots still all found; 612 journal tests pass.
+
+## Shot timing per end in History (journal)
+
+- Under each end the watch recorded, History shows its heart-rate curve and, below it, **one bar per shot** (set-up, draw, hold, with the total) on a **linear seconds axis** with gridlines. The axis is the same for every end of the session (its longest shot cycle), so shots compare across ends; a legend sits under the Ends heading. A tap still opens the end's full timeline.
+- The timeline dialog's shot-cycle chart has the same seconds axis (per end).

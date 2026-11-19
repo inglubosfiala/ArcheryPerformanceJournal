@@ -12,6 +12,7 @@ class KeyedDelegate extends WatchUi.InputDelegate {
     }
 
     function onKey(evt as WatchUi.KeyEvent) as Boolean {
+        app().noteInput();
         var k = evt.getKey();
         if (k == WatchUi.KEY_ENTER) { return onSelect(); }
         if (k == WatchUi.KEY_ESC) { return onBack(); }
@@ -22,6 +23,13 @@ class KeyedDelegate extends WatchUi.InputDelegate {
         return false;
     }
 
+    // a touch on the screen: noted, then handled by the screen (onTouch)
+    function onTap(evt as WatchUi.ClickEvent) as Boolean {
+        app().noteInput();
+        return onTouch(evt);
+    }
+
+    function onTouch(evt as WatchUi.ClickEvent) as Boolean { return false; }
     function onSelect() as Boolean { return false; }
     function onBack() as Boolean { return false; }
     function onNextPage() as Boolean { return false; }

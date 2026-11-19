@@ -27,7 +27,8 @@ class EndState {
     var owned as Number = 6;
     var trace as Array<Number> = [] as Array<Number>;
     var closed as Boolean = false; // the end was closed (LAP or its last arrow)
-    // the shots the detector found in the end: [t s, draw 0.1 s, hold 0.1 s, steadiness 0-9, set-up 0.1 s]
+    // the releases kept in the end: [t s, draw 0.1 s, hold 0.1 s, steadiness 0-9, set-up 0.1 s, arrow no]
+    // (arrow 0: none selected at the release yet; the next arrow picked within 30 s takes it)
     var detected as Array<Array<Number>> = [] as Array<Array<Number>>;
     // the round so far, for the stop screen: closed ends' arrows and grade sums
     var roundEnds as Number = 0;
@@ -99,7 +100,23 @@ class EndState {
         trace.add(hr);
     }
 
+    // A release the app kept, for the arrow selected at it (0: the next one picked).
+    function addDetected(shot as Array<Number>, arrowNo as Number) as Void {
+        var d = shot.slice(0, null);
+        d.add(arrowNo);
+        detected.add(d);
+    }
+
     function chooseArrow(no as Number, hr as Number) as Void {
+        // shot first, picked after: the latest release without an arrow, up to 30 s ago, is this one
+        for (var i = detected.size() - 1; i >= 0; i--) {
+            var d = detected[i];
+            if (trace.size() - d[0] > 30) { break; }
+            if (d[5] == 0) {
+                d[5] = no;
+                break;
+            }
+        }
         pendingNo = no;
         pendingHr = hr;
         pendingT = trace.size();
@@ -251,7 +268,7 @@ class EndState {
     }
 
     // The watch code (journal: public/js/app/watchCode.js):
-    //   APJ3.E<end>.<arrow>...[.D<shot>...][.H<step><first hr><changes>]
+    //   APJ4.E<end>.<arrow>...[.D<release>...][.H<step><first hr><changes>]
     // arrow: number (2) . M (1) . S (1) . t (3, the second of the trace at the shot), in arrow-number
     // order. H: the trace in bins of <step> seconds (1 digit), the first bin's heart rate (3 digits)
     // and one character per further bin: its change, -21..+21 (see DELTAS).
@@ -266,7 +283,7 @@ class EndState {
             }
             sorted[j + 1] = cur;
         }
-        var text = "APJ3.E" + endNo.toString();
+        var text = "APJ4.E" + endNo.toString();
         for (var k = 0; k < sorted.size(); k++) {
             var a = sorted[k];
             var t = a.size() > 4 ? a[4] : 0;
@@ -274,15 +291,16 @@ class EndState {
             if (t > 999) { t = 999; }
             text += "." + a[0].format("%02d") + a[1].toString() + a[2].toString() + t.format("%03d");
         }
-        // the shots the detector found: D, t (3), set-up (2, 0.1 s), draw (2, 0.1 s), hold (3, 0.1 s),
-        // steadiness (1)
+        // the releases kept: D, t (3), arrow (2, 00 none), set-up (2, 0.1 s), draw (2, 0.1 s),
+        // hold (3, 0.1 s), steadiness (1)
         for (var d = 0; d < detected.size(); d++) {
             var x = detected[d];
             var su = x[4] > 99 ? 99 : x[4];
             var dr = x[1] > 99 ? 99 : x[1];
             var ho = x[2] > 999 ? 999 : x[2];
             var tt = x[0] > 999 ? 999 : x[0];
-            text += ".D" + tt.format("%03d") + su.format("%02d") + dr.format("%02d") + ho.format("%03d") + x[3].toString();
+            var no = x.size() > 5 ? x[5] : 0;
+            text += ".D" + tt.format("%03d") + no.format("%02d") + su.format("%02d") + dr.format("%02d") + ho.format("%03d") + x[3].toString();
         }
         return text + traceText();
     }
