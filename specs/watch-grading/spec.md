@@ -179,6 +179,22 @@ The app now works like Garmin's own activity apps:
 - **Back:** the archer wears the watch on the left (draw) wrist with the START button towards the hand, so the watch's -x points to the elbow. The journal shows that part of the follow-through as **Back mm** (about 3 cm on the real arrows); worn another way, the sign would be wrong.
 - **Checked:** the Python detector gives the tuned figures on both real sessions and still finds every synthetic shot; 618 journal tests pass; the watch app builds. The watch's own arithmetic was not run against real data in the simulator.
 
+## The phases renamed, a pause at set-up, tremors bridged (watch 0.11.0, journal)
+
+- **Test:** activity 25131021078, three arrows shot with a deliberate pause of about 3 s at the set-up position. The pause fell inside the still stretch the detector called the hold, after the movement it called the draw. So the shakiness of the wrist shows the **set** (hooking and gripping) and the **raise** to the set-up position; the slow, smooth draw does not shake the wrist and is part of the still stretch, together with the anchor.
+- **Phases now:** **Set** (the old "set-up") · **Set-up** (the old "draw": the raise, plus any pause at the set-up position) · **Draw** (the still stretch while the wrist's tilt moves; the old "settle") · **Anchor** (the tilt steady until the release). On the test: set-up 6.7-7.4 s of which 3.9-4.5 s pause, draw 2.2-3.0 s, anchor 0.7-1.2 s; on the two normal sessions no pause, draw mostly 2.2-3.5 s, anchor 0.7-2.7 s.
+- **Pause:** back from the anchor the draw lasts while the tilt moves; it starts after the last 0.5 s in which the tilt changed by less than 1 degree per 0.5 s (or at the start of the still stretch). Watch code **format 6** (`APJ6`) adds it as a sixth character (0.2 s). The saved names stay (`setup`, `draw`, `hold`, `settle`, `pause`); the journal derives set-up = draw + pause, draw = settle - pause, anchor = hold - settle. Ends from watches before 0.10 show Set · Set-up · Draw + anchor.
+- **Missed release:** arrow 1 of the test was not found: a tremor of some 0.3 s one second before its release cut the still stretch to 1.1 s, under the 1.5 s needed. `BRIDGE` is now 0.3 s (was 0.1 s): all 3 found there, the same releases as before on the other two sessions.
+- **Watch screen:** the reminder line shows draw + anchor of the last release.
+- **Checked:** Python detector on the three real sessions and the synthetic shots; 623 journal tests pass; the watch app builds. The watch's own arithmetic was not run against real data in the simulator.
+
+## Grading on or off (watch 0.11.0)
+
+- **Why:** the archer does not always want to grade; the timing, heart rate and motion are worth recording by themselves.
+- **Setup:** the setup (UP on the start screen) first asks **Grade the shots?** - "Grade M · S" or "Timing only". With grading it goes on to arrows per end and numbered arrows as before; with timing only it returns to the start screen, which then says "Timing only · no grading". The choice is kept between rounds.
+- **Timing only:** the shot screen has nothing to tap: it shows the end and its time, the number of releases found, the heart rate and the last release's draw and anchor. LAP closes the end (it never closes by itself), START pauses, as before. The releases are numbered in the order shot (1-24) and the code carries them with the heart-rate curve and no arrows; the journal shows them under those numbers, ungraded.
+- **Checked:** the watch app builds; a journal test reads a timing-only code. The new watch screens were not looked at in the simulator.
+
 
 ## Shot timing per end in History (journal)
 

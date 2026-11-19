@@ -127,31 +127,38 @@ export function timelineChart(tl, { hrTrace = null } = {}) {
 
 const sec = (v) => (v == null ? '–' : v.toFixed(1));
 
-/** A shot's phases in order, [seconds, class]: the hold split into settle and anchor when known. */
+/**
+ * A shot's phases in order, [seconds, class]: the set (hook and grip), the set-up (raising the bow,
+ * with any pause at the set-up position), then the draw and the anchor; from a watch that does not
+ * split those two, one "draw and anchor".
+ */
 function phases(sh) {
   return [
     [sh.setup, 'setup'],
-    [sh.draw, 'draw'],
     ...(sh.settle != null
       ? [
-          [sh.settle, 'settle'],
+          [sh.raise, 'draw'],
+          [sh.pull, 'settle'],
           [sh.anchor, 'hold'],
         ]
-      : [[sh.hold, 'hold']]),
+      : [
+          [sh.draw, 'draw'],
+          [sh.hold, 'hold'],
+        ]),
   ];
 }
 
-/** The legend's keys: with a settle part, the rest of the hold is the anchor. */
+/** The legend's keys. */
 export function phaseKeys(split) {
   return [
-    h('span', { class: 'wt-key wt-key-setup' }, 'Set-up'),
-    h('span', { class: 'wt-key wt-key-draw' }, 'Draw'),
+    h('span', { class: 'wt-key wt-key-setup' }, 'Set'),
+    h('span', { class: 'wt-key wt-key-draw' }, 'Set-up'),
     ...(split
       ? [
-          h('span', { class: 'wt-key wt-key-settle' }, 'Settle'),
+          h('span', { class: 'wt-key wt-key-settle' }, 'Draw'),
           h('span', { class: 'wt-key wt-key-hold' }, 'Anchor'),
         ]
-      : [h('span', { class: 'wt-key wt-key-hold' }, 'Hold')]),
+      : [h('span', { class: 'wt-key wt-key-hold' }, 'Draw + anchor')]),
   ];
 }
 
@@ -224,7 +231,7 @@ export function shotCycleChart(tl, { max: span = null, legend = true } = {}) {
         class: 'wt-chart',
         viewBox: `0 0 ${VB_W} ${height}`,
         role: 'img',
-        'aria-label': `Shot cycle: ${shots.map((sh) => `arrow ${sh.no ?? '?'}: set-up ${sec(sh.setup)}, draw ${sec(sh.draw)}, ${sh.settle != null ? `settle ${sec(sh.settle)}, anchor ${sec(sh.anchor)}` : `hold ${sec(sh.hold)}`} seconds`).join('; ')}`,
+        'aria-label': `Shot cycle: ${shots.map((sh) => `arrow ${sh.no ?? '?'}: set ${sec(sh.setup)}, ${sh.settle != null ? `set-up ${sec(sh.raise)}, draw ${sec(sh.pull)}, anchor ${sec(sh.anchor)}` : `set-up ${sec(sh.draw)}, draw and anchor ${sec(sh.hold)}`} seconds`).join('; ')}`,
       },
       ...parts,
     ),
@@ -234,7 +241,7 @@ export function shotCycleChart(tl, { max: span = null, legend = true } = {}) {
 function timelineLabel(tl) {
   const shots = tl.shots.map(
     (sh) =>
-      `arrow ${sh.no ?? '?'} at ${mmss(sh.t)}${sh.detected ? `, draw ${sec(sh.draw)} s, hold ${sec(sh.hold)} s` : ''}${sh.m != null ? `, M${sh.m}` : ''}${sh.hr != null ? `, heart rate ${sh.hr}` : ''}`,
+      `arrow ${sh.no ?? '?'} at ${mmss(sh.t)}${sh.detected ? (sh.settle != null ? `, draw ${sec(sh.pull)} s, anchor ${sec(sh.anchor)} s` : `, draw and anchor ${sec(sh.hold)} s`) : ''}${sh.m != null ? `, M${sh.m}` : ''}${sh.hr != null ? `, heart rate ${sh.hr}` : ''}`,
   );
   return `End timeline, ${mmss(tl.seconds)}${tl.hr ? `, heart rate ${tl.hr.min} to ${tl.hr.max}` : ''}. ${shots.join('; ')}`;
 }
@@ -250,11 +257,14 @@ function timelineDetails(tl) {
     tile('Shots', String(tl.shots.length)),
     ...(tl.avg
       ? [
-          tile('Ø draw', `${sec(tl.avg.draw)} s`),
-          tile('Ø hold', `${sec(tl.avg.hold)} s`),
           ...(tl.avg.anchor != null
-            ? [tile('Ø anchor', `${sec(tl.avg.anchor)} s`), tile('Ø follow-through', `${tl.avg.follow} mm`)]
-            : []),
+            ? [
+                tile('Ø set-up', `${sec(tl.avg.raise)} s`),
+                tile('Ø draw', `${sec(tl.avg.pull)} s`),
+                tile('Ø anchor', `${sec(tl.avg.anchor)} s`),
+                tile('Ø follow-through', `${tl.avg.follow} mm`),
+              ]
+            : [tile('Ø set-up', `${sec(tl.avg.draw)} s`), tile('Ø draw + anchor', `${sec(tl.avg.hold)} s`)]),
         ]
       : [
           tile('Rhythm', tl.avgGap != null ? `Ø ${tl.avgGap} s` : '–'),
@@ -280,9 +290,9 @@ function timelineDetails(tl) {
               ...[
                 'Arrow',
                 'Time',
+                'Set',
                 'Set-up',
-                'Draw',
-                ...(split ? ['Settle', 'Anchor', 'Follow mm', 'Back mm'] : ['Hold']),
+                ...(split ? ['Draw', 'Anchor', 'Follow mm', 'Back mm'] : ['Draw + anchor']),
                 'M',
                 'S',
                 '♥',
@@ -304,11 +314,11 @@ function timelineDetails(tl) {
                 ),
                 h('td', null, mmss(sh.t)),
                 h('td', null, sh.detected ? sec(sh.setup) : '–'),
-                h('td', null, sh.detected ? sec(sh.draw) : '–'),
+                h('td', null, sh.detected ? sec(sh.raise ?? sh.draw) : '–'),
                 ...(split
                   ? [
-                      h('td', null, sh.settle != null ? sec(sh.settle) : '–'),
-                      h('td', null, sh.settle != null ? sec(sh.anchor) : sh.detected ? sec(sh.hold) : '–'),
+                      h('td', null, sh.settle != null ? sec(sh.pull) : sh.detected ? sec(sh.hold) : '–'),
+                      h('td', null, sh.settle != null ? sec(sh.anchor) : '–'),
                       h('td', null, follow(sh)),
                       h('td', null, sh.followBack ?? '–'),
                     ]
@@ -331,7 +341,7 @@ function timelineDetails(tl) {
     ? h(
         'p',
         { class: 'wt-note' },
-        'Settle: the start of the hold, while the wrist still turns. Anchor: the rest, with the wrist steady. Follow: how far the hand moves in the first 0.1 s after the release; in brackets, how far that is from this end’s average direction. Back: the part of it straight back along the forearm, towards the elbow.',
+        'Set: hooking and gripping. Set-up: raising the bow, with any pause before the draw. Draw: the wrist turning slowly into the anchor. Anchor: the wrist steady until the release. Follow: how far the hand moves in the first 0.1 s after the release; in brackets, how far that is from this end’s average direction. Back: the part of it straight back along the forearm, towards the elbow.',
       )
     : null;
   return h('div', { class: 'wt-details' }, tiles, shotCycleChart(tl), rows, note);

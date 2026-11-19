@@ -13,7 +13,7 @@ import Toybox.WatchUi;
 //   rest          the end's code for the journal and a rest timer; LAP starts the next end
 //   START         stop screen at any time: Resume, Save, Discard
 // The version shown on the start screen; keep it the same as the version typed in the store upload.
-const APP_VERSION = "0.10.0";
+const APP_VERSION = "0.11.0";
 
 const PHASE_IDLE = 0;
 const PHASE_END = 1;
@@ -110,7 +110,10 @@ class ArcheryApp extends Application.AppBase {
         if (detector.feed(acc.x as Array<Number>, acc.y as Array<Number>, acc.z as Array<Number>)) {
             // kept pending until it is clear the archer did not touch the watch around it
             var snapMs = System.getTimer() - detector.lastBack * 1000 / ShotDetector.RATE;
-            _pending = [detector.lastShot, snapMs, (state as EndState).pendingNo];
+            var st = state as EndState;
+            // timing only: the releases are numbered in the order shot (the journal reads up to 24)
+            var no = st.grading ? st.pendingNo : (st.detected.size() < 24 ? st.detected.size() + 1 : 0);
+            _pending = [detector.lastShot, snapMs, no];
         }
     }
 

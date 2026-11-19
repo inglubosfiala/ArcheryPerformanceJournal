@@ -38,7 +38,8 @@ const isDetected = (list) =>
         ? d.drift == null && d.fx == null && d.fy == null && d.fz == null
         : inRange(d.settle, 0, SETTLE_MAX) &&
           inRange(d.drift, 0, DRIFT_MAX) &&
-          [d.fx, d.fy, d.fz].every((v) => Number.isInteger(v) && inRange(v, -FOLLOW_MAX, FOLLOW_MAX))),
+          [d.fx, d.fy, d.fz].every((v) => Number.isInteger(v) && inRange(v, -FOLLOW_MAX, FOLLOW_MAX))) &&
+      (d.pause == null || (d.settle != null && inRange(d.pause, 0, SETTLE_MAX))),
   );
 const isGrade = (g) => g == null || (Number.isInteger(g) && g >= 1 && g <= 5);
 const isCount = (n) => Number.isInteger(n) && n >= 0;
