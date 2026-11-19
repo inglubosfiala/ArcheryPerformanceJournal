@@ -329,24 +329,11 @@ function renderActive(ctx, session) {
       h('strong', null, `${current.ld} · ${current.cld}`),
     ),
     chip(`${T.noteForEnd}${current.note ? ' (written)' : ''}. ${T.endDetails(endNo)}`, 'details-note', icons.pencil(), 'Note', current.note ? h('span', { class: 'score-chip-dot', 'aria-hidden': 'true' }) : null),
-    // what the watch recorded: scan its code into this end (grades in a graded session; shot
-    // timing and heart rate in every session)
-    h(
-      'button',
-      {
-        type: 'button',
-        class: 'score-chip-btn',
-        'aria-label': `Scan the watch code into ${T.endN(endNo).toLowerCase()}`,
-        onClick: () => scanWatch(ctx),
-        dataset: { fk: 'watch-scan' },
-      },
-      icons.watch(),
-      'Watch',
-    ),
   );
 
-  // --- bottom bar, in thumb reach: Previous (end), Next (end), and Scan (the most used, the largest)
-  // at the right. There is no Save end step (every change is saved as it is made): Next opens the
+  // --- bottom bar, in thumb reach, four buttons of one size: Previous (end), Next (end), Watch (scan
+  // the watch's code into this end: grades in a graded session, shot timing and heart rate in
+  // every session) and Scan (the target) at the right. There is no Save end step (every change is saved as it is made): Next opens the
   // next end, and from the end being shot it needs at least one arrow, so empty ends do not pile
   // up. It turns accent once every slot of the end has a score.
   const prevBtn = h(
@@ -376,6 +363,19 @@ function renderActive(ctx, session) {
       dataset: { fk: 'end-next' },
     },
     T.nextShort,
+  );
+
+  const watchBtn = h(
+    'button',
+    {
+      type: 'button',
+      class: 'score-watch',
+      'aria-label': `Scan the watch code into ${T.endN(endNo).toLowerCase()}`,
+      onClick: () => scanWatch(ctx),
+      dataset: { fk: 'watch-scan' },
+    },
+    icons.watch(),
+    'Watch',
   );
 
   // --- the End n details sheet: let-downs, correct let-downs and the note (same handlers as before)
@@ -480,7 +480,7 @@ function renderActive(ctx, session) {
         h('section', { class: 'score-screen', 'aria-label': T.endN(endNo) }, strip, input, under, chips),
         totalSection,
       ),
-      APL.BottomBar({ children: h('div', { class: 'score-actions' }, prevBtn, nextBtn, photoButton(ctx, session)) }),
+      APL.BottomBar({ children: h('div', { class: 'score-actions' }, prevBtn, nextBtn, watchBtn, photoButton(ctx, session)) }),
     ),
     overlay: sheet === 'details' ? detailsSheet() : scoreOverlay(ctx, session, { sheet, setSheet }),
   };

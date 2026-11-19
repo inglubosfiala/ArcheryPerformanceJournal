@@ -2768,16 +2768,24 @@ button.arrow-count:hover {
   box-shadow: 0 0 0 3px var(--ink);
 }
 
-/* bottom bar: Previous (end), Next (end; accent once the end is complete), and Scan, the
-   largest, at the right under the thumb */
+/* bottom bar: Previous (end), Next (end; accent once the end is complete), Watch and Scan, all
+   four the same size, Scan at the right under the thumb */
 .score-actions {
   display: flex;
   gap: 8px;
 }
 
 .score-prev,
-.score-next {
-  flex: none;
+.score-next,
+.score-watch,
+.score-scan {
+  flex: 1 1 0;
+  min-width: 0;
+}
+
+.score-prev,
+.score-next,
+.score-watch {
   height: var(--tap-primary);
   border: 1px solid var(--border);
   border-radius: var(--radius-lg);
@@ -2791,9 +2799,19 @@ button.arrow-count:hover {
 }
 
 .score-prev,
-.score-next {
-  min-width: 96px;
-  padding: 0 14px;
+.score-next,
+.score-watch {
+  padding: 0 6px;
+}
+
+.score-watch {
+  gap: 6px;
+}
+
+.score-watch svg {
+  width: 20px;
+  height: 20px;
+  flex: none;
 }
 
 .score-next.is-ready:not(:disabled) {
@@ -2803,25 +2821,24 @@ button.arrow-count:hover {
 }
 
 .score-scan {
-  flex: 1 1 auto;
-  min-width: 0;
   height: var(--tap-primary);
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 10px;
-  padding: 0 12px;
+  gap: 6px;
+  padding: 0 6px;
   border: 2px solid var(--accent-bright);
-  border-radius: var(--radius-xl);
+  border-radius: var(--radius-lg);
   background: var(--accent-tint);
   color: var(--ink);
-  font-size: 18px;
-  font-weight: 800;
+  font: var(--type-body-strong);
+  white-space: nowrap;
 }
 
 .score-scan svg {
-  width: 24px;
-  height: 24px;
+  width: 20px;
+  height: 20px;
+  flex: none;
   color: var(--accent-bright);
 }
 
