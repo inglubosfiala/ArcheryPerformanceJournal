@@ -2,19 +2,25 @@ import Toybox.Lang;
 import Toybox.Math;
 
 // Finds the shots of an end in the draw hand's accelerometer (100 samples a second, milli-g; the
-// watch's 25 Hz stream is smoothed and flattens the short release snap):
-//   set-up  the hand rising with the bow and settling (from the last rest up to the draw)
-//   draw    the hand moving back (after a pause, up to the anchor)
-//   anchor  the hand still: aiming and expansion (the "hold")
-//   release a sharp snap of the hand right after that stillness
-// Per shot: [t (s since the end began), draw (0.1 s), hold (0.1 s), steadiness 0-9 (0 = stillest),
-// set-up (0.1 s), settle (0.1 s), tilt change at anchor (0.1 degrees), follow-through x, y, z (mm)].
+// watch's 25 Hz stream is smoothed and flattens the short release snap).
 //
-// The hold is split by the wrist's tilt (the direction of gravity in 0.1 s means): "settle" is its
-// first part, while the tilt still moves; "anchor" the rest, where it stays within 2 degrees of its
-// last 0.5 s. The follow-through is the hand's path over the 0.1 s after the snap, along the watch's
-// own axes: acceleration = gravity - reading, with gravity as read just before the snap. A release
-// is therefore reported 0.1 s after its snap.
+// What the shakiness of the acceleration shows (checked with a deliberate pause at the set-up
+// position, activity 25131021078): the hand moves clearly while the archer hooks and grips (the
+// "set") and while the bow is raised; from the set-up position on, the slow, smooth draw barely
+// shakes the wrist, so the draw and the anchor are one still stretch, ended by the release snap.
+// That stretch is split by the wrist's tilt (the direction of gravity in 0.1 s means):
+//   pause   at its start, while the tilt does not move: the set-up position held
+//   draw    while the tilt moves
+//   anchor  at its end, where the tilt stays within 2 degrees of its last 0.5 s
+//
+// Per shot: [t (s since the end began), raise (0.1 s), still stretch (0.1 s), steadiness 0-9 (0 =
+// stillest), set (0.1 s), still stretch before the anchor (0.1 s), tilt change at anchor (0.1
+// degrees), pause (0.1 s), follow-through x, y, z (mm)]. So: set-up = raise + pause, draw = before
+// the anchor - pause, anchor = still stretch - before the anchor.
+//
+// The follow-through is the hand's path over the 0.1 s after the snap, along the watch's own axes:
+// acceleration = gravity - reading, with gravity as read just before the snap. A release is
+// therefore reported 0.1 s after its snap.
 //
 // Tuned on real sessions (2 ends x 6 arrows each, activities 25128610129 and 25128765325):
 // releases are 450-1850 mg snaps after 2-10 s of stillness; other jolts (lowering the bow, tapping the watch) follow
@@ -26,7 +32,7 @@ class ShotDetector {
     static const QUIET = 15;           // jitter (mg) below which the hand counts as still (still: 2-14)
     static const RELEASE = 420;        // |magnitude - 1 g| (mg) of the release snap (soft ones: ~450)
     static const MIN_HOLD = 150;       // stillness (samples) needed right before a release: 1.5 s
-    static const BRIDGE = 10;          // a tremor up to 0.1 s inside a hold does not end it
+    static const BRIDGE = 30;          // a tremor up to 0.3 s inside the still stretch does not end it
     static const GAP_AFTER_HOLD = 40;  // the snap must come within 0.4 s of the stillness ending
     static const PAUSE = 50;           // a pause (samples) that marks the start of the draw: 0.5 s
     static const MAX_DRAW = 800;       // look back at most 8 s for the draw's start
@@ -37,6 +43,8 @@ class ShotDetector {
     static const BLOCK = 10;           // the tilt is followed in means of 0.1 s
     static const BLOCKS = 300;         // HISTORY / BLOCK
     static const TILT_COS2 = 0.998782; // cos(2 degrees) squared: the tilt at anchor
+    static const PAUSE_COS2 = 0.999695; // cos(1 degree) squared: the tilt's change in 0.5 s in a pause
+    static const PAUSE_BLOCKS = 5;     // a pause lasts 0.5 s
     static const RAW = 64;             // raw samples kept for the follow-through
     static const FT_BEFORE = 8;        // its path starts 0.08 s before the snap is seen ...
     static const FT_AFTER = 9;         // ... and ends 0.1 s after it
@@ -218,7 +226,7 @@ class ShotDetector {
         var steady = hold > 0 ? (sum * 2) / hold / 5 : 0;
         if (steady > 9) { steady = 9; }
         var split = anchor(i, hold);
-        _pend = [i / RATE, tenths(draw), tenths(hold), steady, tenths(setup), tenths(split[0]), split[1]] as Array<Number>;
+        _pend = [i / RATE, tenths(draw), tenths(hold), steady, tenths(setup), tenths(split[0]), split[1], tenths(split[2])] as Array<Number>;
         _rel = i;
     }
 
@@ -236,14 +244,14 @@ class ShotDetector {
         return [x, y, z] as Array<Float>;
     }
 
-    // The hold split by the wrist's tilt: [samples of settling before the tilt stays within
-    // 2 degrees of its last 0.5 s, the tilt's change at anchor in 0.1 degrees].
+    // The still stretch split by the wrist's tilt: [samples before the anchor, the tilt's change at
+    // anchor in 0.1 degrees, samples of pause at its start].
     hidden function anchor(i as Number, hold as Number) as Array<Number> {
         var last = (i - 15) / BLOCK - 1; // the last whole 0.1 s ending 0.15 s before the snap
         var first = (i - hold) / BLOCK + 1;
         if (first < last - BLOCKS + 2) { first = last - BLOCKS + 2; }
         if (first < 0) { first = 0; }
-        if (last - 4 < first) { return [0, 0] as Array<Number>; }
+        if (last - 4 < first) { return [0, 0, 0] as Array<Number>; }
         var fin = blockSum(last - 4, last);
         var ff = fin[0] * fin[0] + fin[1] * fin[1] + fin[2] * fin[2];
         var b = last;
@@ -263,8 +271,39 @@ class ShotDetector {
             if (c > 1.0) { c = 1.0; }
             drift = (Math.toDegrees(Math.acos(c)) * 10 + 0.5).toNumber();
         }
+        // the draw: back from the anchor while the tilt moves, to a pause of 0.5 s (tilt change over
+        // 0.5 s under 1 degree) or to the start of the still stretch
+        var flat = 0;
+        var start = first;
+        for (var k = b - 1 - PAUSE_BLOCKS; k >= first; k--) {
+            var ui = k % BLOCKS;
+            var wi = (k + PAUSE_BLOCKS) % BLOCKS;
+            var ax = _bx[ui].toFloat();
+            var ay = _by[ui].toFloat();
+            var az = _bz[ui].toFloat();
+            var cx = _bx[wi].toFloat();
+            var cy = _by[wi].toFloat();
+            var cz = _bz[wi].toFloat();
+            var d = ax * cx + ay * cy + az * cz;
+            if (d > 0 && d * d >= PAUSE_COS2 * (ax * ax + ay * ay + az * az) * (cx * cx + cy * cy + cz * cz)) {
+                flat++;
+                if (flat >= PAUSE_BLOCKS) {
+                    start = k + 2 * PAUSE_BLOCKS - 1;
+                    break;
+                }
+            } else {
+                flat = 0;
+            }
+        }
         var settle = b * BLOCK - (i - hold);
-        return [settle < 0 ? 0 : settle, drift] as Array<Number>;
+        if (settle < 0) { settle = 0; }
+        var pause = 0;
+        if (start > first) {
+            pause = start * BLOCK - (i - hold);
+            if (pause < 0) { pause = 0; }
+            if (pause > settle) { pause = settle; }
+        }
+        return [settle, drift, pause] as Array<Number>;
     }
 
     // The hand's path over the 0.1 s after the snap, in mm along the watch's x, y and z.

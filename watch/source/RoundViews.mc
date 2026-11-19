@@ -34,7 +34,8 @@ class StartView extends WatchUi.View {
         dc.drawText(w / 2, (h * 24) / 100, Graphics.FONT_MEDIUM, "Arrow Grades", Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
         dc.setColor(COLOR_DIM, Graphics.COLOR_TRANSPARENT);
         dc.drawText(w / 2, (h * 35) / 100, Graphics.FONT_XTINY,
-            st.perEnd.toString() + " arrows/end · arrows 1-" + st.owned.toString(), Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
+            st.grading ? st.perEnd.toString() + " arrows/end · arrows 1-" + st.owned.toString() : "Timing only · no grading",
+            Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
 
         // a big START button for touch, too
         cx = w / 2;

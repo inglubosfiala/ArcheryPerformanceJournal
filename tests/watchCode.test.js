@@ -434,3 +434,56 @@ describe('format 5: settle, anchor and follow-through of each release', () => {
     expect(errors()).toEqual(['end 1: invalid detected shots']);
   });
 });
+
+describe('format 6: the pause at the set-up position, and what the phases are', () => {
+  // still stretch 8.3 s: 4.0 s pause at set-up (K = 20 x 0.2), then 3.0 s draw (settle 7.0 = Z),
+  // 1.3 s anchor; the raise before it took 3.2 s, the set 1.0 s
+  const CODE = 'APJ6.E1.0111001.D0140110320831Z87HLK';
+
+  it('reads the pause', () => {
+    expect(parseWatchCode(CODE).detected[0]).toMatchObject({ setup: 1, draw: 3.2, hold: 8.3, settle: 7, pause: 4 });
+  });
+
+  it('a format 5 release has none, and five characters only', () => {
+    expect(parseWatchCode('APJ5.E1.D0140110320831Z87HL').detected[0].pause).toBeUndefined();
+    expect(parseWatchCode('APJ5.E1.D0140110320831Z87HLK')).toEqual({ ok: false, error: 'bad' });
+    expect(parseWatchCode('APJ6.E1.D0140110320831Z87HL')).toEqual({ ok: false, error: 'bad' });
+  });
+
+  it('the timeline gives set, set-up (raise + pause), draw and anchor', () => {
+    const tl = endTimeline(L.applyWatchGrades(start(1), parseWatchCode(CODE)).current);
+    expect(tl.shots.map((x) => [x.setup, x.raise, x.pull, x.anchor])).toEqual([[1, 7.2, 3, 1.3]]);
+    expect(tl.avg).toMatchObject({ raise: 7.2, pull: 3, anchor: 1.3 });
+  });
+
+  it('without a pause the whole stretch before the anchor is the draw', () => {
+    const tl = endTimeline(L.applyWatchGrades(start(1), parseWatchCode('APJ5.E1.0111001.D0140110320831Z87HL')).current);
+    expect(tl.shots.map((x) => [x.raise, x.pull, x.anchor])).toEqual([[3.2, 7, 1.3]]);
+  });
+
+  it('the validator checks the pause', () => {
+    let s = L.applyWatchGrades(start(1), parseWatchCode(CODE));
+    s = L.nextEnd(L.enterScore(s, 9));
+    const errors = () => collections.sessions.validate({ ...s, id: 'x', status: 'finished' }).filter((e) => /detected/.test(e));
+    expect(errors()).toEqual([]);
+    s.ends[0].watchShots[0].pause = -1;
+    expect(errors()).toEqual(['end 1: invalid detected shots']);
+  });
+});
+
+describe('timing only: the watch with grading off', () => {
+  // no arrows graded; two releases, numbered by the watch in the order shot
+  const CODE = 'APJ6.E1.D0140100320831Z87HLK.D0300246210771Z09JQN.H1078LLLM';
+
+  it('the end keeps the releases and their numbers, with no grades', () => {
+    const code = parseWatchCode(CODE);
+    expect(code.arrows).toEqual([]);
+    const s = L.applyWatchGrades(start(3), code);
+    expect(s.current.arrows.every((a) => a.m == null && a.s == null && a.no == null)).toBe(true);
+    const tl = endTimeline(s.current);
+    expect(tl.shots.map((x) => [x.no, x.t, x.m, x.detected])).toEqual([
+      [1, 14, null, true],
+      [2, 30, null, true],
+    ]);
+  });
+});

@@ -49,13 +49,16 @@ const avg1 = (xs) => (xs.length ? Math.round((xs.reduce((t, v) => t + v, 0) / xs
  *   { seconds, shots: [{ no, t, gap, m, s, hr, v, setup, draw, hold, steady, detected }],
  *     avgGap, avg: { setup, draw, hold } | null, firstShot, lastShot, hr: { min, avg, max } | null }
  *
- * From watch app 0.10 a release also has `settle` (the first part of the hold, while the wrist's
- * tilt still moves), `anchor` (the rest of the hold), `drift` (the tilt's change at anchor,
+ * What the times are (see watchCode.js): `setup` is the set (hook and grip), `draw` the raise to
+ * the set-up position, `hold` the still stretch from there to the release (the slow draw and the
+ * anchor). From watch app 0.10 that stretch is split, and a release also has `raise` (the set-up
+ * phase: the raise and any pause at the set-up position), `pull` (the real draw), `anchor`, `settle`
+ * (pause + pull), `drift` (the tilt's change at anchor,
  * degrees), `follow` (the length of the hand's path over the 0.1 s after the release, mm) and
  * `followOff` (how far that path ends from the end's average one, mm; null with fewer than two)
  * and `followBack` (the part of it straight back along the forearm, towards the elbow, mm: the
  * watch's -x, as worn on the left wrist with the START button towards the hand);
- * `avg` then also has `anchor` and `follow`.
+ * `avg` then also has `raise`, `pull`, `anchor` and `follow`.
  */
 export function endTimeline(end) {
   const trace = end?.hrTrace?.hr?.length ? end.hrTrace : null;
@@ -76,11 +79,16 @@ export function endTimeline(end) {
   // the follow-through of each release against the end's average one
   const followed = releases.filter((r) => r.fx != null);
   const mean = ['fx', 'fy', 'fz'].map((k) => followed.reduce((t, r) => t + r[k], 0) / (followed.length || 1));
+  const r1 = (v) => Math.round(v * 10) / 10;
+  const settleOf = (r) => Math.min(r.settle, r.hold);
+  const pauseOf = (r) => Math.min(r.pause ?? 0, settleOf(r));
   const more = (r) =>
     r.settle == null
       ? {}
       : {
-          settle: Math.min(r.settle, r.hold),
+          settle: settleOf(r),
+          raise: r1(r.draw + pauseOf(r)),
+          pull: r1(settleOf(r) - pauseOf(r)),
           anchor: Math.round(Math.max(0, r.hold - r.settle) * 10) / 10,
           drift: r.drift,
           follow: Math.round(Math.hypot(r.fx, r.fy, r.fz)),
@@ -94,7 +102,8 @@ export function endTimeline(end) {
     const a = arrowFor(r, releases[i + 1]);
     if (a) used.add(a);
     return {
-      ...(a ? fromArrow(a) : { no: null, m: null, s: null, v: null }),
+      // timing only (watch grading off): the release keeps the number the watch gave it
+      ...(a ? fromArrow(a) : { no: r.no ?? null, m: null, s: null, v: null }),
       t: r.t,
       hr: traceAt(trace, r.t) ?? a?.hr ?? null,
       setup: r.setup,
@@ -133,6 +142,8 @@ export function endTimeline(end) {
           hold: avg1(releases.map((r) => r.hold)),
           ...(followed.length
             ? {
+                raise: avg1(followed.map((r) => r.draw + pauseOf(r))),
+                pull: avg1(followed.map((r) => settleOf(r) - pauseOf(r))),
                 anchor: avg1(followed.map((r) => Math.max(0, r.hold - r.settle))),
                 follow: Math.round(
                   followed.reduce((t, r) => t + Math.hypot(r.fx, r.fy, r.fz), 0) / followed.length,

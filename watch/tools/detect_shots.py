@@ -15,7 +15,7 @@ ALPHA = 1 / 16             # jitter smoothing per sample (~0.16 s)
 QUIET = 15                 # jitter (mg) below which the hand counts as still (still: 2-14 mg)
 RELEASE = 420              # |magnitude - 1 g| (mg) of the release snap (real ones: 450-1850 mg)
 MIN_HOLD = RATE * 3 // 2   # stillness right before a release: 1.5 s (real holds: 3.5-5 s)
-BRIDGE = RATE // 10        # a tremor up to 0.1 s inside a hold does not end it
+BRIDGE = RATE * 3 // 10    # a tremor up to 0.3 s inside a hold does not end it
 GAP_AFTER_HOLD = RATE * 2 // 5   # the snap within 0.4 s of the stillness ending
 PAUSE = RATE // 2          # a pause that marks the start of the draw: 0.5 s
 MAX_DRAW = RATE * 8        # look back at most 8 s for the draw's start
@@ -26,6 +26,8 @@ HISTORY = RATE * 30        # 30 s of quiet flags kept for looking back
 BLOCK = RATE // 10         # the wrist's tilt is followed in means of 0.1 s
 BLOCKS = HISTORY // BLOCK
 TILT_COS2 = math.cos(math.radians(2)) ** 2   # at anchor: the tilt within 2 degrees of its last 0.5 s
+PAUSE_COS2 = math.cos(math.radians(1)) ** 2  # a pause before the draw: under 1 degree in 0.5 s ...
+PAUSE_BLOCKS = 5                             # ... for 0.5 s
 RAW = 64                   # raw samples kept for the follow-through
 FT_BEFORE = 8              # the follow-through path starts 0.08 s before the snap is seen ...
 FT_AFTER = 9               # ... and ends 0.1 s after it
@@ -144,20 +146,22 @@ class ShotDetector:
                 setup = draw_start - setup_start
         total = sum(self.jit[s % HISTORY] for s in range(anchor, i))
         steady = min(9, (total * 2) // hold // 5) if hold > 0 else 0
-        settle, drift = self.anchor(i, hold)
-        self.pend = [i // RATE, tenths(draw), tenths(hold), steady, tenths(setup), tenths(settle), drift]
+        settle, drift, pause = self.anchor(i, hold)
+        self.pend = [i // RATE, tenths(draw), tenths(hold), steady, tenths(setup), tenths(settle), drift, tenths(pause)]
         self.rel = i
 
     def block_sum(self, a, b):
         return [sum(self.blocks[c][k % BLOCKS] for k in range(a, b + 1)) for c in range(3)]
 
     def anchor(self, i, hold):
-        """The hold split by the wrist's tilt: (samples of settling before the tilt stays within
-        2 degrees of its last 0.5 s, the tilt's change at anchor in 0.1 degrees)."""
+        """The still stretch before the release split by the wrist's tilt: (samples before the anchor,
+        where the tilt stays within 2 degrees of its last 0.5 s; the tilt's change at anchor in 0.1
+        degrees; samples of pause at its start, before the tilt begins to move: the set-up position
+        held before the draw)."""
         last = (i - 15) // BLOCK - 1          # the last whole 0.1 s ending 0.15 s before the snap
         first = max((i - hold) // BLOCK + 1, last - BLOCKS + 2, 0)
         if last - 4 < first:
-            return 0, 0
+            return 0, 0, 0
         fin = self.block_sum(last - 4, last)
         ff = sum(v * v for v in fin)
         b = last
@@ -172,7 +176,24 @@ class ShotDetector:
             u = self.block_sum(b, b + 4)
             cos = sum(p * q for p, q in zip(u, fin)) / math.sqrt(sum(v * v for v in u) * ff)
             drift = int(math.degrees(math.acos(min(1.0, cos))) * 10 + 0.5)
-        return max(0, b * BLOCK - (i - hold)), drift
+        # the draw: back from the anchor while the tilt moves, to a pause of 0.5 s (tilt change over
+        # 0.5 s under 1 degree) or to the start of the still stretch
+        flat, k, start = 0, b - 1 - PAUSE_BLOCKS, first
+        while k >= first:
+            u = [self.blocks[c][k % BLOCKS] for c in range(3)]
+            w = [self.blocks[c][(k + PAUSE_BLOCKS) % BLOCKS] for c in range(3)]
+            dot = sum(p * q for p, q in zip(u, w))
+            if dot > 0 and dot * dot >= PAUSE_COS2 * sum(v * v for v in u) * sum(v * v for v in w):
+                flat += 1
+                if flat >= PAUSE_BLOCKS:
+                    start = k + 2 * PAUSE_BLOCKS - 1
+                    break
+            else:
+                flat = 0
+            k -= 1
+        settle = max(0, b * BLOCK - (i - hold))
+        pause = min(settle, max(0, start * BLOCK - (i - hold))) if start > first else 0
+        return settle, drift, pause
 
     def follow_through(self):
         """The hand's path over the 0.1 s after the snap, in mm along the watch's x, y and z

@@ -1,6 +1,15 @@
 // The watch code: the text in the QR code the Arrow Grades watch app shows after an end
 // (watch/source/EndState.mc payload()). One end's grades, made on the wrist right after each shot.
 //
+// What the release's times mean (found with a deliberate pause at the set-up position, watch app
+// 0.11): `setup` is the SET (hooking and gripping, before the bow is raised), `draw` the RAISE to
+// the set-up position, and `hold` the still stretch from there to the release: the slow draw and
+// the anchor. `pause` and `settle` split that stretch: set-up phase = draw + pause, the real draw =
+// settle - pause, the anchor = hold - settle. The names are kept as the codes and the saved
+// sessions have them.
+//
+// Format 6 (watch app 0.11.0 on): as format 5 with a sixth character: the pause at the set-up
+// position before the draw (0.2 s).
 // Format 5 (watch app 0.10.0 on): as format 4, each release may end with five more characters (left
 // out when the code would get too long), one each from DELTAS (0-42): settle (0.2 s: the first part
 // of the hold, while the wrist's tilt still moves; the rest is the anchor), the tilt's change at
@@ -39,6 +48,7 @@ const TRACE = /^H([1-9])(\d{3})([0-9A-Z$%*+\-/:]*)$/;
 const DETECTED = /^D(\d{3})(\d{2})(\d{2})(\d{3})(\d)$/;
 const DETECTED_4 = /^D(\d{3})(\d{2})(\d{2})(\d{2})(\d{3})(\d)$/;
 const DETECTED_5 = /^D(\d{3})(\d{2})(\d{2})(\d{2})(\d{3})(\d)([0-9A-Z$%*+\-/:]{5})?$/;
+const DETECTED_6 = /^D(\d{3})(\d{2})(\d{2})(\d{2})(\d{3})(\d)([0-9A-Z$%*+\-/:]{6})?$/;
 export const DETECTED_MAX = 30;
 /** Settle up to 8.4 s, tilt change up to 4.2 degrees, follow-through within 63 mm an axis. */
 export const SETTLE_MAX = 8.4;
@@ -76,7 +86,7 @@ export function parseWatchCode(text) {
   if (typeof text !== 'string') return { ok: false, error: 'not-watch' };
   const parts = text.trim().toUpperCase().split('.');
   if (!/^APJ\d+$/.test(parts[0])) return { ok: false, error: 'not-watch' };
-  const format = { APJ1: 1, APJ2: 2, APJ3: 3, APJ4: 4, APJ5: 5 }[parts[0]] ?? 0;
+  const format = { APJ1: 1, APJ2: 2, APJ3: 3, APJ4: 4, APJ5: 5, APJ6: 6 }[parts[0]] ?? 0;
   if (!format) return { ok: false, error: 'version' };
   const endMatch = /^E(\d{1,3})$/.exec(parts[1] ?? '');
   if (!endMatch) return bad;
@@ -101,7 +111,7 @@ export function parseWatchCode(text) {
         steady: Number(m[5]),
       });
     } else {
-      const m = (format === 4 ? DETECTED_4 : DETECTED_5).exec(part);
+      const m = (format === 4 ? DETECTED_4 : format === 5 ? DETECTED_5 : DETECTED_6).exec(part);
       if (!m) return bad;
       const no = Number(m[2]);
       if (no > ARROW_NO_MAX) return bad;
@@ -120,6 +130,7 @@ export function parseWatchCode(text) {
               fx: (more[2] - 21) * 3,
               fy: (more[3] - 21) * 3,
               fz: (more[4] - 21) * 3,
+              ...(more.length > 5 ? { pause: more[5] / 5 } : {}),
             }
           : {}),
       });
