@@ -1,0 +1,162 @@
+import Toybox.Lang;
+import Toybox.Math;
+
+// Finds the shots of an end in the draw hand's accelerometer (25 samples a second, milli-g):
+//   set-up  the hand rising with the bow and settling (from the last rest up to the draw)
+//   draw    the hand moving back (after a pause, up to the anchor)
+//   anchor  the hand still: aiming and expansion (the "hold")
+//   release a sharp snap of the hand right after that stillness
+// Per shot: [t (s since the end began), draw (0.1 s), hold (0.1 s), steadiness 0-9 (0 = stillest),
+// set-up (0.1 s)].
+//
+// The thresholds are first guesses; the raw motion and every detected release are logged in the
+// activity file, so they can be tuned on real shots (watch/tools/detect_shots.py runs the same
+// algorithm on an exported FIT file).
+class ShotDetector {
+    static const RATE = 25;            // samples per second
+    static const QUIET = 30;           // jitter (mg) below which the hand counts as still
+    static const RELEASE = 900;        // |magnitude - 1 g| (mg) of the release snap
+    static const MIN_HOLD = 25;        // stillness (samples) needed right before a release: 1.0 s
+    static const GAP_AFTER_HOLD = 10;  // the snap must come within 0.4 s of the stillness ending
+    static const PAUSE = 13;           // a pause (samples) that marks the start of the draw: 0.5 s
+    static const MAX_DRAW = 200;       // look back at most 8 s for the draw's start
+    static const REST = 25;            // a rest (samples) before the set-up: 1.0 s
+    static const MAX_SETUP = 200;      // look back at most 8 s for the set-up's start
+    static const REFRACTORY = 75;      // 3 s between two releases
+    static const HISTORY = 750;        // 30 s of quiet flags kept for looking back
+
+    var shots as Array<Array<Number>> = [] as Array<Array<Number>>;
+    var lastShot as Array<Number>? = null;
+
+    hidden var _n as Number = 0;             // samples since the end began
+    hidden var _prev as Float = 1000.0;
+    hidden var _jitter as Float = 0.0;
+    hidden var _quiet as ByteArray = new [HISTORY]b; // 1 = still, ring buffer by sample index
+    hidden var _jit as ByteArray = new [HISTORY]b;   // jitter / 2 (mg), for steadiness
+    hidden var _quietRun as Number = 0;      // current run of still samples
+    hidden var _lastRun as Number = 0;       // length of the last finished run
+    hidden var _sinceRun as Number = 9999;   // samples since that run ended
+    hidden var _refractory as Number = 0;
+
+    function initialize() {
+    }
+
+    // A new end: nothing found yet, time starts again.
+    function reset() as Void {
+        shots = [] as Array<Array<Number>>;
+        lastShot = null;
+        _n = 0;
+        _jitter = 0.0;
+        _quietRun = 0;
+        _lastRun = 0;
+        _sinceRun = 9999;
+        _refractory = 0;
+    }
+
+    // Feed a batch of samples. Returns true when a release was found in it.
+    function feed(xs as Array<Number>, ys as Array<Number>, zs as Array<Number>) as Boolean {
+        var found = false;
+        for (var k = 0; k < xs.size(); k++) {
+            var x = xs[k].toFloat();
+            var y = ys[k].toFloat();
+            var z = zs[k].toFloat();
+            var m = Math.sqrt(x * x + y * y + z * z).toFloat();
+            var d = m - _prev;
+            if (d < 0) { d = -d; }
+            _prev = m;
+            _jitter = _jitter * 0.75 + d * 0.25;
+            var still = _jitter < QUIET;
+            var slot = _n % HISTORY;
+            _quiet[slot] = still ? 1 : 0;
+            var j = (_jitter / 2).toNumber();
+            _jit[slot] = j > 255 ? 255 : j;
+
+            if (still) {
+                _quietRun++;
+            } else {
+                if (_quietRun > 0) {
+                    _lastRun = _quietRun;
+                    _sinceRun = 0;
+                }
+                _quietRun = 0;
+                _sinceRun++;
+            }
+            if (_refractory > 0) { _refractory--; }
+
+            var dev = m - 1000.0;
+            if (dev < 0) { dev = -dev; }
+            if (_refractory == 0 && dev > RELEASE && _lastRun >= MIN_HOLD && _sinceRun <= GAP_AFTER_HOLD) {
+                record(_n);
+                _refractory = REFRACTORY;
+                _lastRun = 0;
+                found = true;
+            }
+            _n++;
+        }
+        return found;
+    }
+
+    hidden function record(i as Number) as Void {
+        var anchor = i - _sinceRun - _lastRun; // first still sample of the hold
+        if (anchor < 0) { anchor = 0; }
+        var hold = i - anchor;
+        // the draw: moving samples before the anchor, back to a pause of PAUSE still samples
+        var drawStart = -1;
+        var run = 0;
+        var k = anchor - 1;
+        var limit = anchor - MAX_DRAW;
+        if (limit < 0) { limit = 0; }
+        if (limit < i - HISTORY + 1) { limit = i - HISTORY + 1; }
+        while (k >= limit) {
+            if (_quiet[k % HISTORY] == 1) {
+                run++;
+                if (run >= PAUSE) {
+                    drawStart = k + run;
+                    break;
+                }
+            } else {
+                run = 0;
+            }
+            k--;
+        }
+        var draw = drawStart >= 0 ? anchor - drawStart : 0;
+        // the set-up: back from the draw over the pause and the moving before it, to a rest of REST
+        var setup = 0;
+        if (drawStart >= 0) {
+            var floor = drawStart - MAX_SETUP;
+            if (floor < 0) { floor = 0; }
+            if (floor < i - HISTORY + 1) { floor = i - HISTORY + 1; }
+            k = drawStart - 1;
+            while (k >= floor && _quiet[k % HISTORY] == 1) { k--; } // the pause
+            var moved = false;
+            run = 0;
+            var setupStart = -1;
+            while (k >= floor) {
+                if (_quiet[k % HISTORY] == 1) {
+                    run++;
+                    if (moved && run >= REST) {
+                        setupStart = k + run;
+                        break;
+                    }
+                } else {
+                    run = 0;
+                    moved = true;
+                }
+                k--;
+            }
+            if (setupStart >= 0) { setup = drawStart - setupStart; }
+        }
+        // steadiness: average jitter while holding
+        var sum = 0;
+        for (var s = anchor; s < i; s++) { sum += _jit[s % HISTORY]; }
+        var steady = hold > 0 ? (sum * 2) / hold / 5 : 0;
+        if (steady > 9) { steady = 9; }
+        var shot = [i / RATE, tenths(draw), tenths(hold), steady, tenths(setup)] as Array<Number>;
+        shots.add(shot);
+        lastShot = shot;
+    }
+
+    hidden function tenths(samples as Number) as Number {
+        return (samples * 10 + RATE / 2) / RATE;
+    }
+}

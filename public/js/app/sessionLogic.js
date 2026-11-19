@@ -232,6 +232,9 @@ export function applyWatchGrades(session, code) {
     // the heart rate while the end was shot (watch app 0.3 on); a code without one removes an older one
     if (code.trace) end.hrTrace = { step: code.trace.step, hr: [...code.trace.hr] };
     else delete end.hrTrace;
+    // the shots the watch's motion detector found (set-up, draw, hold), watch app 0.6 on
+    if (code.detected?.length) end.watchShots = code.detected.map((d) => ({ ...d }));
+    else delete end.watchShots;
     s.cursor = 0;
     s.pinned = false;
   });

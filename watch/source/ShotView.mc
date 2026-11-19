@@ -57,14 +57,26 @@ class ShotView extends WatchUi.View {
 
         cells = drawGrid(dc, options(), -1, color);
 
-        // the last graded shot, as a reminder
+        // the last graded shot and the last shot the detector timed (draw + hold), as a reminder
+        var line = "";
         if (st.shots.size() > 0) {
             var a = st.shots[st.shots.size() - 1];
-            dc.setColor(COLOR_DIM, Graphics.COLOR_TRANSPARENT);
-            dc.drawText(w / 2, (h * 87) / 100, Graphics.FONT_XTINY,
-                "last #" + a[0].toString() + "  M" + a[1].toString() + " S" + a[2].toString() + (a[3] > 0 ? "  HR" + a[3].toString() : ""),
-                Graphics.TEXT_JUSTIFY_CENTER);
+            line = "#" + a[0].toString() + " M" + a[1].toString() + " S" + a[2].toString();
         }
+        var timed = app().detector.lastShot;
+        if (timed != null) {
+            var ts = timed as Array<Number>;
+            line += (line.length() > 0 ? " · " : "") + secs(ts[1]) + "+" + secs(ts[2]) + "s";
+        }
+        if (line.length() > 0) {
+            dc.setColor(COLOR_DIM, Graphics.COLOR_TRANSPARENT);
+            dc.drawText(w / 2, (h * 87) / 100, Graphics.FONT_XTINY, line, Graphics.TEXT_JUSTIFY_CENTER);
+        }
+    }
+
+    // 0.1 s as "2.1"
+    hidden function secs(tenths as Number) as String {
+        return (tenths / 10).toString() + "." + (tenths % 10).toString();
     }
 
     function valueAt(x as Number, y as Number) as Number {

@@ -58,7 +58,7 @@ describe('parseWatchCode', () => {
   });
 
   it('refuses a newer format version', () => {
-    expect(parseWatchCode('APJ3.E1.0143092')).toEqual({ ok: false, error: 'version' });
+    expect(parseWatchCode('APJ9.E1.0143092')).toEqual({ ok: false, error: 'version' });
   });
 
   it('refuses damaged codes: wrong length, grade over 5, arrow 0, repeated arrow', () => {
@@ -81,6 +81,7 @@ describe('parseWatchCode, format 2 (heart-rate trace)', () => {
         { no: 2, m: 5, s: 4, t: 6, hr: 83 },
       ],
       trace: { step: 2, hr: [80, 80, 81, 83] },
+      detected: [],
     });
   });
 
@@ -94,7 +95,7 @@ describe('parseWatchCode, format 2 (heart-rate trace)', () => {
   });
 
   it('without a trace the arrows have no heart rate', () => {
-    expect(parseWatchCode('APJ2.E1.0143004')).toEqual({ ok: true, end: 1, arrows: [{ no: 1, m: 4, s: 3, t: 4, hr: null }], trace: null });
+    expect(parseWatchCode('APJ2.E1.0143004')).toEqual({ ok: true, end: 1, arrows: [{ no: 1, m: 4, s: 3, t: 4, hr: null }], trace: null, detected: [] });
   });
 
   it('refuses a damaged trace', () => {
@@ -213,7 +214,7 @@ describe('hrChart', () => {
 describe('an end closed on the watch without grades', () => {
   it('brings only its heart-rate trace; the slots stay as they are', () => {
     const code = parseWatchCode('APJ2.E4.H3090LM');
-    expect(code).toEqual({ ok: true, end: 4, arrows: [], trace: { step: 3, hr: [90, 90, 91] } });
+    expect(code).toEqual({ ok: true, end: 4, arrows: [], trace: { step: 3, hr: [90, 90, 91] }, detected: [] });
     const before = L.enterScore(start(3), 9);
     const s = L.applyWatchGrades(before, code);
     expect(s.current.arrows).toEqual(before.current.arrows);
@@ -231,7 +232,7 @@ describe('endTimeline', () => {
         { v: null, m: null, s: null },
       ],
     };
-    expect(endTimeline(end)).toEqual({
+    expect(endTimeline(end)).toMatchObject({
       seconds: 12,
       shots: [
         { no: 1, t: 2, gap: null, m: 2, s: 3, hr: 90, v: 9 },
@@ -255,5 +256,63 @@ describe('endTimeline', () => {
 
   it('formats seconds as m:ss', () => {
     expect([mmss(0), mmss(42), mmss(725.4)]).toEqual(['0:00', '0:42', '12:05']);
+  });
+});
+
+describe('format 3: shots the watch detected (set-up, draw, hold)', () => {
+  // two releases at 12 s and 41 s; arrow #2 tapped at 15 s, #1 at 44 s; trace of 2 s bins
+  const CODE = 'APJ3.E2.0143044.0254015.D01220140431.D04124140662.H2080LMNLKJ';
+
+  it('reads the detected shots: release second, set-up, draw and hold in seconds, steadiness', () => {
+    const r = parseWatchCode(CODE);
+    expect(r.ok).toBe(true);
+    expect(r.detected).toEqual([
+      { t: 12, setup: 2, draw: 1.4, hold: 4.3, steady: 1 },
+      { t: 41, setup: 2.4, draw: 1.4, hold: 6.6, steady: 2 },
+    ]);
+    expect(r.arrows.map((a) => [a.no, a.t])).toEqual([
+      [1, 44],
+      [2, 15],
+    ]);
+    expect(r.trace.step).toBe(2);
+  });
+
+  it('format 2 codes have no detected shots', () => {
+    expect(parseWatchCode('APJ2.E1.0143004').detected).toEqual([]);
+  });
+
+  it('refuses a damaged detected shot', () => {
+    expect(parseWatchCode('APJ3.E1.0143004.D012201404')).toEqual({ ok: false, error: 'bad' });
+  });
+
+  it('the end keeps the detected shots; the timeline puts each graded arrow on the release before its tap', () => {
+    const s = L.applyWatchGrades(start(2), parseWatchCode(CODE));
+    expect(s.current.watchShots).toHaveLength(2);
+    const tl = endTimeline({ ...s.current, arrows: s.current.arrows.map((a, i) => ({ ...a, v: [9, 10][i] })) });
+    expect(tl.shots.map((x) => [x.t, x.no, x.m, x.setup, x.draw, x.hold, x.v])).toEqual([
+      [12, 2, 5, 2, 1.4, 4.3, 10],
+      [41, 1, 4, 2.4, 1.4, 6.6, 9],
+    ]);
+    expect(tl.avg).toEqual({ setup: 2.2, draw: 1.4, hold: 5.4 });
+    expect(tl.shots[1].gap).toBe(29);
+  });
+
+  it('a release without a graded arrow and an arrow without a release both stay on the timeline', () => {
+    const tl = endTimeline({
+      watchShots: [{ t: 10, setup: 2, draw: 2, hold: 4, steady: 1 }],
+      arrows: [{ no: 3, t: 60, m: 3, s: 3 }],
+    });
+    expect(tl.shots.map((x) => [x.t, x.no, x.draw ?? null])).toEqual([
+      [10, null, 2],
+      [60, 3, null],
+    ]);
+  });
+
+  it('the validator checks the detected shots', () => {
+    let s = L.applyWatchGrades(start(1), parseWatchCode('APJ3.E1.0143014.D01220140431'));
+    s = L.nextEnd(L.enterScore(s, 10));
+    expect(collections.sessions.validate({ ...s, id: 'x', status: 'finished' }).filter((e) => /detected/.test(e))).toEqual([]);
+    s.ends[0].watchShots[0].hold = -1;
+    expect(collections.sessions.validate({ ...s, id: 'x', status: 'finished' }).filter((e) => /detected/.test(e))).toEqual(['end 1: invalid detected shots']);
   });
 });

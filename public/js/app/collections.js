@@ -4,7 +4,7 @@ import { sightErrors, historyErrors } from './gearFields.js';
 import { defaultLastSetup, isGoal } from './lastSetup.js';
 import { SESSION_TYPES, DRILL_IDS, MENTAL_TECHNIQUES, GYM_FOCUS, EFFORT_MAX, FOCUS_MAX, isScored, countsArrows, isTime, emptyReview, emptyCompetition } from './sessionTypes.js';
 import { GYM_UNITS, REPS_MAX, KG_MAX } from './gym.js';
-import { ARROW_NO_MAX, HR_MIN, HR_MAX, SHOT_TIME_MAX, TRACE_STEP_MAX, TRACE_MAX } from './watchCode.js';
+import { ARROW_NO_MAX, HR_MIN, HR_MAX, SHOT_TIME_MAX, TRACE_STEP_MAX, TRACE_MAX, DETECTED_MAX } from './watchCode.js';
 
 const isStr = (v) => typeof v === 'string';
 // the heart rate while an end was shot, from the watch: { step: seconds per value, hr: [...] }
@@ -17,6 +17,14 @@ const isTrace = (t) =>
   t.hr.length >= 1 &&
   t.hr.length <= TRACE_MAX &&
   t.hr.every((v) => Number.isInteger(v) && v >= HR_MIN && v <= HR_MAX);
+// the shots the watch detected in an end: [{ t, setup, draw, hold, steady }]
+const inRange = (v, lo, hi) => typeof v === 'number' && Number.isFinite(v) && v >= lo && v <= hi;
+const isDetected = (list) =>
+  Array.isArray(list) &&
+  list.length <= DETECTED_MAX &&
+  list.every(
+    (d) => d && Number.isInteger(d.t) && inRange(d.t, 0, SHOT_TIME_MAX) && inRange(d.setup, 0, 9.9) && inRange(d.draw, 0, 9.9) && inRange(d.hold, 0, 99.9) && Number.isInteger(d.steady) && inRange(d.steady, 0, 9),
+  );
 const isGrade = (g) => g == null || (Number.isInteger(g) && g >= 1 && g <= 5);
 const isCount = (n) => Number.isInteger(n) && n >= 0;
 const isUnit = (n) => n == null || (typeof n === 'number' && Number.isFinite(n) && Math.abs(n) <= 2);
@@ -44,6 +52,7 @@ function validateEnd(e, where, n, requireValues) {
   if (e.arrows.length !== n) errs.push(`${where}: expected ${n} arrows`);
   e.arrows.forEach((a, i) => errs.push(...validateArrow(a, `${where} arrow ${i + 1}`, requireValues)));
   if (e.hrTrace != null && !isTrace(e.hrTrace)) errs.push(`${where}: invalid heart-rate trace`);
+  if (e.watchShots != null && !isDetected(e.watchShots)) errs.push(`${where}: invalid detected shots`);
   if (!isCount(e.ld) || !isCount(e.cld)) errs.push(`${where}: invalid let-downs`);
   else if (e.cld > e.ld) errs.push(`${where}: correct let-downs exceed let-downs`);
   if (e.note != null && !isStr(e.note)) errs.push(`${where}: invalid note`);
