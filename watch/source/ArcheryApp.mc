@@ -19,6 +19,7 @@ const PHASE_REST = 2;
 class ArcheryApp extends Application.AppBase {
     var state as EndState?;
     var recorder as Recorder = new Recorder();
+    var detector as ShotDetector = new ShotDetector();
     var phase as Number = PHASE_IDLE;
     var paused as Boolean = false;
     var phaseStart as Number = 0; // System.getTimer() when the end or the rest began
@@ -49,6 +50,7 @@ class ArcheryApp extends Application.AppBase {
 
     function onStop(state as Dictionary?) as Void {
         Sensor.enableSensorEvents(null);
+        stopMotion();
         if (_ticker != null) { (_ticker as Timer.Timer).stop(); }
         // the app closed while a round ran (it should be stopped and saved first): save, not lose it
         if (recorder.isRecording()) { saveLapValues(); }
@@ -73,6 +75,38 @@ class ArcheryApp extends Application.AppBase {
         return [v, new StartDelegate(v)];
     }
 
+    // ---------------------------------------------------------------- the draw hand's motion
+
+    // The accelerometer for the shot detector, 25 samples a second, while a round runs.
+    hidden function startMotion() as Void {
+        if (!(Sensor has :registerSensorDataListener)) { return; }
+        try {
+            Sensor.registerSensorDataListener(method(:onMotion), {
+                :period => 1,
+                :accelerometer => { :enabled => true, :sampleRate => ShotDetector.RATE }
+            });
+        } catch (e) {
+            // no high-rate accelerometer: the round works without shot timing
+        }
+    }
+
+    hidden function stopMotion() as Void {
+        if (Sensor has :unregisterSensorDataListener) {
+            try { Sensor.unregisterSensorDataListener(); } catch (e) { }
+        }
+    }
+
+    function onMotion(data as Sensor.SensorData) as Void {
+        if (phase != PHASE_END || paused) { return; }
+        var acc = data.accelerometerData;
+        if (acc == null) { return; }
+        if (detector.feed(acc.x as Array<Number>, acc.y as Array<Number>, acc.z as Array<Number>)) {
+            var shot = detector.lastShot as Array<Number>;
+            recorder.markRelease(shot[2]);
+            WatchUi.requestUpdate();
+        }
+    }
+
     // Seconds since the end or the rest began.
     function phaseSeconds() as Number {
         return (System.getTimer() - phaseStart) / 1000;
@@ -85,6 +119,8 @@ class ArcheryApp extends Application.AppBase {
         st.newRound(st.perEnd, st.owned);
         recorder.start();
         recorder.setLap(PHASE_END, 0.0, 0.0);
+        detector.reset();
+        startMotion();
         phase = PHASE_END;
         paused = false;
         phaseStart = System.getTimer();
@@ -97,6 +133,7 @@ class ArcheryApp extends Application.AppBase {
     function closeEnd() as Void {
         var st = state as EndState;
         if (phase != PHASE_END) { return; } // grading is optional: an end without grades closes too
+        st.detected = detector.shots;
         st.closeEnd();
         var avg = st.averages();
         recorder.setLap(PHASE_END, avg[0], avg[1]);
@@ -114,6 +151,7 @@ class ArcheryApp extends Application.AppBase {
         recorder.lap();
         recorder.setLap(PHASE_END, 0.0, 0.0);
         (state as EndState).nextEnd();
+        detector.reset();
         phase = PHASE_END;
         phaseStart = System.getTimer();
         buzz();
@@ -158,6 +196,7 @@ class ArcheryApp extends Application.AppBase {
     }
 
     hidden function endRound(message as String) as Void {
+        stopMotion();
         phase = PHASE_IDLE;
         paused = false;
         longBuzz();

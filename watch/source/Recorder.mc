@@ -17,6 +17,7 @@ class Recorder {
     static const FIELD_END_M = 2;
     static const FIELD_END_S = 3;
     static const FIELD_PHASE = 4;
+    static const FIELD_RELEASE = 5; // record: hold (0.1 s, max 250) of a release the detector found
 
     hidden var _session as ActivityRecording.Session? = null;
     hidden var _shot as FitContributor.Field? = null;
@@ -24,6 +25,7 @@ class Recorder {
     hidden var _endM as FitContributor.Field? = null;
     hidden var _endS as FitContributor.Field? = null;
     hidden var _phase as FitContributor.Field? = null;
+    hidden var _release as FitContributor.Field? = null;
     hidden var _markSecs as Number = 0;
 
     function initialize() {
@@ -56,8 +58,10 @@ class Recorder {
         _endM = s.createField("end_m", FIELD_END_M, FitContributor.DATA_TYPE_FLOAT, { :mesgType => FitContributor.MESG_TYPE_LAP, :units => "M" });
         _endS = s.createField("end_s", FIELD_END_S, FitContributor.DATA_TYPE_FLOAT, { :mesgType => FitContributor.MESG_TYPE_LAP, :units => "S" });
         _phase = s.createField("phase", FIELD_PHASE, FitContributor.DATA_TYPE_UINT8, { :mesgType => FitContributor.MESG_TYPE_LAP, :units => "1end2rest" });
+        _release = s.createField("release", FIELD_RELEASE, FitContributor.DATA_TYPE_UINT8, { :mesgType => FitContributor.MESG_TYPE_RECORD, :units => "hold_ds" });
         (_shot as FitContributor.Field).setData(0);
         (_grade as FitContributor.Field).setData(0);
+        (_release as FitContributor.Field).setData(0);
         s.start();
         _session = s;
     }
@@ -69,6 +73,7 @@ class Recorder {
             if (_markSecs == 0) {
                 if (_shot != null) { (_shot as FitContributor.Field).setData(0); }
                 if (_grade != null) { (_grade as FitContributor.Field).setData(0); }
+                if (_release != null) { (_release as FitContributor.Field).setData(0); }
             }
         }
     }
@@ -76,6 +81,13 @@ class Recorder {
     function markArrow(no as Number) as Void {
         if (_shot == null) { return; }
         (_shot as FitContributor.Field).setData(no);
+        _markSecs = 2;
+    }
+
+    // a release the shot detector found (its hold in 0.1 s), to compare with the taps when tuning
+    function markRelease(holdTenths as Number) as Void {
+        if (_release == null) { return; }
+        (_release as FitContributor.Field).setData(holdTenths < 1 ? 1 : (holdTenths > 250 ? 250 : holdTenths));
         _markSecs = 2;
     }
 
@@ -131,5 +143,6 @@ class Recorder {
         _endM = null;
         _endS = null;
         _phase = null;
+        _release = null;
     }
 }

@@ -46,10 +46,19 @@ export function timelineChart(tl, { hrTrace = null } = {}) {
     y = (v) => T + ((hi - v) / (hi - lo)) * (B - T);
     const pts = hrTrace.hr.map((v, i) => [x(i * hrTrace.step + hrTrace.step / 2), y(v)]);
     const line = pts.map(([px, py]) => `${px.toFixed(1)},${py.toFixed(1)}`).join(' ');
-    parts.push(s('polygon', { class: 'wt-area', points: `${pts[0][0].toFixed(1)},${B} ${line} ${pts[pts.length - 1][0].toFixed(1)},${B}` }));
+    parts.push(
+      s('polygon', {
+        class: 'wt-area',
+        points: `${pts[0][0].toFixed(1)},${B} ${line} ${pts[pts.length - 1][0].toFixed(1)},${B}`,
+      }),
+    );
     parts.push(s('polyline', { class: 'wt-line', points: line }));
-    parts.push(s('text', { class: 'wt-axis', x: L - 4, y: y(tl.hr.max) + 4, 'text-anchor': 'end' }, `♥${tl.hr.max}`));
-    parts.push(s('text', { class: 'wt-axis', x: L - 4, y: y(tl.hr.min) + 4, 'text-anchor': 'end' }, `${tl.hr.min}`));
+    parts.push(
+      s('text', { class: 'wt-axis', x: L - 4, y: y(tl.hr.max) + 4, 'text-anchor': 'end' }, `♥${tl.hr.max}`),
+    );
+    parts.push(
+      s('text', { class: 'wt-axis', x: L - 4, y: y(tl.hr.min) + 4, 'text-anchor': 'end' }, `${tl.hr.min}`),
+    );
   }
 
   // time axis
@@ -61,67 +70,207 @@ export function timelineChart(tl, { hrTrace = null } = {}) {
   }
 
   // shots: a line through the plot, a marker (on the curve when there is one), the arrow number
-  // above; between two shots the seconds that passed
+  // above; a detected shot's set-up, draw and hold as a band ending at its release; between two
+  // shots the seconds that passed
   tl.shots.forEach((sh, i) => {
     const sx = x(sh.t);
+    if (sh.detected) {
+      let end = sh.t;
+      for (const [len, cls] of [
+        [sh.hold, 'hold'],
+        [sh.draw, 'draw'],
+        [sh.setup, 'setup'],
+      ]) {
+        if (len > 0) {
+          const x0 = x(Math.max(0, end - len));
+          parts.push(
+            s('rect', {
+              class: `wt-ph wt-ph-${cls}`,
+              x: x0,
+              y: B - 9,
+              width: Math.max(1, x(end) - x0),
+              height: 7,
+            }),
+          );
+        }
+        end -= len;
+      }
+    }
     const tone = mTone(sh.m);
     parts.push(s('line', { class: `wt-shot is-${tone}`, x1: sx, x2: sx, y1: T - 6, y2: B }));
     const my = y && sh.hr != null ? y(sh.hr) : B - 8;
     parts.push(s('circle', { class: `wt-dot is-${tone}`, cx: sx, cy: my, r: 4.5 }));
-    parts.push(s('text', { class: `wt-no is-${tone}`, x: sx, y: T - 10, 'text-anchor': 'middle' }, sh.no != null ? `#${sh.no}` : '•'));
+    parts.push(
+      s(
+        'text',
+        { class: `wt-no is-${tone}`, x: sx, y: T - 10, 'text-anchor': 'middle' },
+        sh.no != null ? `#${sh.no}` : '•',
+      ),
+    );
     if (sh.gap != null) {
       const px = x(tl.shots[i - 1].t);
       if (sx - px >= 22) {
         parts.push(s('line', { class: 'wt-gapline', x1: px + 3, x2: sx - 3, y1: B + 26, y2: B + 26 }));
-        parts.push(s('text', { class: 'wt-gap', x: (px + sx) / 2, y: B + 40, 'text-anchor': 'middle' }, `${Math.round(sh.gap)} s`));
+        parts.push(
+          s(
+            'text',
+            { class: 'wt-gap', x: (px + sx) / 2, y: B + 40, 'text-anchor': 'middle' },
+            `${Math.round(sh.gap)} s`,
+          ),
+        );
       }
     }
   });
 
-  return s('svg', { class: 'wt-chart', viewBox: `0 0 ${VB_W} ${VB_H}`, role: 'img', 'aria-label': timelineLabel(tl) }, ...parts);
+  return s(
+    'svg',
+    { class: 'wt-chart', viewBox: `0 0 ${VB_W} ${VB_H}`, role: 'img', 'aria-label': timelineLabel(tl) },
+    ...parts,
+  );
+}
+
+const sec = (v) => (v == null ? '–' : v.toFixed(1));
+
+/**
+ * One row per detected shot: its set-up, draw and hold as a stacked bar (seconds written in the
+ * segments that are wide enough), so each shot's cycle can be compared with the others.
+ */
+export function shotCycleChart(tl) {
+  const shots = tl.shots.filter((sh) => sh.detected);
+  if (!shots.length) return null;
+  const rowH = 22;
+  const top = 4;
+  const left = 44;
+  const right = 296; // room for the total after the longest bar
+  const total = (sh) => sh.setup + sh.draw + sh.hold;
+  const max = Math.max(6, ...shots.map(total));
+  const w = (secs) => (secs / max) * (right - left);
+  const parts = [];
+  shots.forEach((sh, i) => {
+    const y = top + i * rowH;
+    const tone = mTone(sh.m);
+    parts.push(
+      s(
+        'text',
+        { class: `wt-no is-${tone}`, x: left - 6, y: y + 13, 'text-anchor': 'end' },
+        sh.no != null ? `#${sh.no}` : '•',
+      ),
+    );
+    let x0 = left;
+    for (const [len, cls] of [
+      [sh.setup, 'setup'],
+      [sh.draw, 'draw'],
+      [sh.hold, 'hold'],
+    ]) {
+      const wd = w(len);
+      if (wd > 0) {
+        parts.push(s('rect', { class: `wt-ph wt-ph-${cls}`, x: x0, y, width: wd, height: rowH - 6, rx: 3 }));
+        if (wd >= 24)
+          parts.push(
+            s('text', { class: 'wt-ph-text', x: x0 + wd / 2, y: y + 12, 'text-anchor': 'middle' }, sec(len)),
+          );
+      }
+      x0 += wd;
+    }
+    parts.push(s('text', { class: 'wt-axis', x: x0 + 4, y: y + 12 }, `${sec(total(sh))} s`));
+  });
+  const height = top + shots.length * rowH + 2;
+  return h(
+    'div',
+    { class: 'wt-cycle' },
+    h(
+      'div',
+      { class: 'wt-legend', 'aria-hidden': 'true' },
+      h('span', { class: 'wt-key wt-key-setup' }, 'Set-up'),
+      h('span', { class: 'wt-key wt-key-draw' }, 'Draw'),
+      h('span', { class: 'wt-key wt-key-hold' }, 'Hold'),
+    ),
+    s(
+      'svg',
+      {
+        class: 'wt-chart',
+        viewBox: `0 0 ${VB_W} ${height}`,
+        role: 'img',
+        'aria-label': `Shot cycle: ${shots.map((sh) => `arrow ${sh.no ?? '?'}: set-up ${sec(sh.setup)}, draw ${sec(sh.draw)}, hold ${sec(sh.hold)} seconds`).join('; ')}`,
+      },
+      ...parts,
+    ),
+  );
 }
 
 function timelineLabel(tl) {
-  const shots = tl.shots.map((sh) => `arrow ${sh.no ?? '?'} at ${mmss(sh.t)}${sh.m != null ? `, M${sh.m}` : ''}${sh.hr != null ? `, heart rate ${sh.hr}` : ''}`);
+  const shots = tl.shots.map(
+    (sh) =>
+      `arrow ${sh.no ?? '?'} at ${mmss(sh.t)}${sh.detected ? `, draw ${sec(sh.draw)} s, hold ${sec(sh.hold)} s` : ''}${sh.m != null ? `, M${sh.m}` : ''}${sh.hr != null ? `, heart rate ${sh.hr}` : ''}`,
+  );
   return `End timeline, ${mmss(tl.seconds)}${tl.hr ? `, heart rate ${tl.hr.min} to ${tl.hr.max}` : ''}. ${shots.join('; ')}`;
 }
 
 /** The figures and the arrows in the order shot, under the chart. */
 function timelineDetails(tl) {
-  const tile = (label, value) => h('div', { class: 'wt-tile' }, h('span', { class: 'wt-tile-label' }, label), h('strong', null, value));
+  const tile = (label, value) =>
+    h('div', { class: 'wt-tile' }, h('span', { class: 'wt-tile-label' }, label), h('strong', null, value));
   const tiles = h(
     'div',
     { class: 'wt-tiles' },
     tile('Length', mmss(tl.seconds)),
     tile('Shots', String(tl.shots.length)),
-    tile('Rhythm', tl.avgGap != null ? `Ø ${tl.avgGap} s` : '–'),
-    tile('Heart rate', tl.hr ? `${tl.hr.min}–${tl.hr.max}` : '–'),
+    ...(tl.avg
+      ? [tile('Ø draw', `${sec(tl.avg.draw)} s`), tile('Ø hold', `${sec(tl.avg.hold)} s`)]
+      : [
+          tile('Rhythm', tl.avgGap != null ? `Ø ${tl.avgGap} s` : '–'),
+          tile('Heart rate', tl.hr ? `${tl.hr.min}–${tl.hr.max}` : '–'),
+        ]),
   );
   const rows = tl.shots.length
     ? h(
-        'table',
-        { class: 'wt-table' },
-        h('thead', null, h('tr', null, ...['Arrow', 'Time', 'Gap', 'M', 'S', '♥', 'Score'].map((c) => h('th', { scope: 'col' }, c)))),
+        'div',
+        { class: 'wt-table-wrap' },
         h(
-          'tbody',
-          null,
-          tl.shots.map((sh) =>
+          'table',
+          { class: 'wt-table' },
+          h(
+            'thead',
+            null,
             h(
               'tr',
               null,
-              h('td', null, h('span', { class: `wt-badge is-${mTone(sh.m)}` }, sh.no != null ? `#${sh.no}` : '–')),
-              h('td', null, mmss(sh.t)),
-              h('td', null, sh.gap != null ? `+${Math.round(sh.gap)} s` : '–'),
-              h('td', null, sh.m ?? '–'),
-              h('td', null, sh.s ?? '–'),
-              h('td', null, sh.hr ?? '–'),
-              h('td', null, sh.v ?? '–'),
+              ...['Arrow', 'Time', 'Set-up', 'Draw', 'Hold', 'M', 'S', '♥', 'Score'].map((c) =>
+                h('th', { scope: 'col' }, c),
+              ),
+            ),
+          ),
+          h(
+            'tbody',
+            null,
+            tl.shots.map((sh) =>
+              h(
+                'tr',
+                null,
+                h(
+                  'td',
+                  null,
+                  h('span', { class: `wt-badge is-${mTone(sh.m)}` }, sh.no != null ? `#${sh.no}` : '–'),
+                ),
+                h('td', null, mmss(sh.t)),
+                h('td', null, sh.detected ? sec(sh.setup) : '–'),
+                h('td', null, sh.detected ? sec(sh.draw) : '–'),
+                h('td', null, sh.detected ? sec(sh.hold) : '–'),
+                h('td', null, sh.m ?? '–'),
+                h('td', null, sh.s ?? '–'),
+                h('td', null, sh.hr ?? '–'),
+                h('td', null, sh.v ?? '–'),
+              ),
             ),
           ),
         ),
       )
-    : h('p', { class: 'wt-empty' }, 'No arrows were graded on the watch in this end; its heart rate is kept.');
-  return h('div', { class: 'wt-details' }, tiles, rows);
+    : h(
+        'p',
+        { class: 'wt-empty' },
+        'No arrows were graded on the watch in this end; its heart rate is kept.',
+      );
+  return h('div', { class: 'wt-details' }, tiles, shotCycleChart(tl), rows);
 }
 
 /**

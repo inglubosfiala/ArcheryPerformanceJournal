@@ -33,27 +33,54 @@ export function hrChart(trace, arrows = [], { w = 200, h = 40, pad = 3 } = {}) {
   return { points, shots, min: Math.min(...hr), max: Math.max(...hr), seconds };
 }
 
+/** How long after a release the archer's tap on the watch may come to still belong to it. */
+export const TAP_WINDOW = 30;
+
+const avg1 = (xs) => (xs.length ? Math.round((xs.reduce((t, v) => t + v, 0) / xs.length) * 10) / 10 : null);
+
 /**
- * What the watch recorded through one end, for the end's timeline: its shots in the order shot
- * (each with its time, the gap since the shot before, grades, heart rate and score), the end's
- * length and its heart rate. Null when the end has nothing from the watch (no trace, no shot times).
- *   { seconds, shots: [{ no, t, gap, m, s, hr, v }], avgGap, firstShot, lastShot, hr: { min, avg, max } | null }
+ * What the watch recorded through one end, for the end's timeline: its shots in the order shot,
+ * the end's length and its heart rate. Null when the end has nothing from the watch.
+ *
+ * A shot is a release the watch's motion detector found (`watchShots`, with its set-up, draw and
+ * hold), joined with the arrow graded on the watch right after it (tapped from 2 s before the
+ * release until the next release, at most TAP_WINDOW s later). A graded arrow without a release
+ * keeps the time of its tap; a release without a graded arrow stays, unnamed.
+ *   { seconds, shots: [{ no, t, gap, m, s, hr, v, setup, draw, hold, steady, detected }],
+ *     avgGap, avg: { setup, draw, hold } | null, firstShot, lastShot, hr: { min, avg, max } | null }
  */
 export function endTimeline(end) {
   const trace = end?.hrTrace?.hr?.length ? end.hrTrace : null;
+  const releases = [...(end?.watchShots ?? [])].sort((a, b) => a.t - b.t);
   const timed = (end?.arrows ?? []).filter((a) => a && a.t != null).sort((a, b) => a.t - b.t);
-  if (!trace && !timed.length) return null;
-  const shots = timed.map((a, i) => ({
-    no: a.no ?? null,
-    t: a.t,
-    gap: i ? a.t - timed[i - 1].t : null,
-    m: a.m ?? null,
-    s: a.s ?? null,
-    hr: a.hr ?? traceAt(trace, a.t),
-    v: a.v ?? null,
-  }));
+  if (!trace && !timed.length && !releases.length) return null;
+
+  const used = new Set();
+  const arrowFor = (r, next) =>
+    timed.find((a) => !used.has(a) && a.t >= r.t - 2 && a.t - r.t <= TAP_WINDOW && (next == null || a.t < next.t));
+  const fromArrow = (a) => ({ no: a.no ?? null, m: a.m ?? null, s: a.s ?? null, v: a.v ?? null });
+  const list = releases.map((r, i) => {
+    const a = arrowFor(r, releases[i + 1]);
+    if (a) used.add(a);
+    return {
+      ...(a ? fromArrow(a) : { no: null, m: null, s: null, v: null }),
+      t: r.t,
+      hr: traceAt(trace, r.t) ?? a?.hr ?? null,
+      setup: r.setup,
+      draw: r.draw,
+      hold: r.hold,
+      steady: r.steady,
+      detected: true,
+    };
+  });
+  for (const a of timed) {
+    if (!used.has(a)) list.push({ ...fromArrow(a), t: a.t, hr: a.hr ?? traceAt(trace, a.t), detected: false });
+  }
+  list.sort((a, b) => a.t - b.t);
+  const shots = list.map((x, i) => ({ ...x, gap: i ? x.t - list[i - 1].t : null }));
+
   const gaps = shots.filter((x) => x.gap != null).map((x) => x.gap);
-  const lastT = timed.length ? timed[timed.length - 1].t : 0;
+  const lastT = shots.length ? shots[shots.length - 1].t : 0;
   const seconds = Math.max(trace ? trace.hr.length * trace.step : 0, lastT);
   const hr = trace
     ? {
@@ -66,8 +93,11 @@ export function endTimeline(end) {
     seconds,
     shots,
     avgGap: gaps.length ? Math.round(gaps.reduce((t, g) => t + g, 0) / gaps.length) : null,
-    firstShot: timed.length ? timed[0].t : null,
-    lastShot: timed.length ? lastT : null,
+    avg: releases.length
+      ? { setup: avg1(releases.map((r) => r.setup)), draw: avg1(releases.map((r) => r.draw)), hold: avg1(releases.map((r) => r.hold)) }
+      : null,
+    firstShot: shots.length ? shots[0].t : null,
+    lastShot: shots.length ? lastT : null,
     hr,
   };
 }
