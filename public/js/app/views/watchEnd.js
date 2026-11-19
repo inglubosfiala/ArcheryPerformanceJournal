@@ -282,7 +282,7 @@ function timelineDetails(tl) {
                 'Time',
                 'Set-up',
                 'Draw',
-                ...(split ? ['Settle', 'Anchor', 'Follow mm'] : ['Hold']),
+                ...(split ? ['Settle', 'Anchor', 'Follow mm', 'Back mm'] : ['Hold']),
                 'M',
                 'S',
                 '♥',
@@ -310,6 +310,7 @@ function timelineDetails(tl) {
                       h('td', null, sh.settle != null ? sec(sh.settle) : '–'),
                       h('td', null, sh.settle != null ? sec(sh.anchor) : sh.detected ? sec(sh.hold) : '–'),
                       h('td', null, follow(sh)),
+                      h('td', null, sh.followBack ?? '–'),
                     ]
                   : [h('td', null, sh.detected ? sec(sh.hold) : '–')]),
                 h('td', null, sh.m ?? '–'),
@@ -330,7 +331,7 @@ function timelineDetails(tl) {
     ? h(
         'p',
         { class: 'wt-note' },
-        'Settle: the start of the hold, while the wrist still turns. Anchor: the rest, with the wrist steady. Follow: how far the hand moves in the first 0.1 s after the release; in brackets, how far that is from this end’s average direction.',
+        'Settle: the start of the hold, while the wrist still turns. Anchor: the rest, with the wrist steady. Follow: how far the hand moves in the first 0.1 s after the release; in brackets, how far that is from this end’s average direction. Back: the part of it straight back along the forearm, towards the elbow.',
       )
     : null;
   return h('div', { class: 'wt-details' }, tiles, shotCycleChart(tl), rows, note);

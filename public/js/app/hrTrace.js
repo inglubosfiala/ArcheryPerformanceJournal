@@ -52,7 +52,9 @@ const avg1 = (xs) => (xs.length ? Math.round((xs.reduce((t, v) => t + v, 0) / xs
  * From watch app 0.10 a release also has `settle` (the first part of the hold, while the wrist's
  * tilt still moves), `anchor` (the rest of the hold), `drift` (the tilt's change at anchor,
  * degrees), `follow` (the length of the hand's path over the 0.1 s after the release, mm) and
- * `followOff` (how far that path ends from the end's average one, mm; null with fewer than two);
+ * `followOff` (how far that path ends from the end's average one, mm; null with fewer than two)
+ * and `followBack` (the part of it straight back along the forearm, towards the elbow, mm: the
+ * watch's -x, as worn on the left wrist with the START button towards the hand);
  * `avg` then also has `anchor` and `follow`.
  */
 export function endTimeline(end) {
@@ -82,6 +84,7 @@ export function endTimeline(end) {
           anchor: Math.round(Math.max(0, r.hold - r.settle) * 10) / 10,
           drift: r.drift,
           follow: Math.round(Math.hypot(r.fx, r.fy, r.fz)),
+          followBack: -r.fx,
           followOff:
             followed.length > 1
               ? Math.round(Math.hypot(r.fx - mean[0], r.fy - mean[1], r.fz - mean[2]))

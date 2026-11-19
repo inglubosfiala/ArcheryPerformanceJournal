@@ -406,9 +406,9 @@ describe('format 5: settle, anchor and follow-through of each release', () => {
 
   it('the timeline splits the hold into settle and anchor and measures the follow-through', () => {
     const tl = endTimeline(L.applyWatchGrades(start(2), parseWatchCode(CODE)).current);
-    expect(tl.shots.map((x) => [x.no, x.settle, x.anchor, x.drift, x.follow, x.followOff])).toEqual([
-      [2, 3, 1.3, 0.8, 34, 2],
-      [1, 2, 4.6, 0.3, 31, 2],
+    expect(tl.shots.map((x) => [x.no, x.settle, x.anchor, x.drift, x.follow, x.followOff, x.followBack])).toEqual([
+      [2, 3, 1.3, 0.8, 34, 2, 30],
+      [1, 2, 4.6, 0.3, 31, 2, 27],
     ]);
     expect(tl.avg).toMatchObject({ hold: 5.4, anchor: 2.9, follow: 32 });
   });
