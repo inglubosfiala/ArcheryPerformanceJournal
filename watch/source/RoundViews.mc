@@ -46,7 +46,8 @@ class StartView extends WatchUi.View {
         dc.drawText(cx, cy, Graphics.FONT_SMALL, "START", Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
 
         dc.setColor(COLOR_DIM, Graphics.COLOR_TRANSPARENT);
-        dc.drawText(w / 2, (h * 85) / 100, Graphics.FONT_XTINY, "UP: setup", Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
+        dc.drawText(w / 2, (h * 81) / 100, Graphics.FONT_XTINY, "UP: setup", Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
+        dc.drawText(w / 2, (h * 90) / 100, Graphics.FONT_XTINY, "v" + APP_VERSION, Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
     }
 }
 

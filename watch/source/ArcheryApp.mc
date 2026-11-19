@@ -12,6 +12,9 @@ import Toybox.WatchUi;
 //   end           grade each shot by touch; LAP (or the last arrow) closes the end
 //   rest          the end's code for the journal and a rest timer; LAP starts the next end
 //   START         stop screen at any time: Resume, Save, Discard
+// The version shown on the start screen; keep it the same as the version typed in the store upload.
+const APP_VERSION = "0.7.0";
+
 const PHASE_IDLE = 0;
 const PHASE_END = 1;
 const PHASE_REST = 2;
