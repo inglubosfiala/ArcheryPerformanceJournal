@@ -160,6 +160,13 @@ The app now works like Garmin's own activity apps:
 - **Phases found in that session** (set-up / draw / hold, s): end 1 #1 3.0/0.9/3.7, #2 3.1/3.0/4.3, #3 4.4/2.5/3.8, #4 1.5/2.9/4.2, #5 3.5/2.5/4.2; end 2 #1 2.5/2.0/3.6, #2 5.8/3.6/2.9, #3 3.8/4.1/4.5, #4 2.6/2.1/3.9, #5 4.6/2.7/5.1, #6 4.2/3.7/7.7.
 - **Checked:** watch and Python detectors give identical snaps on the first 80 s of the real session at 100 Hz; synthetic shots still all found; 612 journal tests pass.
 
+## Soft releases (watch 0.9.1)
+
+- **Data:** activity 25128765325 (0.9.0), 2 ends x 6 arrows. The watch kept 11 of 12 releases, each on the right arrow; it missed end 1 arrow 4, a soft release of 451 mg after a 2.2 s hold, and end 1 arrow 6 was found only just (~550 mg).
+- **Detector:** `RELEASE` lowered from 550 to 420 mg. On both real sessions it finds every release (12 of 12 here, the same 11 as before on 25128610129) and nothing else; false snaps start at 400 mg.
+- **Known gap:** a shaky hold (jitter just under `QUIET`) can be cut by a tremor, so the hold reads short and the draw too short (end 2 arrow 4: 1.7 s hold / 0.4 s draw, really about 3 s of hold). Left until more shots are recorded.
+
+
 ## Shot timing per end in History (journal)
 
 - Under each end the watch recorded, History shows its heart-rate curve and, below it, **one bar per shot** (set-up, draw, hold, with the total) on a **linear seconds axis** with gridlines. The axis is the same for every end of the session (its longest shot cycle), so shots compare across ends; a legend sits under the Ends heading. A tap still opens the end's full timeline.
