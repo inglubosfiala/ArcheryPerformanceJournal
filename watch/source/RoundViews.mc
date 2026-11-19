@@ -8,6 +8,7 @@ import Toybox.WatchUi;
 // ---------------------------------------------------------------- start screen
 
 // The app's first screen, as in Garmin's activity apps: START starts the round, UP opens the setup.
+// No title: the round's setup, the START button, and a mark at each of the two buttons.
 class StartView extends WatchUi.View {
     var cx as Number = 0;
     var cy as Number = 0;
@@ -30,25 +31,36 @@ class StartView extends WatchUi.View {
         dc.drawArc(w / 2, h / 2, w / 2 - 6, Graphics.ARC_COUNTER_CLOCKWISE, 18, 42);
         dc.setPenWidth(1);
 
+        // the UP button sits at 9 o'clock: a white mark on the edge next to it and the menu's three
+        // lines beside the mark - UP opens the setup
         dc.setColor(Graphics.COLOR_WHITE, Graphics.COLOR_TRANSPARENT);
-        dc.drawText(w / 2, (h * 24) / 100, Graphics.FONT_MEDIUM, "Arrow Grades", Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
-        dc.setColor(COLOR_DIM, Graphics.COLOR_TRANSPARENT);
-        dc.drawText(w / 2, (h * 35) / 100, Graphics.FONT_XTINY,
+        dc.setPenWidth(10);
+        dc.drawArc(w / 2, h / 2, w / 2 - 6, Graphics.ARC_COUNTER_CLOCKWISE, 168, 192);
+        dc.setPenWidth(4);
+        var mx = (w * 8) / 100;
+        var mw = (w * 7) / 100;
+        for (var i = -1; i <= 1; i++) {
+            var my = h / 2 + i * (h * 3) / 100;
+            dc.drawLine(mx, my, mx + mw, my);
+        }
+        dc.setPenWidth(1);
+
+        dc.setColor(Graphics.COLOR_WHITE, Graphics.COLOR_TRANSPARENT);
+        dc.drawText(w / 2, (h * 26) / 100, Graphics.FONT_XTINY,
             st.grading ? st.perEnd.toString() + " arrows/end · arrows 1-" + st.owned.toString() : "Timing only · no grading",
             Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
 
         // a big START button for touch, too
         cx = w / 2;
-        cy = (h * 60) / 100;
-        r = w / 7;
+        cy = (h * 54) / 100;
+        r = w / 6;
         dc.setColor(COLOR_GO, Graphics.COLOR_TRANSPARENT);
         dc.fillCircle(cx, cy, r);
         dc.setColor(Graphics.COLOR_BLACK, Graphics.COLOR_TRANSPARENT);
         dc.drawText(cx, cy, Graphics.FONT_SMALL, "START", Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
 
         dc.setColor(COLOR_DIM, Graphics.COLOR_TRANSPARENT);
-        dc.drawText(w / 2, (h * 81) / 100, Graphics.FONT_XTINY, "UP: setup", Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
-        dc.drawText(w / 2, (h * 90) / 100, Graphics.FONT_XTINY, "v" + APP_VERSION, Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
+        dc.drawText(w / 2, (h * 88) / 100, Graphics.FONT_XTINY, "v" + APP_VERSION, Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
     }
 }
 
@@ -70,6 +82,10 @@ class StartDelegate extends KeyedDelegate {
         var dx = xy[0] - _view.cx;
         var dy = xy[1] - _view.cy;
         if (dx * dx + dy * dy <= (_view.r + 10) * (_view.r + 10)) { app().startRound(); }
+        // the menu lines at the UP button open the setup, as the button does
+        var sw = System.getDeviceSettings().screenWidth;
+        var sh = System.getDeviceSettings().screenHeight;
+        if (xy[0] < (sw * 24) / 100 && xy[1] > (sh * 36) / 100 && xy[1] < (sh * 64) / 100) { showSetup(); }
         return true;
     }
 
