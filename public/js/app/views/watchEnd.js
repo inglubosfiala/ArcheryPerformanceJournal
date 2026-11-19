@@ -76,11 +76,7 @@ export function timelineChart(tl, { hrTrace = null } = {}) {
     const sx = x(sh.t);
     if (sh.detected) {
       let end = sh.t;
-      for (const [len, cls] of [
-        [sh.hold, 'hold'],
-        [sh.draw, 'draw'],
-        [sh.setup, 'setup'],
-      ]) {
+      for (const [len, cls] of [...phases(sh)].reverse()) {
         if (len > 0) {
           const x0 = x(Math.max(0, end - len));
           parts.push(
@@ -131,6 +127,34 @@ export function timelineChart(tl, { hrTrace = null } = {}) {
 
 const sec = (v) => (v == null ? '–' : v.toFixed(1));
 
+/** A shot's phases in order, [seconds, class]: the hold split into settle and anchor when known. */
+function phases(sh) {
+  return [
+    [sh.setup, 'setup'],
+    [sh.draw, 'draw'],
+    ...(sh.settle != null
+      ? [
+          [sh.settle, 'settle'],
+          [sh.anchor, 'hold'],
+        ]
+      : [[sh.hold, 'hold']]),
+  ];
+}
+
+/** The legend's keys: with a settle part, the rest of the hold is the anchor. */
+export function phaseKeys(split) {
+  return [
+    h('span', { class: 'wt-key wt-key-setup' }, 'Set-up'),
+    h('span', { class: 'wt-key wt-key-draw' }, 'Draw'),
+    ...(split
+      ? [
+          h('span', { class: 'wt-key wt-key-settle' }, 'Settle'),
+          h('span', { class: 'wt-key wt-key-hold' }, 'Anchor'),
+        ]
+      : [h('span', { class: 'wt-key wt-key-hold' }, 'Hold')]),
+  ];
+}
+
 /**
  * One row per detected shot: its set-up, draw and hold as a stacked bar (seconds written in the
  * segments that are wide enough), so each shot's cycle can be compared with the others.
@@ -170,11 +194,7 @@ export function shotCycleChart(tl, { max: span = null, legend = true } = {}) {
       ),
     );
     let x0 = left;
-    for (const [len, cls] of [
-      [sh.setup, 'setup'],
-      [sh.draw, 'draw'],
-      [sh.hold, 'hold'],
-    ]) {
+    for (const [len, cls] of phases(sh)) {
       const wd = w(len);
       if (wd > 0) {
         parts.push(s('rect', { class: `wt-ph wt-ph-${cls}`, x: x0, y, width: wd, height: rowH - 6, rx: 3 }));
@@ -195,9 +215,7 @@ export function shotCycleChart(tl, { max: span = null, legend = true } = {}) {
       ? h(
           'div',
           { class: 'wt-legend', 'aria-hidden': 'true' },
-          h('span', { class: 'wt-key wt-key-setup' }, 'Set-up'),
-          h('span', { class: 'wt-key wt-key-draw' }, 'Draw'),
-          h('span', { class: 'wt-key wt-key-hold' }, 'Hold'),
+          ...phaseKeys(shots.some((sh) => sh.settle != null)),
         )
       : null,
     s(
@@ -206,7 +224,7 @@ export function shotCycleChart(tl, { max: span = null, legend = true } = {}) {
         class: 'wt-chart',
         viewBox: `0 0 ${VB_W} ${height}`,
         role: 'img',
-        'aria-label': `Shot cycle: ${shots.map((sh) => `arrow ${sh.no ?? '?'}: set-up ${sec(sh.setup)}, draw ${sec(sh.draw)}, hold ${sec(sh.hold)} seconds`).join('; ')}`,
+        'aria-label': `Shot cycle: ${shots.map((sh) => `arrow ${sh.no ?? '?'}: set-up ${sec(sh.setup)}, draw ${sec(sh.draw)}, ${sh.settle != null ? `settle ${sec(sh.settle)}, anchor ${sec(sh.anchor)}` : `hold ${sec(sh.hold)}`} seconds`).join('; ')}`,
       },
       ...parts,
     ),
@@ -231,12 +249,21 @@ function timelineDetails(tl) {
     tile('Length', mmss(tl.seconds)),
     tile('Shots', String(tl.shots.length)),
     ...(tl.avg
-      ? [tile('Ø draw', `${sec(tl.avg.draw)} s`), tile('Ø hold', `${sec(tl.avg.hold)} s`)]
+      ? [
+          tile('Ø draw', `${sec(tl.avg.draw)} s`),
+          tile('Ø hold', `${sec(tl.avg.hold)} s`),
+          ...(tl.avg.anchor != null
+            ? [tile('Ø anchor', `${sec(tl.avg.anchor)} s`), tile('Ø follow-through', `${tl.avg.follow} mm`)]
+            : []),
+        ]
       : [
           tile('Rhythm', tl.avgGap != null ? `Ø ${tl.avgGap} s` : '–'),
           tile('Heart rate', tl.hr ? `${tl.hr.min}–${tl.hr.max}` : '–'),
         ]),
   );
+  const split = tl.shots.some((sh) => sh.settle != null);
+  const follow = (sh) =>
+    sh.follow == null ? '–' : sh.followOff != null ? `${sh.follow} (${sh.followOff})` : `${sh.follow}`;
   const rows = tl.shots.length
     ? h(
         'div',
@@ -250,9 +277,17 @@ function timelineDetails(tl) {
             h(
               'tr',
               null,
-              ...['Arrow', 'Time', 'Set-up', 'Draw', 'Hold', 'M', 'S', '♥', 'Score'].map((c) =>
-                h('th', { scope: 'col' }, c),
-              ),
+              ...[
+                'Arrow',
+                'Time',
+                'Set-up',
+                'Draw',
+                ...(split ? ['Settle', 'Anchor', 'Follow mm'] : ['Hold']),
+                'M',
+                'S',
+                '♥',
+                'Score',
+              ].map((c) => h('th', { scope: 'col' }, c)),
             ),
           ),
           h(
@@ -270,7 +305,13 @@ function timelineDetails(tl) {
                 h('td', null, mmss(sh.t)),
                 h('td', null, sh.detected ? sec(sh.setup) : '–'),
                 h('td', null, sh.detected ? sec(sh.draw) : '–'),
-                h('td', null, sh.detected ? sec(sh.hold) : '–'),
+                ...(split
+                  ? [
+                      h('td', null, sh.settle != null ? sec(sh.settle) : '–'),
+                      h('td', null, sh.settle != null ? sec(sh.anchor) : sh.detected ? sec(sh.hold) : '–'),
+                      h('td', null, follow(sh)),
+                    ]
+                  : [h('td', null, sh.detected ? sec(sh.hold) : '–')]),
                 h('td', null, sh.m ?? '–'),
                 h('td', null, sh.s ?? '–'),
                 h('td', null, sh.hr ?? '–'),
@@ -285,7 +326,14 @@ function timelineDetails(tl) {
         { class: 'wt-empty' },
         'No arrows were graded on the watch in this end; its heart rate is kept.',
       );
-  return h('div', { class: 'wt-details' }, tiles, shotCycleChart(tl), rows);
+  const note = split
+    ? h(
+        'p',
+        { class: 'wt-note' },
+        'Settle: the start of the hold, while the wrist still turns. Anchor: the rest, with the wrist steady. Follow: how far the hand moves in the first 0.1 s after the release; in brackets, how far that is from this end’s average direction.',
+      )
+    : null;
+  return h('div', { class: 'wt-details' }, tiles, shotCycleChart(tl), rows, note);
 }
 
 /**

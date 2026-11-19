@@ -351,3 +351,86 @@ describe('format 4: the watch names the arrow of each release', () => {
     expect(collections.sessions.validate({ ...s, id: 'x', status: 'finished' }).filter((e) => /detected/.test(e))).toEqual(['end 1: invalid detected shots']);
   });
 });
+
+describe('format 5: settle, anchor and follow-through of each release', () => {
+  // arrow #2 released at 12 s: hold 4.3 s, of which 3.0 s settle (F = 15 x 0.2), tilt change 0.8
+  // degrees (8), follow-through x -30 mm (B = 11), y -15 mm (G = 16), z +3 mm (M = 22)
+  const CODE = 'APJ5.E1.0143020.0254003.D0120220140431F8BGM.D0310124140662A3CGL';
+
+  it('reads the extra figures of each release', () => {
+    expect(parseWatchCode(CODE).detected).toEqual([
+      {
+        t: 12,
+        no: 2,
+        setup: 2,
+        draw: 1.4,
+        hold: 4.3,
+        steady: 1,
+        settle: 3,
+        drift: 0.8,
+        fx: -30,
+        fy: -15,
+        fz: 3,
+      },
+      {
+        t: 31,
+        no: 1,
+        setup: 2.4,
+        draw: 1.4,
+        hold: 6.6,
+        steady: 2,
+        settle: 2,
+        drift: 0.3,
+        fx: -27,
+        fy: -15,
+        fz: 0,
+      },
+    ]);
+  });
+
+  it('a release without them (the code got too long) reads as in format 4', () => {
+    expect(parseWatchCode('APJ5.E1.D0120220140431').detected[0]).toEqual({
+      t: 12,
+      no: 2,
+      setup: 2,
+      draw: 1.4,
+      hold: 4.3,
+      steady: 1,
+    });
+  });
+
+  it('refuses a damaged tail', () => {
+    expect(parseWatchCode('APJ5.E1.D0120220140431F8B')).toEqual({ ok: false, error: 'bad' });
+    expect(parseWatchCode('APJ4.E1.D0120220140431F8BGM')).toEqual({ ok: false, error: 'bad' });
+  });
+
+  it('the timeline splits the hold into settle and anchor and measures the follow-through', () => {
+    const tl = endTimeline(L.applyWatchGrades(start(2), parseWatchCode(CODE)).current);
+    expect(tl.shots.map((x) => [x.no, x.settle, x.anchor, x.drift, x.follow, x.followOff])).toEqual([
+      [2, 3, 1.3, 0.8, 34, 2],
+      [1, 2, 4.6, 0.3, 31, 2],
+    ]);
+    expect(tl.avg).toMatchObject({ hold: 5.4, anchor: 2.9, follow: 32 });
+  });
+
+  it('a format 4 end has no split', () => {
+    const tl = endTimeline(
+      L.applyWatchGrades(start(2), parseWatchCode('APJ4.E1.0143020.D0120120140431')).current,
+    );
+    expect(tl.shots[0].settle).toBeUndefined();
+    expect(tl.avg.anchor).toBeUndefined();
+  });
+
+  it('the validator checks the extra figures', () => {
+    let s = L.applyWatchGrades(start(2), parseWatchCode(CODE));
+    s = L.nextEnd(L.enterScore(L.enterScore(s, 9), 8));
+    const errors = () =>
+      collections.sessions.validate({ ...s, id: 'x', status: 'finished' }).filter((e) => /detected/.test(e));
+    expect(errors()).toEqual([]);
+    s.ends[0].watchShots[0].fx = 99;
+    expect(errors()).toEqual(['end 1: invalid detected shots']);
+    s.ends[0].watchShots[0].fx = -30;
+    delete s.ends[0].watchShots[0].drift;
+    expect(errors()).toEqual(['end 1: invalid detected shots']);
+  });
+});

@@ -4,7 +4,7 @@ import { sightErrors, historyErrors } from './gearFields.js';
 import { defaultLastSetup, isGoal } from './lastSetup.js';
 import { SESSION_TYPES, DRILL_IDS, MENTAL_TECHNIQUES, GYM_FOCUS, EFFORT_MAX, FOCUS_MAX, isScored, countsArrows, isTime, emptyReview, emptyCompetition } from './sessionTypes.js';
 import { GYM_UNITS, REPS_MAX, KG_MAX } from './gym.js';
-import { ARROW_NO_MAX, HR_MIN, HR_MAX, SHOT_TIME_MAX, TRACE_STEP_MAX, TRACE_MAX, DETECTED_MAX } from './watchCode.js';
+import { ARROW_NO_MAX, HR_MIN, HR_MAX, SHOT_TIME_MAX, TRACE_STEP_MAX, TRACE_MAX, DETECTED_MAX, SETTLE_MAX, DRIFT_MAX, FOLLOW_MAX } from './watchCode.js';
 
 const isStr = (v) => typeof v === 'string';
 // the heart rate while an end was shot, from the watch: { step: seconds per value, hr: [...] }
@@ -17,7 +17,8 @@ const isTrace = (t) =>
   t.hr.length >= 1 &&
   t.hr.length <= TRACE_MAX &&
   t.hr.every((v) => Number.isInteger(v) && v >= HR_MIN && v <= HR_MAX);
-// the shots the watch detected in an end: [{ t, setup, draw, hold, steady }]
+// the shots the watch detected in an end: [{ t, setup, draw, hold, steady }], from watch app 0.10
+// also settle, drift and the follow-through fx, fy, fz (all five or none)
 const inRange = (v, lo, hi) => typeof v === 'number' && Number.isFinite(v) && v >= lo && v <= hi;
 const isDetected = (list) =>
   Array.isArray(list) &&
@@ -32,7 +33,12 @@ const isDetected = (list) =>
       inRange(d.draw, 0, 9.9) &&
       inRange(d.hold, 0, 99.9) &&
       Number.isInteger(d.steady) &&
-      inRange(d.steady, 0, 9),
+      inRange(d.steady, 0, 9) &&
+      (d.settle == null
+        ? d.drift == null && d.fx == null && d.fy == null && d.fz == null
+        : inRange(d.settle, 0, SETTLE_MAX) &&
+          inRange(d.drift, 0, DRIFT_MAX) &&
+          [d.fx, d.fy, d.fz].every((v) => Number.isInteger(v) && inRange(v, -FOLLOW_MAX, FOLLOW_MAX))),
   );
 const isGrade = (g) => g == null || (Number.isInteger(g) && g >= 1 && g <= 5);
 const isCount = (n) => Number.isInteger(n) && n >= 0;

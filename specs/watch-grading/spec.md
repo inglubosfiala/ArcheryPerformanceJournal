@@ -166,6 +166,18 @@ The app now works like Garmin's own activity apps:
 - **Detector:** `RELEASE` lowered from 550 to 420 mg. On both real sessions it finds every release (12 of 12 here, the same 11 as before on 25128610129) and nothing else; false snaps start at 400 mg.
 - **Known gap:** a shaky hold (jitter just under `QUIET`) can be cut by a tremor, so the hold reads short and the draw too short (end 2 arrow 4: 1.7 s hold / 0.4 s draw, really about 3 s of hold). Left until more shots are recorded.
 
+## Anchor and follow-through (watch 0.10.0, journal)
+
+- **Why:** checked on the 24 real releases of activities 25128610129 and 25128765325 (throwaway analysis in `watch/tools/prototype_shot3d/`). The expansion itself (about 2 mm over 2-4 s, some 0.1-0.2 mg) is far below the hand's tremor (2-14 mg) and cannot be measured as a distance. Two things can:
+  - **The hold is not all anchor.** In most arrows the wrist's tilt still changes by 10-15 degrees over the first seconds of the detected hold (a slow movement, smooth enough to count as still), then stays within a few tenths of a degree until the release.
+  - **The follow-through.** Over the 0.1 s after the snap the hand moves about 3 cm along the forearm and 1.5 cm across it, alike from arrow to arrow (spread under 1 cm); a tap on the watch moves it along z (into the screen) instead. Without the gyroscope the path differs by 1-6 mm from the one with it, so the watch uses the accelerometer alone.
+- **Settle and anchor:** the detector follows the direction of gravity in 0.1 s means. Back from 0.15 s before the snap, the **anchor** is the stretch whose tilt stays within 2 degrees of its last 0.5 s; the part of the hold before it is **settle**. The tilt's change at anchor (first 0.5 s against last 0.5 s) is kept in 0.1 degrees.
+- **Follow-through:** the hand's path in mm along the watch's x, y and z from 0.08 s before the snap is seen to 0.1 s after it: acceleration = gravity - reading (Garmin reads -1000 on z face up), gravity being the mean reading from 0.4 to 0.1 s before the snap. A release is therefore reported 0.1 s after its snap.
+- **Watch code format 5** (`APJ5`): a release may end with five more characters, one each from the trace's 43-character alphabet (0-42): settle (0.2 s), tilt change at anchor (0.1 degrees), follow-through x, y, z (3 mm, 21 = 0). When the code would pass 390 characters (many arrows) the watch leaves these out and the release reads as in format 4.
+- **Journal:** the end's timeline and History's shot bars split the hold into **Settle** and **Anchor**; the table shows both and **Follow mm**: the path's length and, in brackets, how far it ends from the end's average one. Tiles add the average anchor and follow-through. Ends scanned from older watch versions look as before.
+- **Not done:** rejecting snaps without a follow-through in the watch's plane (it would have dropped every tap in the two sessions, but a weak release could go with them); telling which way along the forearm the hand moves (depends on the wrist and how the watch is worn).
+- **Checked:** the Python detector gives the tuned figures on both real sessions and still finds every synthetic shot; 618 journal tests pass; the watch app builds. The watch's own arithmetic was not run against real data in the simulator.
+
 
 ## Shot timing per end in History (journal)
 

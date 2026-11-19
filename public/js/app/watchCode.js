@@ -1,6 +1,11 @@
 // The watch code: the text in the QR code the Arrow Grades watch app shows after an end
 // (watch/source/EndState.mc payload()). One end's grades, made on the wrist right after each shot.
 //
+// Format 5 (watch app 0.10.0 on): as format 4, each release may end with five more characters (left
+// out when the code would get too long), one each from DELTAS (0-42): settle (0.2 s: the first part
+// of the hold, while the wrist's tilt still moves; the rest is the anchor), the tilt's change at
+// anchor (0.1 degrees), and the follow-through: the hand's path over the 0.1 s after the release
+// along the watch's x, y and z (3 mm, 21 = 0).
 // Format 4 (watch app 0.9.0 on): as format 3, each release also carries the arrow it belongs to
 // (the arrow selected at the release, or the next one picked): .D<t 3><arrow 2><set-up 2>...,
 // arrow 00 = none.
@@ -33,7 +38,12 @@ const ARROW = /^(\d{2})([0-5])([0-5])(\d{3})$/;
 const TRACE = /^H([1-9])(\d{3})([0-9A-Z$%*+\-/:]*)$/;
 const DETECTED = /^D(\d{3})(\d{2})(\d{2})(\d{3})(\d)$/;
 const DETECTED_4 = /^D(\d{3})(\d{2})(\d{2})(\d{2})(\d{3})(\d)$/;
+const DETECTED_5 = /^D(\d{3})(\d{2})(\d{2})(\d{2})(\d{3})(\d)([0-9A-Z$%*+\-/:]{5})?$/;
 export const DETECTED_MAX = 30;
+/** Settle up to 8.4 s, tilt change up to 4.2 degrees, follow-through within 63 mm an axis. */
+export const SETTLE_MAX = 8.4;
+export const DRIFT_MAX = 4.2;
+export const FOLLOW_MAX = 63;
 
 const bad = { ok: false, error: 'bad' };
 
@@ -56,7 +66,7 @@ export function traceAt(trace, t) {
 /**
  * Read a scanned code. Returns { ok: true, end, arrows: [{ no, m, s, hr }] } (format 2 and 3 also:
  * each arrow's `t`, the end's `trace` { step, hr } or null and `detected` [{ t, setup, draw, hold,
- * steady }], empty before format 3) with the arrows in arrow-number order,
+ * steady }], empty before format 3; format 5 also settle, drift, fx, fy, fz) with the arrows in arrow-number order,
  * or { ok: false, error } where error is
  *   'not-watch'  not a code of the watch app,
  *   'version'    a newer format than this app reads (update the app),
@@ -66,7 +76,7 @@ export function parseWatchCode(text) {
   if (typeof text !== 'string') return { ok: false, error: 'not-watch' };
   const parts = text.trim().toUpperCase().split('.');
   if (!/^APJ\d+$/.test(parts[0])) return { ok: false, error: 'not-watch' };
-  const format = { APJ1: 1, APJ2: 2, APJ3: 3, APJ4: 4 }[parts[0]] ?? 0;
+  const format = { APJ1: 1, APJ2: 2, APJ3: 3, APJ4: 4, APJ5: 5 }[parts[0]] ?? 0;
   if (!format) return { ok: false, error: 'version' };
   const endMatch = /^E(\d{1,3})$/.exec(parts[1] ?? '');
   if (!endMatch) return bad;
@@ -83,12 +93,19 @@ export function parseWatchCode(text) {
     if (format === 3) {
       const m = DETECTED.exec(part);
       if (!m) return bad;
-      detected.unshift({ t: Number(m[1]), setup: Number(m[2]) / 10, draw: Number(m[3]) / 10, hold: Number(m[4]) / 10, steady: Number(m[5]) });
+      detected.unshift({
+        t: Number(m[1]),
+        setup: Number(m[2]) / 10,
+        draw: Number(m[3]) / 10,
+        hold: Number(m[4]) / 10,
+        steady: Number(m[5]),
+      });
     } else {
-      const m = DETECTED_4.exec(part);
+      const m = (format === 4 ? DETECTED_4 : DETECTED_5).exec(part);
       if (!m) return bad;
       const no = Number(m[2]);
       if (no > ARROW_NO_MAX) return bad;
+      const more = m[7] ? [...m[7]].map((ch) => DELTAS.indexOf(ch)) : null;
       detected.unshift({
         t: Number(m[1]),
         ...(no ? { no } : {}),
@@ -96,6 +113,15 @@ export function parseWatchCode(text) {
         draw: Number(m[4]) / 10,
         hold: Number(m[5]) / 10,
         steady: Number(m[6]),
+        ...(more
+          ? {
+              settle: more[0] / 5,
+              drift: more[1] / 10,
+              fx: (more[2] - 21) * 3,
+              fy: (more[3] - 21) * 3,
+              fz: (more[4] - 21) * 3,
+            }
+          : {}),
       });
     }
     rest = rest.slice(0, -1);

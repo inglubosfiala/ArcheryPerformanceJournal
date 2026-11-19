@@ -40,7 +40,7 @@ import { sumArrows } from '../stats.js';
 import { rescoreEnd } from '../sessionLogic.js';
 import { faceRings } from './face.js';
 import { hrChart, endTimeline } from '../hrTrace.js';
-import { showWatchEnd, shotCycleChart } from './watchEnd.js';
+import { showWatchEnd, shotCycleChart, phaseKeys } from './watchEnd.js';
 import { whenCard, gearCard } from './common.js';
 
 // ---------------------------------------------------------------- state of the page (ui `ov`)
@@ -435,9 +435,7 @@ export function endsSection(ss, { all = false, onShowAll, onEdit }) {
       ? h(
           'div',
           { class: 'wt-legend ov-ends-legend', 'aria-hidden': 'true' },
-          h('span', { class: 'wt-key wt-key-setup' }, 'Set-up'),
-          h('span', { class: 'wt-key wt-key-draw' }, 'Draw'),
-          h('span', { class: 'wt-key wt-key-hold' }, 'Hold'),
+          ...phaseKeys(ss.ends.some((e) => (e.watchShots ?? []).some((d) => d.settle != null))),
         )
       : null,
     ends.map((e, i) => [
