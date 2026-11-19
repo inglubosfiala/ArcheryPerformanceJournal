@@ -4,7 +4,7 @@
 import { h } from '../../core/dom.js';
 import * as APL from '../../ui/apl/index.js';
 import { confirmDialog } from './confirm.js';
-import { APP_VERSION, SUPPORT_URL, PAYPAL_ME, TIP_AMOUNTS } from '../../config.js';
+import { versionLabel, SUPPORT_URL, PAYPAL_ME, TIP_AMOUNTS } from '../../config.js';
 import { exportBackup, parseBackup } from '../../backup/backup.js';
 import { checkForUpdate, storageInfo } from '../../pwa/updates.js';
 import { card } from './common.js';
@@ -31,7 +31,7 @@ const sectionCard = (id, label, children) =>
   card({ class: 'apl-card' }, APL.Section({ label, id, children }));
 const caption = (text) => h('p', { class: 'apl-cap13' }, text);
 
-const versionText = (ctx) => `Version ${APP_VERSION === '__APP_VERSION__' ? 'dev' : APP_VERSION} · ${ctx.env} environment`;
+const versionText = (ctx, long = false) => versionLabel({ env: ctx.env }, { long });
 const dateText = (iso) => (iso ? new Date(iso).toLocaleDateString('en-GB') : 'never');
 
 // The sub-pages, by the part after #/settings/. An unknown part shows the overview.
@@ -349,7 +349,7 @@ function aboutCard(ctx) {
 
   return sectionCard('set-about', 'Storage and app', [
     storageLine,
-    caption(versionText(ctx)),
+    caption(versionText(ctx, true)),
     APL.Button({
       children: 'Check for new version',
       variant: 'secondary',

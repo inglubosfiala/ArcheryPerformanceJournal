@@ -155,7 +155,7 @@ Triggers: `push` and `pull_request`.
 ### 5.4 Deploy (`.github/workflows/deploy.yml`)
 Trigger: CI passing on `main` or `main-test`, and manual `workflow_dispatch`. Deployments queue (never cancel a running one).
 1. Check out `main` (production) and, if it exists, `main-test` (test).
-2. Stamp each: replace `__APP_VERSION__` (short commit SHA) and `__APP_ENV__` (`prod` / `test`) in `sw.js` and `config.js`.
+2. Stamp each (the checkout has the full history): replace `__APP_VERSION__` (major.minor from `package.json`, then the branch's first-parent commit count, e.g. `0.1.158`), `__APP_COMMIT__` (short commit SHA), `__APP_BUILT_AT__` (build time, ISO) and `__APP_ENV__` (`prod` / `test`) in `sw.js` and `config.js`. Settings shows *Version 0.1.158 · 19 Nov 2026*; Storage & app adds the commit and the environment. Bump `package.json` for a new major / minor line.
 3. Assemble the site: production at the root, test under `/test/` (its manifest renamed *Archery Journal TEST*).
 4. Upload with `actions/upload-pages-artifact` and publish with `actions/deploy-pages`.
 
