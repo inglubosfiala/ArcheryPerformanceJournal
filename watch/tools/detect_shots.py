@@ -13,7 +13,7 @@ import sys
 RATE = 100                 # samples per second (the watch's raw rate; its 25 Hz stream is smoothed)
 ALPHA = 1 / 16             # jitter smoothing per sample (~0.16 s)
 QUIET = 15                 # jitter (mg) below which the hand counts as still (still: 2-14 mg)
-RELEASE = 550              # |magnitude - 1 g| (mg) of the release snap (real ones: 620-1850 mg)
+RELEASE = 420              # |magnitude - 1 g| (mg) of the release snap (real ones: 450-1850 mg)
 MIN_HOLD = RATE * 3 // 2   # stillness right before a release: 1.5 s (real holds: 3.5-5 s)
 BRIDGE = RATE // 10        # a tremor up to 0.1 s inside a hold does not end it
 GAP_AFTER_HOLD = RATE * 2 // 5   # the snap within 0.4 s of the stillness ending

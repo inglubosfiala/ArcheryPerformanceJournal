@@ -10,15 +10,15 @@ import Toybox.Math;
 // Per shot: [t (s since the end began), draw (0.1 s), hold (0.1 s), steadiness 0-9 (0 = stillest),
 // set-up (0.1 s)].
 //
-// Tuned on a real session (2 ends x 6 arrows, activity 25128610129): releases are 620-1850 mg
-// snaps after 3.5-5 s of stillness; other jolts (lowering the bow, tapping the watch) follow
+// Tuned on real sessions (2 ends x 6 arrows each, activities 25128610129 and 25128765325):
+// releases are 450-1850 mg snaps after 2-10 s of stillness; other jolts (lowering the bow, tapping the watch) follow
 // shorter stillness. The app ignores snaps next to the archer's own taps and button presses.
 // watch/tools/detect_shots.py runs the same algorithm on an exported FIT file.
 class ShotDetector {
     static const RATE = 100;           // samples per second
     static const ALPHA = 0.0625;       // jitter smoothing per sample (~0.16 s)
     static const QUIET = 15;           // jitter (mg) below which the hand counts as still (still: 2-14)
-    static const RELEASE = 550;        // |magnitude - 1 g| (mg) of the release snap
+    static const RELEASE = 420;        // |magnitude - 1 g| (mg) of the release snap (soft ones: ~450)
     static const MIN_HOLD = 150;       // stillness (samples) needed right before a release: 1.5 s
     static const BRIDGE = 10;          // a tremor up to 0.1 s inside a hold does not end it
     static const GAP_AFTER_HOLD = 40;  // the snap must come within 0.4 s of the stillness ending
