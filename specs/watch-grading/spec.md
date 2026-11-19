@@ -194,6 +194,7 @@ The app now works like Garmin's own activity apps:
 - **Setup:** the setup (UP on the start screen) first asks **Grade the shots?** - "Grade M · S" or "Timing only". With grading it goes on to arrows per end and numbered arrows as before; with timing only it returns to the start screen, which then says "Timing only · no grading". The choice is kept between rounds.
 - **Timing only:** the shot screen has nothing to tap: it shows the end and its time, the number of releases found, the heart rate and the last release's draw and anchor. LAP closes the end (it never closes by itself), START pauses, as before. The releases are numbered in the order shot (1-24) and the code carries them with the heart-rate curve and no arrows; the journal shows them under those numbers, ungraded.
 - **Checked:** the watch app builds; a journal test reads a timing-only code. The new watch screens were not looked at in the simulator.
+- **Start screen (0.11.1):** no title and no "UP: setup" text; a white mark on the edge at the UP button with the menu's three lines beside it shows that UP opens the setup (a tap on the lines does the same). The round's setup line, the START button and the version stay.
 
 
 ## Shot timing per end in History (journal)
