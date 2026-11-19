@@ -56,8 +56,12 @@ export function endTimeline(end) {
   if (!trace && !timed.length && !releases.length) return null;
 
   const used = new Set();
+  // the arrow the watch named for the release (format 4: the arrow selected at the release, or the
+  // next one picked); else the arrow tapped right after it
   const arrowFor = (r, next) =>
-    timed.find((a) => !used.has(a) && a.t >= r.t - 2 && a.t - r.t <= TAP_WINDOW && (next == null || a.t < next.t));
+    r.no != null
+      ? (end.arrows ?? []).find((a) => a && a.no === r.no && !used.has(a))
+      : timed.find((a) => !used.has(a) && a.t >= r.t - 2 && a.t - r.t <= TAP_WINDOW && (next == null || a.t < next.t));
   const fromArrow = (a) => ({ no: a.no ?? null, m: a.m ?? null, s: a.s ?? null, v: a.v ?? null });
   const list = releases.map((r, i) => {
     const a = arrowFor(r, releases[i + 1]);

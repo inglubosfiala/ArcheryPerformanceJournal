@@ -64,7 +64,7 @@ class StartDelegate extends KeyedDelegate {
         return true;
     }
 
-    function onTap(evt as WatchUi.ClickEvent) as Boolean {
+    function onTouch(evt as WatchUi.ClickEvent) as Boolean {
         var xy = evt.getCoordinates();
         var dx = xy[0] - _view.cx;
         var dy = xy[1] - _view.cy;
@@ -181,7 +181,7 @@ class StopDelegate extends KeyedDelegate {
         }
     }
 
-    function onTap(evt as WatchUi.ClickEvent) as Boolean {
+    function onTouch(evt as WatchUi.ClickEvent) as Boolean {
         var y = evt.getCoordinates()[1];
         for (var i = 0; i < _view.rows.size(); i++) {
             if (y >= _view.rows[i][0] && y < _view.rows[i][0] + _view.rows[i][1]) {

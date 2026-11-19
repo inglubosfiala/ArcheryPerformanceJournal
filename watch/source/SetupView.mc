@@ -87,7 +87,7 @@ class SetupDelegate extends KeyedDelegate {
         showStart();
     }
 
-    function onTap(evt as WatchUi.ClickEvent) as Boolean {
+    function onTouch(evt as WatchUi.ClickEvent) as Boolean {
         var xy = evt.getCoordinates();
         choose(cellValueAt(_view.cells, xy[0], xy[1]));
         return true;
