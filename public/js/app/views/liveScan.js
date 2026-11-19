@@ -2,7 +2,8 @@
 // result (spot outlines, numbered arrows) is drawn over the live picture. When the same arrows stay
 // in place for about a second the result locks by itself; "Take now" takes it at once. When to lock
 // is decided by the steady reading of scan.js; this view runs the camera, the detector and the drawing.
-// Nothing is recorded or stored: frames are analysed in memory and dropped.
+// Nothing is recorded or stored here: frames are analysed in memory and dropped. (The one frame
+// that is taken may be saved to the phone by the caller, see scanPhoto.js.)
 import { h } from '../../core/dom.js';
 import { icons } from '../icons.js';
 import * as APL from '../../ui/apl/index.js';
@@ -78,7 +79,7 @@ export function drawArrowMarks(g, spots, arrows, labels, { hollow = false, activ
 /**
  * Open the live view. Resolves with
  *   { canvas, res }  the locked (or taken) frame and its detection result,
- *   { file }         a photo chosen instead (taken with Photo, or picked with Gallery), or
+ *   { file, taken }  a photo chosen instead (`taken`: with Photo just now; else picked with Gallery), or
  *   null             closed without a result.
  */
 export function liveScan({ face, maxArrows, spotHint = 0 }) {
@@ -110,7 +111,7 @@ export function liveScan({ face, maxArrows, spotHint = 0 }) {
         'aria-hidden': 'true',
         onChange: (e) => {
           const file = e.target.files?.[0];
-          if (file) finish({ file });
+          if (file) finish({ file, taken: capture });
         },
       });
     const cameraInput = fileInput(true);

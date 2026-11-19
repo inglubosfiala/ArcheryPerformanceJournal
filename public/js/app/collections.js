@@ -200,6 +200,8 @@ export const defaultSettings = {
   lastSetup: defaultLastSetup(),
   // the user's wording of the M and S grades, only what differs from the defaults (gradeTexts.js); synced
   gradeTexts: null,
+  // keep the raw picture of every Scan as a file on the phone (scanPhoto.js); this device only
+  saveScanPhotos: true,
 };
 
 /** Settings shared between devices by Google Drive sync; all others stay on the device. */

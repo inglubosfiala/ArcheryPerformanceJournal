@@ -11,6 +11,8 @@ import { card } from './common.js';
 import { paypalMeUrl } from '../support.js';
 import { renderGrades } from './settingsGrades.js';
 import { isDefault, scaleName } from '../gradeTexts.js';
+import { keepsScanPhotos } from '../scanPhoto.js';
+import { icons } from '../icons.js';
 
 // the APL themes; 'system' follows the device (this device only, not synced)
 const THEMES = [
@@ -34,6 +36,7 @@ const dateText = (iso) => (iso ? new Date(iso).toLocaleDateString('en-GB') : 'ne
 
 // The sub-pages, by the part after #/settings/. An unknown part shows the overview.
 const PAGES = {
+  scan: { title: 'Scan', render: (ctx) => [scanCard(ctx)] },
   appearance: { title: 'Appearance', render: (ctx) => [appearanceCard(ctx)] },
   sync: { title: 'Sync & backup', render: (ctx) => [syncCard(ctx), backupCard(ctx)] },
   app: { title: 'Storage & app', render: (ctx) => [aboutCard(ctx)] },
@@ -109,6 +112,12 @@ function overview(ctx) {
                 : `Your wording · ${scaleName(settings, 'm')} · ${scaleName(settings, 's')}`,
             ),
           }),
+          settingsRow({
+            page: 'scan',
+            icon: icons.camera(),
+            title: 'Scan',
+            sub: rowSub(keepsScanPhotos(settings) ? 'Photos are saved to the phone' : 'Photos are not saved'),
+          }),
         ]),
         settingsGroup('App', [
           settingsRow({ page: 'appearance', icon: APL.Icon({ name: 'theme' }), title: 'Appearance', sub: rowSub(`Theme: ${theme}`) }),
@@ -125,6 +134,23 @@ function overview(ctx) {
       ),
     ),
   };
+}
+
+// ---------------------------------------------------------------- Scan
+
+function scanCard(ctx) {
+  return sectionCard('set-scan', 'Photos', [
+    APL.Switch({
+      title: 'Save scan photos',
+      detail: 'Keep the picture each Scan reads the arrows from',
+      checked: keepsScanPhotos(ctx.repo.getSettings()),
+      onChange: (saveScanPhotos) => ctx.saveSettings({ saveScanPhotos }) && ctx.rerender(),
+      fk: 'save-scan-photos',
+    }),
+    caption(
+      'The picture is saved as it was taken, without the marks, to the Download folder of this phone (the gallery shows it as an album). The first time, the browser may ask to allow downloading several files. A photo picked from the gallery is not saved again.',
+    ),
+  ]);
 }
 
 // ---------------------------------------------------------------- Appearance
