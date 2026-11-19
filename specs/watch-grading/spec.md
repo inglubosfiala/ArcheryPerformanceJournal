@@ -126,3 +126,9 @@ The app now works like Garmin's own activity apps:
 - **Heart-rate trace:** now the whole end, from its start (START or LAP) to its close; the 30 s pre-roll before the first tap is gone, since an end may have no taps at all. A code with no arrows but a trace fills only the end's heart rate in the journal.
 - **Buttons no longer grade:** START is start/stop, so grading is touch only.
 - **Checked** in the simulator with a self-driving round (start, grade, LAP, rest code decoded as `APJ2.E1.0100006.0245002`, next end, stop, resume, stop, save) and its FIT file: laps End 1 (phase 1, M 4.0, S 5.0), Rest (phase 2), End 2 (phase 1).
+
+## End timeline (journal)
+
+- **After the Watch scan** a dialog shows what the watch recorded through the end (`views/watchEnd.js`): a timeline chart with the heart-rate curve, each shot as a numbered marker coloured by its M grade (4-5 green, 3 amber, 1-2 red, none grey) and the seconds between shots; the figures (length, shots, rhythm = average gap, heart-rate range); and the arrows in the order shot (time, gap, M, S, heart rate, score). **OK** goes on to the scoring screen.
+- **In History** each end the watch recorded has its heart-rate curve (or *Watch timeline* without a heart rate) under its row; a tap opens the same dialog, with the scores filled in.
+- The model is `endTimeline(end)` in `hrTrace.js` (shots sorted by time, gaps, length, heart-rate min/avg/max), unit-tested.

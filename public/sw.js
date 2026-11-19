@@ -62,6 +62,7 @@ const SHELL = [
   './js/app/watchCode.js',
   './js/app/hrTrace.js',
   './js/app/views/watchScan.js',
+  './js/app/views/watchEnd.js',
   './js/vendor/jsQR.js',
   './js/app/runningSession.js',
   './js/app/openFormSession.js',

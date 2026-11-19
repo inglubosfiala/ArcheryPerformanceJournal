@@ -39,7 +39,8 @@ import { isMultiSpot, keypadValues, zoneOf } from '../scoring.js';
 import { sumArrows } from '../stats.js';
 import { rescoreEnd } from '../sessionLogic.js';
 import { faceRings } from './face.js';
-import { hrChart } from '../hrTrace.js';
+import { hrChart, endTimeline } from '../hrTrace.js';
+import { showWatchEnd } from './watchEnd.js';
 import { whenCard, gearCard } from './common.js';
 
 // ---------------------------------------------------------------- state of the page (ui `ov`)
@@ -390,6 +391,26 @@ function hrSparkline(end) {
   );
 }
 
+/**
+ * Under an end's row, when the watch recorded it: its heart-rate curve (or just "Watch timeline"
+ * without a heart rate); a tap opens the end's timeline (shot timing, heart rate, grades).
+ */
+function watchRow(end, i) {
+  if (!endTimeline(end)) return null;
+  return h(
+    'button',
+    {
+      type: 'button',
+      class: 'ov-end-watch',
+      'aria-haspopup': 'dialog',
+      'aria-label': `End ${i + 1}: watch timeline`,
+      onClick: () => showWatchEnd(end, { title: `End ${i + 1} · from the watch` }),
+      dataset: { fk: `end-watch-${i}` },
+    },
+    hrSparkline(end) ?? h('span', { class: 'ov-end-watch-text' }, '⏱ Watch timeline'),
+  );
+}
+
 /** One row per end: its score chips with the grades under each, and its total. Tap = Edit end. */
 export function endsSection(ss, { all = false, onShowAll, onEdit }) {
   const ends = all ? ss.ends : ss.ends.slice(0, ENDS_SHOWN);
@@ -403,7 +424,7 @@ export function endsSection(ss, { all = false, onShowAll, onEdit }) {
       h('h2', { class: 'apl-label', id: 'ov-ends' }, T.ends),
       h('span', { class: 'apl-cap' }, 'Tap an end to edit'),
     ),
-    ends.map((e, i) =>
+    ends.map((e, i) => [
       h(
         'button',
         {
@@ -422,9 +443,9 @@ export function endsSection(ss, { all = false, onShowAll, onEdit }) {
         ),
         h('span', { class: 'ov-end-sum' }, String(sumArrows(e.arrows))),
         h('span', { class: 'ov-row-go', 'aria-hidden': 'true' }, icons.chevron()),
-        hrSparkline(e),
       ),
-    ),
+      watchRow(e, i),
+    ]),
     !all && ss.ends.length > ENDS_SHOWN
       ? h('button', { type: 'button', class: 'ov-more', onClick: onShowAll, dataset: { fk: 'ends-all' } }, `Show all ${ss.ends.length} ends`)
       : null,

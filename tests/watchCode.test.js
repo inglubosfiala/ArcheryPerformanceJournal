@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { parseWatchCode } from '../public/js/app/watchCode.js';
-import { hrChart } from '../public/js/app/hrTrace.js';
+import { hrChart, endTimeline, mmss } from '../public/js/app/hrTrace.js';
 import * as L from '../public/js/app/sessionLogic.js';
 import { collections } from '../public/js/app/collections.js';
 
@@ -218,5 +218,42 @@ describe('an end closed on the watch without grades', () => {
     const s = L.applyWatchGrades(before, code);
     expect(s.current.arrows).toEqual(before.current.arrows);
     expect(s.current.hrTrace).toEqual({ step: 3, hr: [90, 90, 91] });
+  });
+});
+
+describe('endTimeline', () => {
+  it('the shots in the order shot, with the gap since the one before and the end length', () => {
+    const end = {
+      hrTrace: { step: 2, hr: [80, 90, 100, 110, 100, 90] },
+      arrows: [
+        { v: 10, m: 4, s: 5, no: 3, t: 9, hr: 100 },
+        { v: 9, m: 2, s: 3, no: 1, t: 2 },
+        { v: null, m: null, s: null },
+      ],
+    };
+    expect(endTimeline(end)).toEqual({
+      seconds: 12,
+      shots: [
+        { no: 1, t: 2, gap: null, m: 2, s: 3, hr: 90, v: 9 },
+        { no: 3, t: 9, gap: 7, m: 4, s: 5, hr: 100, v: 10 },
+      ],
+      avgGap: 7,
+      firstShot: 2,
+      lastShot: 9,
+      hr: { min: 80, avg: 95, max: 110 },
+    });
+  });
+
+  it('an end closed without grades: only the heart rate; no watch data at all: null', () => {
+    expect(endTimeline({ hrTrace: { step: 1, hr: [70, 72] }, arrows: [{ v: 9 }] })).toMatchObject({ seconds: 2, shots: [], avgGap: null, hr: { min: 70, avg: 71, max: 72 } });
+    expect(endTimeline({ arrows: [{ v: 9, m: 3, s: 3 }] })).toBeNull();
+  });
+
+  it('shot times without a heart rate still give the timing', () => {
+    expect(endTimeline({ arrows: [{ no: 1, t: 5 }, { no: 2, t: 50 }] })).toMatchObject({ seconds: 50, avgGap: 45, hr: null });
+  });
+
+  it('formats seconds as m:ss', () => {
+    expect([mmss(0), mmss(42), mmss(725.4)]).toEqual(['0:00', '0:42', '12:05']);
   });
 });
