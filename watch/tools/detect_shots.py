@@ -10,17 +10,18 @@ import math
 import random
 import sys
 
-RATE = 25
-QUIET = 30
-RELEASE = 900
-MIN_HOLD = 25
-GAP_AFTER_HOLD = 10
-PAUSE = 13
-MAX_DRAW = 200
-REST = 25
-MAX_SETUP = 200
-REFRACTORY = 75
-HISTORY = 750
+RATE = 100                 # samples per second (the watch's raw rate; its 25 Hz stream is smoothed)
+ALPHA = 1 / 16             # jitter smoothing per sample (~0.16 s)
+QUIET = 15                 # jitter (mg) below which the hand counts as still (still: 2-14 mg)
+RELEASE = 900              # |magnitude - 1 g| (mg) of the release snap
+MIN_HOLD = RATE            # stillness right before a release: 1.0 s
+GAP_AFTER_HOLD = RATE * 2 // 5   # the snap within 0.4 s of the stillness ending
+PAUSE = RATE // 2          # a pause that marks the start of the draw: 0.5 s
+MAX_DRAW = RATE * 8        # look back at most 8 s for the draw's start
+REST = RATE                # a rest before the set-up: 1.0 s
+MAX_SETUP = RATE * 8       # look back at most 8 s for the set-up's start
+REFRACTORY = RATE * 3      # 3 s between two releases
+HISTORY = RATE * 30        # 30 s of quiet flags kept for looking back
 
 
 class ShotDetector:
@@ -42,7 +43,7 @@ class ShotDetector:
             m = math.sqrt(x * x + y * y + z * z)
             d = abs(m - self.prev)
             self.prev = m
-            self.jitter = self.jitter * 0.75 + d * 0.25
+            self.jitter = self.jitter * (1 - ALPHA) + d * ALPHA
             still = self.jitter < QUIET
             slot = self.n % HISTORY
             self.quiet[slot] = 1 if still else 0
@@ -126,12 +127,13 @@ def synthetic(seed=1):
     def move(sec, amp=180):
         n = int(sec * RATE)
         for k in range(n):
-            a = amp * math.sin(math.pi * k / n) * math.sin(k * 0.9)
+            a = amp * math.sin(math.pi * k / n) * math.sin(k * 0.9 * 25 / RATE)
             xs.append(a + rnd.gauss(0, 25)); ys.append(rnd.gauss(0, 25)); zs.append(1000 + 0.5 * a + rnd.gauss(0, 25))
 
-    def snap():
+    def snap():  # ~0.16 s of the hand flying back
         for v in (2600, -1400, 900, -300):
-            xs.append(v); ys.append(rnd.gauss(0, 60)); zs.append(1000 + v * 0.3)
+            for _ in range(RATE // 25):
+                xs.append(v); ys.append(rnd.gauss(0, 60)); zs.append(1000 + v * 0.3)
 
     still(5)  # standing at the line
     for raise_, draw, hold in [(1.4, 2.2, 4.0), (1.8, 1.8, 6.5), (1.2, 2.6, 3.2), (1.6, 2.0, 5.0), (2.0, 1.6, 7.8), (1.5, 2.4, 4.4)]:
