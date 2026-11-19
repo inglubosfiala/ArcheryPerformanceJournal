@@ -113,3 +113,16 @@ There is no server, no Garmin Connect account link and no phone companion app. T
 - **Raw motion for the shot detector:** the SensorLogger writes the accelerometer and gyroscope into the FIT file. Developer record fields mark the shots: `shot` = arrow number at the arrow tap, `grade` = M*10+S at the S tap (each for ~2 s). With the watch on the draw hand, this is the data to tune a detector of draw, anchor (hold) and release.
 - **Reading it:** `watch/tools/fit_read.py <file.fit> [--csv base]` lists the messages, markers and laps and writes the raw accelerometer / gyroscope and the records as CSV. Get the file from Garmin Connect on the web: the activity → gear icon → *Export Original* (a .zip with the .fit).
 - **Checked:** in the simulator the session starts, laps and saves, and the FIT file holds the four developer fields; the simulator has no sensor data, so markers, lap values and raw motion are first seen on the watch.
+
+## Garmin-style controls (watch 0.5.0)
+
+The app now works like Garmin's own activity apps:
+
+- **Start screen:** the app name, the setup (arrows per end, numbered arrows) and a green mark next to the START button. **START** (or the on-screen START button) starts the round and its activity with a vibration; **UP** (or hold UP) opens the setup, which returns to the start screen; **BACK** leaves the app.
+- **End:** grading by touch as before; the header shows `End n · shot/per end · end time`. **LAP** (the BACK/LAP button) closes the end, also with nothing graded: grading is optional, the heart rate and the raw motion are logged anyway. An arrow picked but not fully graded is kept with its time and without the missing grades. The last arrow's grade closes the end by itself. The menu (tap the header, or hold UP) has *Back one step* and *Undo last shot*.
+- **Rest:** the end's code for the journal and a rest timer (`End n · rest m:ss`); **LAP** (or a tap below the code) starts the next end.
+- **Stop:** **START** at any time pauses the activity and shows the time, ends, arrows and the round's average M and S, with **Resume** (default; BACK resumes too), **Save** and **Discard** (asks first). After Save or Discard the app shows *Saved* / *Discarded* and closes.
+- **Laps in Garmin Connect:** each end and each rest is a lap (`phase` 1 end, 2 rest); end laps carry the end's average M and S.
+- **Heart-rate trace:** now the whole end, from its start (START or LAP) to its close; the 30 s pre-roll before the first tap is gone, since an end may have no taps at all. A code with no arrows but a trace fills only the end's heart rate in the journal.
+- **Buttons no longer grade:** START is start/stop, so grading is touch only.
+- **Checked** in the simulator with a self-driving round (start, grade, LAP, rest code decoded as `APJ2.E1.0100006.0245002`, next end, stop, resume, stop, save) and its FIT file: laps End 1 (phase 1, M 4.0, S 5.0), Rest (phase 2), End 2 (phase 1).

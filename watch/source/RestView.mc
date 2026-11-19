@@ -4,23 +4,24 @@ import Toybox.Lang;
 import Toybox.Timer;
 import Toybox.WatchUi;
 
-// The end's watch code, for the journal's Watch scan. Black on white with a quiet zone,
-// inside the round screen's inscribed square.
-class QrView extends WatchUi.View {
+// Between ends: the end's code for the journal's Watch scan (black on white with a quiet zone,
+// inside the round screen's inscribed square) and the rest timer. LAP starts the next end.
+class RestView extends WatchUi.View {
     hidden var _enc as Qr.Encoder? = null;
     hidden var _timer as Timer.Timer? = null;
     var bottom as Number = 0;
-    var top as Number = 0;
 
     function initialize() {
         View.initialize();
     }
 
     function onShow() as Void {
-        _enc = new Qr.Encoder(endState().payload());
-        var t = new Timer.Timer();
-        t.start(method(:onTick), 50, true);
-        _timer = t;
+        if (_enc == null) {
+            _enc = new Qr.Encoder(endState().payload());
+            var t = new Timer.Timer();
+            t.start(method(:onTick), 50, true);
+            _timer = t;
+        }
         if (Attention has :backlight) {
             try { Attention.backlight(true); } catch (e) { }
         }
@@ -66,7 +67,6 @@ class QrView extends WatchUi.View {
         var x0 = (w - full) / 2;
         var y0 = (h - full) / 2;
         bottom = y0 + full;
-        top = y0;
 
         dc.setColor(Graphics.COLOR_WHITE, Graphics.COLOR_WHITE);
         dc.fillRectangle(x0, y0, full, full);
@@ -88,49 +88,38 @@ class QrView extends WatchUi.View {
 
         dc.setColor(Graphics.COLOR_WHITE, Graphics.COLOR_TRANSPARENT);
         dc.drawText(w / 2, y0 - 24, Graphics.FONT_XTINY,
-            "End " + st.endNo.toString() + " · " + st.shots.size().toString() + " arrows",
+            "End " + st.endNo.toString() + " · rest " + clock(app().phaseSeconds()),
             Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
-        dc.setColor(0x8C8C8C, Graphics.COLOR_TRANSPARENT);
-        dc.drawText(w / 2, bottom + (h - bottom) / 3, Graphics.FONT_XTINY, "Tap here: next end",
+        dc.setColor(COLOR_DIM, Graphics.COLOR_TRANSPARENT);
+        dc.drawText(w / 2, bottom + (h - bottom) / 3, Graphics.FONT_XTINY, "LAP: next end",
             Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
     }
 }
 
-class QrDelegate extends KeyedDelegate {
-    hidden var _view as QrView;
+class RestDelegate extends KeyedDelegate {
+    hidden var _view as RestView;
 
-    function initialize(view as QrView) {
+    function initialize(view as RestView) {
         KeyedDelegate.initialize();
         _view = view;
     }
 
-    hidden function next() as Void {
-        lapAndNextEnd();
-        buzz();
-        showShots();
-    }
-
-    // Only a tap below the code starts the next end, so a touch while scanning does nothing.
+    // a tap below the code also starts the next end; a touch on the code while scanning does nothing
     function onTap(evt as WatchUi.ClickEvent) as Boolean {
         var xy = evt.getCoordinates();
-        if (_view.bottom > 0 && xy[1] > _view.bottom) { next(); }
-        else if (_view.top > 0 && xy[1] < _view.top) { openMenu(); }
+        if (_view.bottom > 0 && xy[1] > _view.bottom) { app().nextEnd(); }
         return true;
     }
 
+    // START: the stop screen
     function onSelect() as Boolean {
-        next();
+        app().pauseRound();
         return true;
     }
 
-    // Back: return to the end to fix a grade (Back again there undoes the last shot).
+    // LAP: the next end
     function onBack() as Boolean {
-        showShots();
-        return true;
-    }
-
-    function onMenu() as Boolean {
-        openMenu();
+        app().nextEnd();
         return true;
     }
 }

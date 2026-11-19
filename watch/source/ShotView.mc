@@ -8,13 +8,13 @@ const COLOR_S = 0x33AAFF;
 const COLOR_ARROW = 0xFFFFFF;
 const COLOR_CELL = 0x262626;
 const COLOR_DIM = 0x8C8C8C;
+const COLOR_GO = 0x2ECC71;
 
-// One shot is graded in three taps: which arrow, M (1-5), S (1-5).
+// One shot is graded in three taps: which arrow, M (1-5), S (1-5). The header shows the end, the
+// shot and the end's time; a tap on it (or hold UP) opens the menu.
 class ShotView extends WatchUi.View {
     // tap zones of the current step: [x, y, w, h, value]
     var cells as Array<Array<Number>> = [] as Array<Array<Number>>;
-    // highlighted cell when using the buttons, -1 when touch is used
-    var sel as Number = -1;
 
     function initialize() {
         View.initialize();
@@ -36,17 +36,9 @@ class ShotView extends WatchUi.View {
         var shotNo = st.shots.size() + 1;
         dc.setColor(COLOR_DIM, Graphics.COLOR_TRANSPARENT);
         dc.drawText(w / 2, (h * 9) / 100, Graphics.FONT_XTINY,
-            "End " + st.endNo.toString() + " · shot " + (shotNo > st.perEnd ? st.perEnd : shotNo).toString() + "/" + st.perEnd.toString(),
+            "End " + st.endNo.toString() + " · " + (shotNo > st.perEnd ? st.perEnd : shotNo).toString() + "/" + st.perEnd.toString()
+                + " · " + clock(app().phaseSeconds()),
             Graphics.TEXT_JUSTIFY_CENTER);
-
-        if (st.isComplete()) {
-            cells = [] as Array<Array<Number>>;
-            dc.setColor(Graphics.COLOR_WHITE, Graphics.COLOR_TRANSPARENT);
-            dc.drawText(w / 2, h / 2 - 30, Graphics.FONT_MEDIUM, "End complete", Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
-            dc.setColor(COLOR_DIM, Graphics.COLOR_TRANSPARENT);
-            dc.drawText(w / 2, h / 2 + 30, Graphics.FONT_SMALL, "Tap for code", Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
-            return;
-        }
 
         var title;
         var color;
@@ -63,9 +55,7 @@ class ShotView extends WatchUi.View {
         dc.setColor(color, Graphics.COLOR_TRANSPARENT);
         dc.drawText(w / 2, (h * 17) / 100, Graphics.FONT_SMALL, title, Graphics.TEXT_JUSTIFY_CENTER);
 
-        var opts = options();
-        if (sel >= opts.size()) { sel = opts.size() - 1; }
-        cells = drawGrid(dc, opts, sel, color);
+        cells = drawGrid(dc, options(), -1, color);
 
         // the last graded shot, as a reminder
         if (st.shots.size() > 0) {
@@ -79,11 +69,6 @@ class ShotView extends WatchUi.View {
 
     function valueAt(x as Number, y as Number) as Number {
         return cellValueAt(cells, x, y);
-    }
-
-    function selectedValue() as Number {
-        if (sel < 0 || sel >= cells.size()) { return 0; }
-        return cells[sel][4];
     }
 }
 
@@ -107,69 +92,37 @@ class ShotDelegate extends KeyedDelegate {
         } else {
             app().recorder.markGrade(st.pendingM, v);
             st.chooseS(v);
-            buzz();
             if (st.isComplete()) {
-                showCode();
+                // the last arrow of the end: closed as with LAP
+                app().closeEnd();
                 return;
             }
+            buzz();
         }
-        if (_view.sel >= 0) { _view.sel = 0; }
         WatchUi.requestUpdate();
     }
 
     function onTap(evt as WatchUi.ClickEvent) as Boolean {
-        if (endState().isComplete()) {
-            showCode();
-            return true;
-        }
         var xy = evt.getCoordinates();
-        // the header ("End 2 · shot 1/6") opens the menu
+        // the header ("End 2 · 1/6 · 0:42") opens the menu
         if (xy[1] < (System.getDeviceSettings().screenHeight * 22) / 100) {
             openMenu();
             return true;
         }
-        _view.sel = -1;
         choose(_view.valueAt(xy[0], xy[1]));
         return true;
     }
 
+    // START: the stop screen
     function onSelect() as Boolean {
-        if (endState().isComplete()) {
-            showCode();
-            return true;
-        }
-        if (_view.sel < 0) {
-            _view.sel = 0;
-            WatchUi.requestUpdate();
-            return true;
-        }
-        choose(_view.selectedValue());
+        app().pauseRound();
         return true;
     }
 
-    hidden function move(d as Number) as Void {
-        var n = _view.cells.size();
-        if (n == 0) { return; }
-        _view.sel = _view.sel < 0 ? 0 : (_view.sel + d + n) % n;
-        WatchUi.requestUpdate();
-    }
-
-    function onNextPage() as Boolean {
-        move(1);
-        return true;
-    }
-
-    function onPreviousPage() as Boolean {
-        move(-1);
-        return true;
-    }
-
+    // LAP: close the end
     function onBack() as Boolean {
-        if (endState().back()) {
-            WatchUi.requestUpdate();
-            return true;
-        }
-        return false;
+        app().closeEnd();
+        return true;
     }
 
     function onMenu() as Boolean {

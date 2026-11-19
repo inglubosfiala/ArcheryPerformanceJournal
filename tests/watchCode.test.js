@@ -209,3 +209,14 @@ describe('hrChart', () => {
     expect(hrChart({ step: 1, hr: [] })).toBeNull();
   });
 });
+
+describe('an end closed on the watch without grades', () => {
+  it('brings only its heart-rate trace; the slots stay as they are', () => {
+    const code = parseWatchCode('APJ2.E4.H3090LM');
+    expect(code).toEqual({ ok: true, end: 4, arrows: [], trace: { step: 3, hr: [90, 90, 91] } });
+    const before = L.enterScore(start(3), 9);
+    const s = L.applyWatchGrades(before, code);
+    expect(s.current.arrows).toEqual(before.current.arrows);
+    expect(s.current.hrTrace).toEqual({ step: 3, hr: [90, 90, 91] });
+  });
+});

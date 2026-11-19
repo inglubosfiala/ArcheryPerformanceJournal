@@ -4,8 +4,9 @@ import Toybox.FitContributor;
 import Toybox.Lang;
 import Toybox.SensorLogging;
 
-// The round as a Garmin activity: heart rate, time and calories as for any workout, each end a lap
-// with its average M and S. The raw accelerometer and gyroscope are logged into the same FIT file
+// The round as a Garmin activity: heart rate, time and calories as for any workout. Each end is a
+// lap with its average M and S, each rest between ends a lap of its own (lap field `phase`: 1 end,
+// 2 rest). The raw accelerometer and gyroscope are logged into the same FIT file
 // (SensorLogger), with a marker at each arrow tap and grade, so the shots can be found in the
 // motion data afterwards (to tune a shot detector: draw, anchor, release).
 class Recorder {
@@ -15,12 +16,14 @@ class Recorder {
     // lap fields
     static const FIELD_END_M = 2;
     static const FIELD_END_S = 3;
+    static const FIELD_PHASE = 4;
 
     hidden var _session as ActivityRecording.Session? = null;
     hidden var _shot as FitContributor.Field? = null;
     hidden var _grade as FitContributor.Field? = null;
     hidden var _endM as FitContributor.Field? = null;
     hidden var _endS as FitContributor.Field? = null;
+    hidden var _phase as FitContributor.Field? = null;
     hidden var _markSecs as Number = 0;
 
     function initialize() {
@@ -52,6 +55,7 @@ class Recorder {
         _grade = s.createField("grade", FIELD_GRADE, FitContributor.DATA_TYPE_UINT8, { :mesgType => FitContributor.MESG_TYPE_RECORD, :units => "MS" });
         _endM = s.createField("end_m", FIELD_END_M, FitContributor.DATA_TYPE_FLOAT, { :mesgType => FitContributor.MESG_TYPE_LAP, :units => "M" });
         _endS = s.createField("end_s", FIELD_END_S, FitContributor.DATA_TYPE_FLOAT, { :mesgType => FitContributor.MESG_TYPE_LAP, :units => "S" });
+        _phase = s.createField("phase", FIELD_PHASE, FitContributor.DATA_TYPE_UINT8, { :mesgType => FitContributor.MESG_TYPE_LAP, :units => "1end2rest" });
         (_shot as FitContributor.Field).setData(0);
         (_grade as FitContributor.Field).setData(0);
         s.start();
@@ -81,12 +85,34 @@ class Recorder {
         _markSecs = 2;
     }
 
-    // The end is done: its averages on the lap, then a new lap for the next end.
-    function lap(avgM as Float, avgS as Float) as Void {
-        if (_session == null) { return; }
+    // The values the lap in progress is written with when it closes.
+    function setLap(phase as Number, avgM as Float, avgS as Float) as Void {
+        if (_phase != null) { (_phase as FitContributor.Field).setData(phase); }
         if (_endM != null) { (_endM as FitContributor.Field).setData(avgM); }
         if (_endS != null) { (_endS as FitContributor.Field).setData(avgS); }
-        (_session as ActivityRecording.Session).addLap();
+    }
+
+    // Close the lap in progress and start the next one.
+    function lap() as Void {
+        if (_session != null) { (_session as ActivityRecording.Session).addLap(); }
+    }
+
+    // START on the stop screen: the activity timer stops / runs again.
+    function pause() as Void {
+        if (_session != null && (_session as ActivityRecording.Session).isRecording()) { (_session as ActivityRecording.Session).stop(); }
+    }
+
+    function resume() as Void {
+        if (_session != null && !(_session as ActivityRecording.Session).isRecording()) { (_session as ActivityRecording.Session).start(); }
+    }
+
+    // Throw the activity away.
+    function discard() as Void {
+        if (_session == null) { return; }
+        var s = _session as ActivityRecording.Session;
+        if (s.isRecording()) { s.stop(); }
+        s.discard();
+        clear();
     }
 
     // Save the activity to Garmin Connect (on the next sync).
@@ -95,10 +121,15 @@ class Recorder {
         var s = _session as ActivityRecording.Session;
         if (s.isRecording()) { s.stop(); }
         s.save();
+        clear();
+    }
+
+    hidden function clear() as Void {
         _session = null;
         _shot = null;
         _grade = null;
         _endM = null;
         _endS = null;
+        _phase = null;
     }
 }
