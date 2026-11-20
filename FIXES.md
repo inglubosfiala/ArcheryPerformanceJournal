@@ -177,3 +177,23 @@ Validation: lint, all 748 Vitest tests across 43 files and all seven PWA tests
 passed. The added generated-image suite has 83 cases covering all 56 registered
 face IDs, plus the negative and capture-integration cases described above.
 These results are not a real-photo accuracy benchmark.
+
+## Sight-mark distances in yards (20 November 2026)
+
+The setup's sight-mark page now offers Metres / Yards for adding distances,
+remembers that choice per setup, and provides yard presets (20, 30, 40, 50, 60,
+80 and 100 yd). Other accepts decimal distances up to 150 in the selected unit.
+Existing marks retain their original labels; a setup can contain both units.
+
+Distance parsing, ordering, nearest-elevation suggestions, duplicate detection
+and session lookup compare physical distances using 1 yd = 0.9144 m. A 20 yd
+mark therefore matches an 18.288 m session, rather than a 20 m session. Session
+lookup tolerates conversion rounding, and the setup summary shows the recorded
+unit. Legacy unlabelled distances remain metres. The stored sight-row format and
+existing session snapshots are unchanged.
+
+Regression tests cover mixed-unit lookup and sorting, legacy distances, decimal
+entry, invalid input, remembered unit selection and unchanged existing marks.
+
+Validation: lint, 751 Vitest tests across 44 files and all seven PWA checks
+passed. The focused sight-mark tests also passed after final input validation.

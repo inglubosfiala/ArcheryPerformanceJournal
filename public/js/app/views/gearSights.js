@@ -15,6 +15,7 @@ import {
   parseElevation,
   parseWindage,
   sightMarks,
+  sightDistanceMatches,
 } from '../gearFields.js';
 import { T } from '../strings.js';
 
@@ -39,25 +40,26 @@ function nearestElevation(marks, distance) {
   return parseElevation(withElev[0].elevation);
 }
 
-function addMark(ctx, setup, distance) {
+function addMark(ctx, setup, distance, unit) {
+  const metres = markDistance({ distance: `${distance} ${unit}` });
   const marks = sightMarks(setup.fields);
-  if (marks.some((m) => markDistance(m) === distance)) {
-    ctx.ui.set({ sightEdit: marks.find((m) => markDistance(m) === distance).id });
+  if (marks.some((m) => sightDistanceMatches(m, metres))) {
+    ctx.ui.set({ sightEdit: marks.find((m) => sightDistanceMatches(m, metres)).id });
     return;
   }
   const id = crypto.randomUUID();
-  const elevation = formatNumber(nearestElevation(marks, distance), 2);
-  if (saveMarks(ctx, setup.id, (ms) => [...ms, { id, distance: `${distance} m`, elevation, windage: '0', note: '' }])) {
+  const elevation = formatNumber(nearestElevation(marks, metres), 2);
+  if (saveMarks(ctx, setup.id, (ms) => [...ms, { id, distance: `${distance} ${unit}`, elevation, windage: '0', note: '' }])) {
     ctx.ui.set({ sightEdit: id, sightFocus: id });
   }
 }
 
-async function addOther(ctx, setup) {
-  const field = APL.TextField({ label: 'Distance in metres', inputmode: 'numeric', placeholder: 'e.g. 25', fk: 'sight-other' });
+async function addOther(ctx, setup, unit) {
+  const field = APL.TextField({ label: unit === 'yd' ? 'Distance in yards' : 'Distance in metres', inputmode: 'decimal', placeholder: 'e.g. 25', fk: 'sight-other' });
   const ok = await confirmDialog({ title: 'Add a distance', body: field, confirmLabel: 'Add', icon: 'sights' });
-  const n = parseInt(field.querySelector('input').value, 10);
-  if (ok && Number.isFinite(n) && n > 0 && n <= 150) addMark(ctx, setup, n);
-  else if (ok) ctx.toast('Enter a distance from 1 to 150 m');
+  const n = Number(field.querySelector('input').value.trim().replace(',', '.'));
+  if (ok && n <= 150 && markDistance({ distance: `${n} ${unit}` }) != null) addMark(ctx, setup, n, unit);
+  else if (ok) ctx.toast(`Enter a distance greater than 0 and up to 150 ${unit}`);
 }
 
 async function deleteMark(ctx, setup, mark) {
@@ -120,6 +122,7 @@ function tile({ label, value, editing, down, up, downText, upText, downLabel, up
 export function renderSightsPage(ctx, setup, { header }) {
   const ui = ctx.ui.get();
   const marks = sightMarks(setup.fields);
+  const unit = setup.fields?.sightDistanceUnit === 'yd' ? 'yd' : 'm';
   const editingId = ui.sightEdit;
   const focusId = ui.sightFocus;
   if (focusId) ctx.ui.quietSet({ sightFocus: null });
@@ -235,7 +238,7 @@ export function renderSightsPage(ctx, setup, { header }) {
     return node;
   };
 
-  const missing = missingDistances(setup.fields);
+  const missing = missingDistances(setup.fields, unit);
   const body = h(
     'div',
     { class: 'apl-screen-body gear-body' },
@@ -244,20 +247,33 @@ export function renderSightsPage(ctx, setup, { header }) {
       'section',
       { class: 'sight-add', 'aria-labelledby': 'sight-add-h' },
       h('h2', { class: 'apl-cap13 sight-add-h', id: 'sight-add-h' }, 'Add a distance'),
+      APL.SegmentedControl({
+        label: 'Sight distance unit',
+        value: unit,
+        fk: 'sight-unit',
+        options: [
+          { value: 'm', label: 'Metres' },
+          { value: 'yd', label: 'Yards' },
+        ],
+        onChange: (value) => {
+          const cur = ctx.repo.get('setups', setup.id);
+          if (cur && ctx.save('setups', { ...cur, fields: { ...cur.fields, sightDistanceUnit: value } })) ctx.rerender();
+        },
+      }),
       h(
         'div',
         { class: 'sight-add-chips' },
         missing.map((d) =>
           h(
             'button',
-            { type: 'button', class: 'sight-add-chip', onClick: () => addMark(ctx, setup, Number(d)), dataset: { fk: `sight-add-${d}` } },
-            `+ ${d} m`,
+            { type: 'button', class: 'sight-add-chip', onClick: () => addMark(ctx, setup, Number(d), unit), dataset: { fk: `sight-add-${d}` } },
+            `+ ${d} ${unit}`,
           ),
         ),
-        h('button', { type: 'button', class: 'sight-add-chip', onClick: () => addOther(ctx, setup), dataset: { fk: 'sight-add-other' } }, 'Other'),
+        h('button', { type: 'button', class: 'sight-add-chip', onClick: () => addOther(ctx, setup, unit), dataset: { fk: 'sight-add-other' } }, 'Other'),
       ),
     ),
-    h('p', { class: 'apl-cap gear-note' }, "Marks belong to this setup. The scoring screen shows the mark for the session's distance."),
+    h('p', { class: 'apl-cap gear-note' }, "Marks keep their recorded units and belong to this setup. The scoring screen shows the mark for the session's distance."),
   );
 
   const menuFor = ui.sightMenu && marks.find((m) => m.id === ui.sightMenu);

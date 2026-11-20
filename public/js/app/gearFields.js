@@ -192,11 +192,19 @@ export const DEFAULT_SIGHT_DISTANCES = ['18', '30', '50', '60', '70', '90'];
 /** A row with a mark set (elevation or windage), not just a distance. */
 export const hasMark = (m) => Boolean(String(m?.elevation ?? '').trim() || String(m?.windage ?? '').trim());
 
-/** The distance of a mark in metres, or null ("70 m", "70m", "70" → 70). */
+/** Distances without a suffix are legacy metres; retain each mark's entered unit. */
 export function markDistance(m) {
-  const n = parseInt(m?.distance, 10);
-  return Number.isFinite(n) ? n : null;
+  const match = String(m?.distance ?? '').trim().match(/^(\d+(?:[.,]\d+)?)\s*(m|metres?|meters?|yd|yds|yards?)?$/i);
+  if (!match) return null;
+  const n = Number(match[1].replace(',', '.'));
+  return Number.isFinite(n) && n > 0 ? n * (/^(yd|yard)/i.test(match[2] || '') ? 0.9144 : 1) : null;
 }
+
+/** Compare canonical metres with enough tolerance for session conversion rounding. */
+export const sightDistanceMatches = (mark, metres) => {
+  const distance = markDistance(mark);
+  return distance != null && Number.isFinite(metres) && Math.abs(distance - metres) < 0.000001;
+};
 
 /** The sight marks of a setup, by distance (marks without a number last). */
 export function sightMarks(gear) {
@@ -209,13 +217,14 @@ export const markCount = (gear) => (Array.isArray(gear?.sights) ? gear.sights.fi
 
 /** The sight mark saved for a distance in metres, or null. */
 export function findSightMark(gear, distance) {
-  return (Array.isArray(gear?.sights) ? gear.sights : []).find((m) => markDistance(m) === distance && hasMark(m)) || null;
+  return (Array.isArray(gear?.sights) ? gear.sights : []).find((m) => sightDistanceMatches(m, distance) && hasMark(m)) || null;
 }
 
-/** The default distances the setup has no row for yet (in metres, as text). */
-export function missingDistances(gear) {
-  const have = new Set((Array.isArray(gear?.sights) ? gear.sights : []).map(markDistance));
-  return DEFAULT_SIGHT_DISTANCES.filter((d) => !have.has(Number(d)));
+/** Default distances still missing in the selected entry unit (existing marks keep their unit). */
+export function missingDistances(gear, unit = 'm') {
+  const defaults = unit === 'yd' ? ['20', '30', '40', '50', '60', '80', '100'] : DEFAULT_SIGHT_DISTANCES;
+  const marks = Array.isArray(gear?.sights) ? gear.sights : [];
+  return defaults.filter((d) => !marks.some((m) => sightDistanceMatches(m, markDistance({ distance: `${d} ${unit}` }))));
 }
 
 /** Windage text as a signed number of clicks: "1R" → 1, "2L" → -2, "0" → 0, "" → 0; null if unreadable. */
@@ -342,7 +351,7 @@ export function keyValues(setup, distance) {
     { label: 'Draw weight', key: 'drawWeight', ...displayValue('drawWeight', f.drawWeight) },
     { label: 'Brace height', key: 'brace', ...displayValue('brace', f.brace) },
     { label: 'Arrows', key: 'arrowModel', value: arrows, unit: '' },
-    { label: `Sight ${distance} m`, key: 'sights', value: mark ? markText(mark) : '', unit: '' },
+    { label: `Sight ${mark?.distance || `${distance} m`}`, key: 'sights', value: mark ? markText(mark) : '', unit: '' },
   ];
 }
 
