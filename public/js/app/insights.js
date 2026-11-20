@@ -38,7 +38,7 @@ export function distancesOf(sessions) {
 /** One row per session, with the numbers the table and charts need (null where not applicable). */
 export function sessionRow(s) {
   const scored = isScored(s.type);
-  const st = scored ? computeStats(s.ends || []) : null;
+  const st = scored ? computeStats(s.ends || [], s.face) : null;
   return {
     id: s.id,
     date: s.date,
@@ -129,7 +129,7 @@ function loadBy(sessions, keyOf, stepDays) {
     row[type] += 1;
     row.min[type] += s.minutes || 0;
     row.totalMin += s.minutes || 0;
-    if (isScored(s.type)) row.arrows += computeStats(s.ends || []).arrows;
+    if (isScored(s.type)) row.arrows += computeStats(s.ends || [], s.face).arrows;
     else if (countsArrows(type)) row.arrows += s.arrows || 0;
     else if (type === 'strength') row.strengthMin += s.minutes || 0;
     else if (type === 'gym') row.gymMin += s.minutes || 0;

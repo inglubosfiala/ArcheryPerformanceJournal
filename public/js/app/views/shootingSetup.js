@@ -1,7 +1,7 @@
 // New session, step 1 (what you do) and the Shooting page: training, competition and blank bale
 // behind one switch. Every field starts from the last session of the kind shown (lastSetup.js);
 // nothing starts until Start is tapped.
-import { h } from '../../core/dom.js';
+import { h, s } from '../../core/dom.js';
 import * as APL from '../../ui/apl/index.js';
 import { T } from '../strings.js';
 import { icons } from '../icons.js';
@@ -14,6 +14,11 @@ import {
   ARROWS_PER_END_MIN,
   ARROWS_PER_END_MAX,
   withCompound,
+  TARGET_FAMILIES,
+  targetFamily,
+  faceLabel,
+  cameraSupported,
+  cameraSupportMessage,
 } from '../scoring.js';
 import {
   TYPE_LABELS,
@@ -30,7 +35,8 @@ import {
 } from '../sessionTypes.js';
 import { setupState, whenSection, equipmentSection } from './sessionSetup.js';
 import { emptyForm, formSections } from './sessionForms.js';
-import { faceParts, FACE_SIZES, kindsForSize, faceForSize, faceForKind, hasCompound } from './setupFaces.js';
+import { faceSheet, faceViewBox } from './face.js';
+import { faceParts, faceSizesForFamily, defaultFamilyFace, faceKindLabel, kindsForSize, faceForSize, faceForKind, hasCompound } from './setupFaces.js';
 
 const ARROW_PRESETS = [3, 6, 9, 12];
 const arrowsText = (n) => `${n} ${n === 1 ? 'arrow' : 'arrows'}/end`;
@@ -302,14 +308,15 @@ function competitionSection(fields, { setKind, quietKind }) {
 /** Distance, face and arrows per end of a scored kind (its grading is under When). */
 function scoredSections(fields, setKind) {
   const { size, kind, compound } = faceParts(fields.face) || faceParts('40t');
+  const family = targetFamily(fields.face);
   // the usual face of a distance, scored the way the archer scores now (compound keeps the inner 10)
-  const usualFace = (d) => DISTANCE_DEFAULTS[d] && withCompound(DISTANCE_DEFAULTS[d].face, compound);
+  const usualFace = (d) => family === 'wa-target' && DISTANCE_DEFAULTS[d] && withCompound(DISTANCE_DEFAULTS[d].face, compound);
   const suggested = usualFace(fields.distance) === fields.face;
   return [
     APL.Section({
       label: T.distance,
       id: 'setup-dist',
-      children: APL.ChipGrid({
+      children: [APL.ChipGrid({
         label: 'Distance',
         value: fields.distance,
         options: DISTANCES.map((d) => ({ value: d, label: `${d} m` })),
@@ -317,25 +324,36 @@ function scoredSections(fields, setKind) {
         onChange: (d) => setKind({ distance: d, ...(usualFace(d) ? { face: usualFace(d) } : {}) }),
         fk: 'dist',
       }),
+      family !== 'wa-target' && APL.TextField({ label: 'Distance in metres', value: fields.distance, inputmode: 'decimal', fk: 'distance-metres',
+        onChange: (e) => { const value = Number(e.target.value); if (Number.isFinite(value) && value > 0) setKind({ distance: value }); } }),
+      family.startsWith('ifaa-') && APL.TextField({ label: 'Distance in yards', value: Number((fields.distance / 0.9144).toFixed(4)), inputmode: 'decimal', fk: 'distance-yards',
+        onChange: (e) => { const value = Number(e.target.value); if (Number.isFinite(value) && value > 0) setKind({ distance: Number((value * 0.9144).toFixed(6)) }); } }),
+      ],
     }),
     APL.Section({
       label: T.targetFace,
       id: 'setup-face',
       accessory: suggested ? APL.Badge({ children: `Suggested for ${fields.distance} m` }) : null,
       children: [
-        APL.FaceCard({ size, kind }),
+        APL.OptionPills({ label: 'Target family', value: family,
+          options: Object.entries(TARGET_FAMILIES).map(([value, label]) => ({ value, label })),
+          onChange: (value) => setKind({ face: defaultFamilyFace(value), arrowsPerEnd: value === 'ifaa-indoor' ? 5 : value.startsWith('ifaa-') ? 4 : 3 }), fk: 'face-family' }),
+        family === 'wa-target' ? APL.FaceCard({ size, kind }) : h('div', { class: 'apl apl-facecard' },
+          s('svg', { width: 84, height: 110, viewBox: faceViewBox(fields.face), role: 'img', 'aria-label': faceLabel(fields.face) }, faceSheet(fields.face)),
+          h('div', { class: 'apl-stack' }, h('strong', null, faceLabel(fields.face)))),
+        !cameraSupported(fields.face) && h('p', { class: 'apl-soft' }, cameraSupportMessage),
         APL.SegmentedControl({
           label: 'Face size',
           value: size,
-          options: FACE_SIZES.map((v) => ({ value: v, label: `${v} cm` })),
+          options: faceSizesForFamily(family).map((v) => ({ value: v, label: `${v} cm` })),
           onChange: (v) => setKind({ face: faceForSize(v, fields.face) }),
           fk: 'face-size',
         }),
-        kindsForSize(size).length > 1
+        kindsForSize(size, family).length > 1
           ? APL.OptionPills({
               label: 'Face type',
               value: kind,
-              options: kindsForSize(size).map((k) => ({ value: k, label: APL.FACE_NAMES[k] })),
+              options: kindsForSize(size, family).map((k) => ({ value: k, label: faceKindLabel(k) || APL.FACE_NAMES[k] })),
               onChange: (k) => setKind({ face: faceForKind(k, fields.face) }),
               fk: 'face-kind',
             })
@@ -371,7 +389,7 @@ function scoredSections(fields, setKind) {
         label: 'Arrows per end',
         numeric: true,
         value: fields.arrowsPerEnd,
-        options: ARROW_PRESETS.map((n) => ({ value: n, label: String(n) })),
+        options: (family.startsWith('ifaa-') ? [4, 5, 6, 12] : ARROW_PRESETS).map((n) => ({ value: n, label: String(n) })),
         onChange: (n) => setKind({ arrowsPerEnd: n }),
         fk: 'n-chip',
       }),

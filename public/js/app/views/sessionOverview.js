@@ -22,7 +22,7 @@ import {
   toggleCondition,
 } from '../sessionTypes.js';
 import {
-  scoreCounts,
+  scoreSummary,
   averageDelta,
   gradeDistribution,
   gradeInsight,
@@ -97,7 +97,7 @@ const editButton = (label, onClick, fk, pressed = null) =>
 // ---------------------------------------------------------------- B1 score summary
 
 function summaryCard(ctx, ss, st) {
-  const counts = scoreCounts(ss.ends);
+  const counts = scoreSummary(ss.ends, ss.face);
   const delta = averageDelta(ss, ctx.finished.list());
   const tile = (n, label) =>
     h('span', { class: 'ov-count' }, h('span', { class: 'ov-count-n' }, String(n)), h('span', { class: 'ov-count-l' }, label));
@@ -132,7 +132,7 @@ function summaryCard(ctx, ss, st) {
           : null,
       ),
     ),
-    h('div', { class: 'ov-counts' }, tile(counts.x, 'X'), tile(counts.ten, '10'), tile(counts.nine, '9'), tile(counts.low, '8 and less')),
+    h('div', { class: 'ov-counts' }, counts.map((bucket) => tile(bucket.count, bucket.label))),
     h('div', { class: 'ov-facts' }, facts.map((f) => h('span', null, f))),
   );
 }
@@ -164,7 +164,7 @@ function gradeBlock(label, short, dist) {
 }
 
 function gradesCard(ss) {
-  const insight = gradeInsight(ss.ends);
+  const insight = gradeInsight(ss.ends, ss.face);
   return ovCard('grades', 'Process grades', [
     h(
       'div',
@@ -365,8 +365,8 @@ const ENDS_SHOWN = 5;
 const gradesText = (a) => [a.m != null && `M${a.m}`, a.s != null && `S${a.s}`].filter(Boolean).join(' ');
 // the heart rate at the shot, when the arrow was graded on the watch
 const hrText = (a) => (a.hr != null ? `♥${a.hr}` : '');
-const chip = (v, cls = '') =>
-  h('span', { class: `score-chip z-${zoneOf(v)} ${cls}`, 'aria-hidden': 'true' }, v == null ? '–' : String(v));
+const chip = (v, cls = '', face) =>
+  h('span', { class: `score-chip z-${zoneOf(v, face)} ${cls}`, 'aria-hidden': 'true' }, v == null ? '–' : String(v));
 
 /**
  * The heart rate while the end was shot (from the watch): the curve, a tick at each shot (red for a
@@ -445,7 +445,7 @@ export function endsSection(ss, { all = false, onShowAll, onEdit }) {
           type: 'button',
           class: 'ov-end',
           'aria-haspopup': 'dialog',
-          'aria-label': `End ${i + 1}: ${e.arrows.map(said).join(', ')}. Total ${sumArrows(e.arrows)}. Edit`,
+          'aria-label': `End ${i + 1}: ${e.arrows.map(said).join(', ')}. Total ${sumArrows(e.arrows, ss.face)}. Edit`,
           onClick: () => onEdit(i),
           dataset: { fk: `end-${i}` },
         },
@@ -453,9 +453,9 @@ export function endsSection(ss, { all = false, onShowAll, onEdit }) {
         h(
           'span',
           { class: 'ov-end-arrows' },
-          e.arrows.map((a) => h('span', { class: 'ov-end-arrow' }, chip(a.v), h('span', { class: 'ov-end-grades' }, gradesText(a) || ' '), hrText(a) ? h('span', { class: 'ov-end-grades ov-end-hr' }, hrText(a)) : null)),
+          e.arrows.map((a) => h('span', { class: 'ov-end-arrow' }, chip(a.v, '', ss.face), h('span', { class: 'ov-end-grades' }, gradesText(a) || ' '), hrText(a) ? h('span', { class: 'ov-end-grades ov-end-hr' }, hrText(a)) : null)),
         ),
-        h('span', { class: 'ov-end-sum' }, String(sumArrows(e.arrows))),
+        h('span', { class: 'ov-end-sum' }, String(sumArrows(e.arrows, ss.face))),
         h('span', { class: 'ov-row-go', 'aria-hidden': 'true' }, icons.chevron()),
       ),
       watchRow(e, i, span),
@@ -543,7 +543,7 @@ function endSheet(ctx, ss, { ov, set }) {
     returnFk: `end-${index}`,
     node: APL.Dialog({
       sheet: true,
-      title: `End ${index + 1} · ${sumArrows(draft.arrows)}`,
+      title: `End ${index + 1} · ${sumArrows(draft.arrows, ss.face)}`,
       idPrefix: 'ov-end',
       onClose: close,
       closeLabel: 'Cancel and close',
@@ -565,7 +565,7 @@ function endSheet(ctx, ss, { ov, set }) {
                 onClick: () => set({ endSel: i, endDraft: draft }),
                 dataset: { fk: `tile-${i}` },
               },
-              chip(a.v, 'ov-tile-chip'),
+              chip(a.v, 'ov-tile-chip', ss.face),
               isGraded(ss)
                 ? h('span', { class: 'ov-tile-grades', 'aria-hidden': 'true' }, h('span', null, `M${a.m ?? '–'}`), h('span', null, `S${a.s ?? '–'}`))
                 : null,
@@ -575,7 +575,7 @@ function endSheet(ctx, ss, { ov, set }) {
         keyRows(ss.face).map((row, r) =>
           APL.ScoreKeypad({
             label: r ? `Score of arrow ${sel + 1}, lower rings` : `Score of arrow ${sel + 1}`,
-            keys: row.map((k) => ({ value: k, zone: zoneOf(k), ariaLabel: `Score ${k === 'M' ? 'miss' : k}` })),
+            keys: row.map((k) => ({ value: k, zone: zoneOf(k, ss.face), ariaLabel: `Score ${k === 'M' ? 'miss' : k}` })),
             value: cur.v,
             onKey: setScore,
             fk: `endkey${r}`,
@@ -750,7 +750,7 @@ export function renderOverview(ctx, ss, { mode = 'history', sections = [] } = {}
   const finished = mode === 'finished';
   const state = overviewState(ctx, ss);
   const { ov, set } = state;
-  const st = computeStats(ss.ends);
+  const st = computeStats(ss.ends, ss.face);
   const label = TYPE_LABELS[sessionType(ss)];
   const usedSetup = ss.gearSnapshotId ? ctx.repo.get('setups', ss.gearSnapshotId) : null;
   const setupName = usedSetup?.name || null;

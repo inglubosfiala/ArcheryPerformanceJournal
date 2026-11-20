@@ -1,7 +1,7 @@
 // What a scored session's overview reads from its arrows: the score counts, the average against
 // earlier sessions, the M / S grade spread and how grades relate to score, and the group (all arrows
 // on one spot, filtered, with its centre and a one-line reading). Pure functions, no DOM.
-import { arrowValue, isMultiSpot } from './scoring.js';
+import { arrowValue, isMultiSpot, keypadValues, scoringProfile } from './scoring.js';
 import { isScored, newestFirst } from './sessionTypes.js';
 
 const scored = (ends) => ends.flatMap((e) => e.arrows).filter((a) => a && a.v != null);
@@ -16,6 +16,22 @@ export function scoreCounts(ends) {
     nine: arrows.filter((a) => a.v === 9).length,
     low: arrows.filter((a) => a.v !== 'X' && arrowValue(a.v) <= 8).length,
   };
+}
+
+/** Face-specific score buckets, retaining the original WA summary labels. */
+export function scoreSummary(ends, face) {
+  if (!scoringProfile(face)) {
+    const counts = scoreCounts(ends);
+    return [{ label: 'X', count: counts.x }, { label: '10', count: counts.ten }, { label: '9', count: counts.nine }, { label: '8 and less', count: counts.low }];
+  }
+  const values = keypadValues(face).filter((v) => v !== 'M');
+  const top = values.slice(0, 3);
+  const arrows = scored(ends);
+  const rest = values.slice(3);
+  return [
+    ...top.map((value) => ({ label: String(value), count: arrows.filter((a) => a.v === value).length })),
+    { label: rest.length ? `${rest[0]} and less` : 'Misses', count: arrows.filter((a) => !top.includes(a.v)).length },
+  ];
 }
 
 /** Earlier sessions needed before the average is shown. */
@@ -41,8 +57,8 @@ export function averageDelta(session, finished) {
   );
   if (earlier.length < AVERAGE_MIN_SESSIONS) return null;
   const pool = earlier.flatMap((s) => scored(s.ends));
-  const average = mean(pool.map((a) => arrowValue(a.v)));
-  return { delta: mean(own.map((a) => arrowValue(a.v))) - average, average, sessions: earlier.length };
+  const average = mean(pool.map((a) => arrowValue(a.v, session.face)));
+  return { delta: mean(own.map((a) => arrowValue(a.v, session.face))) - average, average, sessions: earlier.length };
 }
 
 /** How many arrows got each grade 1–5 (`kind` 'm' or 's'), how many were graded, and the average. */
@@ -58,10 +74,10 @@ export const INSIGHT_MIN_ARROWS = 3;
  * Points per arrow of the arrows shot with the full mental program (M1) and with M3 or worse:
  * `{ m1: { avg, n }, m3: { avg, n } }`, or null while either group has too few scored arrows.
  */
-export function gradeInsight(ends) {
+export function gradeInsight(ends, face) {
   const arrows = scored(ends);
   const group = (keep) => {
-    const xs = arrows.filter(keep).map((a) => arrowValue(a.v));
+    const xs = arrows.filter(keep).map((a) => arrowValue(a.v, face));
     return { avg: mean(xs), n: xs.length };
   };
   const m1 = group((a) => a.m === 1);

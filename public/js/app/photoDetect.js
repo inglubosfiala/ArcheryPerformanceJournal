@@ -7,7 +7,7 @@
 //    the colour the ring there should have. Pixels that do not match (nocks, fletchings, shafts,
 //    holes) are grouped into blobs; the biggest blobs are the arrows, at their centroids.
 // The result is approximate by design: the archer moves any arrow that landed in the wrong place.
-import { isSpotFace, isMultiSpot, spotCentres, colourBands } from './scoring.js';
+import { isSpotFace, isMultiSpot, spotCentres, colourBands, cameraSupported, cameraSupportMessage } from './scoring.js';
 
 /** Colour class of one pixel: 'gold' | 'red' | 'blue' | 'black' | 'white' | 'other'. */
 export function colourClass(r, g, b) {
@@ -150,6 +150,7 @@ function orderSpots(spots, face) {
  * was found.
  */
 export function detectArrows(img, face, maxArrows, { debug = false, spotHint = 0, shaftGap = null } = {}) {
+  if (!cameraSupported(face)) return { error: cameraSupportMessage };
   const { width, height, data } = img;
   const n = width * height;
   const cls = new Array(n);

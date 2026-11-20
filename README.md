@@ -67,6 +67,22 @@ latency, offline cold launch, and updating from a previously installed build.
 The historical reports under `Claude outputs/` are experiments, not a current
 accuracy baseline: measure the real-photo set before changing detection.
 
+## Paper target families
+
+Session setup now includes a **Target family** selector for existing WA Target,
+WA Field (black/teal), IFAA Field, Hunter, Expert, Indoor and Flint. Pick a size
+and layout within that family. Indoor supports the 40 cm single and 16 cm
+five-spot; the other families include their relevant multi-spot variants.
+IFAA X scores count as five; totals, History and backups preserve that meaning.
+IFAA setup accepts yards, converted to metres for storage and summaries.
+
+The added families support manual target placement and score keys. Their camera
+buttons are disabled until a suitable detector is implemented. Existing WA
+Target camera modes remain available. Circular targets only; animal silhouettes
+and full field-course/round enforcement are not included. See
+[the target catalogue specification](specs/target-faces.md) for sizes, rules,
+layout assumptions, line-cut limitations and extension points.
+
 ## Comparing camera scan modes
 
 The scoring screen keeps the original **Scan** button (live steady lock, Photo

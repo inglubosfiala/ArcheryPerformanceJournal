@@ -6,7 +6,7 @@ import * as L from '../public/js/app/sessionLogic.js';
 import { createRunningSession } from '../public/js/app/runningSession.js';
 import { canScan, createScan, createSteadyReading, nextLook, LOCK_MS, LOCK_FRAMES } from '../public/js/app/scan.js';
 import { pictureFromFace } from '../public/js/app/scanGeometry.js';
-import { FACE_IDS, ringEdges, scoreFromPoint, scoringZones } from '../public/js/app/scoring.js';
+import { FACE_IDS, ringEdges, scoreFromPoint, scoringZones, scoringProfile } from '../public/js/app/scoring.js';
 
 const spot = (cx, cy, r) => ({ outer: { cx, cy, rx: r, ry: r, angle: 0 } });
 
@@ -371,7 +371,7 @@ describe('the found arrows', () => {
         const inner = k ? zones[k - 1].edge : 0;
         expect(scoreFromPoint((inner + z.edge) / 2, 0, face)).toBe(z.value);
         // on a zone's outer edge: the next zone out (the X line counts as the X)
-        if (k > 0) expect(scoreFromPoint(0, z.edge, face)).toBe(zones[k + 1]?.value ?? 'M');
+        if (k > 0) expect(scoreFromPoint(0, z.edge, face)).toBe(scoringProfile(face)?.boundary === 'inner' ? z.value : zones[k + 1]?.value ?? 'M');
       });
       expect(scoreFromPoint(1.01, 0, face)).toBe('M');
     }

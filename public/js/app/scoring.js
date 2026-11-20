@@ -1,3 +1,5 @@
+import { EXTRA_FACES, SCORING_PROFILES } from './targetCatalog.js';
+export { TARGET_FAMILIES, TARGET_COLOURS } from './targetCatalog.js';
 // Scoring rules (HANDOFF §5). Pure functions, unit-tested.
 //
 // Every face is data (FACES below): its printed rings, its spots and how it is scored. Everything
@@ -56,6 +58,7 @@ const PLAIN_FACES = {
 const COMPOUND_OF = ['40', '40s', '40t', '40v', '60', '60s', '60t', '60v'];
 
 export const FACES = {
+  ...EXTRA_FACES,
   ...PLAIN_FACES,
   ...Object.fromEntries(COMPOUND_OF.map((id) => [`${id}c`, { ...PLAIN_FACES[id], compound: true }])),
 };
@@ -68,6 +71,14 @@ export const SETUP_FACES = FACE_IDS.filter((id) => FACES[id].setup);
 export const REPLACED_FACES = { '80s': '80r' };
 
 const faceOf = (face) => FACES[face] || FACES['122'];
+
+/** Explicit capabilities allow future detectors without guessing from face size or colour. */
+export const targetDefinition = (face) => faceOf(face);
+export const targetFamily = (face) => faceOf(face).family || 'wa-target';
+export const scoringProfile = (face) => SCORING_PROFILES[faceOf(face).profile] || null;
+export const maxArrowValue = (face) => scoringProfile(face)?.max ?? 10;
+export const cameraSupported = (face) => face in FACES && faceOf(face).camera !== false;
+export const cameraSupportMessage = 'Camera scanning is not available for this target family yet. Place arrows on the face or use the score keys.';
 
 /** Whether a face is scored with the WA compound inner 10. */
 export const isCompoundFace = (face) => !!faceOf(face).compound;
@@ -97,6 +108,7 @@ const KIND_LABELS = { 1: '', 6: ' 10–6', 5: ' 10–5' };
 export function faceLabel(face) {
   const f = FACES[face];
   if (!f) return `${face} cm`;
+  if (f.label) return f.label;
   const kind = f.spots === TRIPLE ? ' triple' : f.spots === VEGAS ? ' Vegas' : KIND_LABELS[f.low];
   return `${f.size} cm${kind}${f.compound ? ' · compound' : ''}`;
 }
@@ -157,15 +169,15 @@ export function sheetPoint(arrow, face) {
   return { x: cx + arrow.x * 100, y: cy + arrow.y * 100 };
 }
 
-/** Numeric value: X = 10, M = 0, empty = 0. */
-export function arrowValue(v) {
-  if (v === 'X') return 10;
+/** Numeric value: X follows the face profile (legacy WA defaults to 10); M and empty = 0. */
+export function arrowValue(v, face) {
+  if (v === 'X') return scoringProfile(face)?.xValue ?? 10;
   if (v === 'M' || v == null) return 0;
   return Number(v);
 }
 
-export function isValidArrowValue(v) {
-  return ARROW_VALUES.includes(v);
+export function isValidArrowValue(v, face) {
+  return scoringProfile(face) ? keypadValues(face).includes(v) : ARROW_VALUES.includes(v);
 }
 
 /**
@@ -173,6 +185,7 @@ export function isValidArrowValue(v) {
  * last: printed ring k (k ≥ 1) is the 10 − (k − 1) ring.
  */
 export function ringEdges(face) {
+  if (scoringProfile(face)) return scoringProfile(face).zones.map((z) => z.edge);
   const n = ringCount(face);
   return [1 / (2 * n), ...Array.from({ length: n }, (_, k) => (k + 1) / n)];
 }
@@ -184,6 +197,7 @@ export function ringEdges(face) {
  * and the 9 ring score 9, then as printed.
  */
 export function scoringZones(face) {
+  if (scoringProfile(face)) return scoringProfile(face).zones;
   const [xEdge, ...edges] = ringEdges(face);
   const printed = edges.map((edge, k) => ({ edge, value: 10 - k }));
   if (!isCompoundFace(face)) return [{ edge: xEdge, value: 'X' }, ...printed];
@@ -206,7 +220,10 @@ export function scoreFromPoint(x, y, face) {
 export function scoringZoneAt(x, y, face) {
   const d = round9(Math.hypot(x, y));
   const zones = scoringZones(face);
-  const k = d <= round9(zones[0].edge) ? 0 : zones.findIndex((z, i) => i > 0 && d < round9(z.edge));
+  const profile = scoringProfile(face);
+  const k = profile
+    ? zones.findIndex((z) => profile.boundary === 'inner' ? d <= round9(z.edge) : d < round9(z.edge))
+    : d <= round9(zones[0].edge) ? 0 : zones.findIndex((z, i) => i > 0 && d < round9(z.edge));
   if (k < 0) return null;
   return { value: zones[k].value, inner: k > 0 ? zones[k - 1].edge : 0, edge: zones[k].edge };
 }
@@ -218,7 +235,7 @@ function round9(n) {
 
 /** Keys shown on the keypad for a face: its zone values, best first, and the miss. */
 export function keypadValues(face) {
-  return [...scoringZones(face).map((z) => z.value), 'M'];
+  return [...new Set(scoringZones(face).map((z) => z.value)), 'M'];
 }
 
 /** The quick keypad of the Log: the best six values of the face and the miss. */
@@ -227,7 +244,11 @@ export function quickKeys(face) {
 }
 
 /** WA zone name for a value, used as a CSS class suffix. */
-export function zoneOf(v) {
+export function zoneOf(v, face) {
+  if (scoringProfile(face) && v != null && v !== 'M') {
+    const zone = scoringZones(face).find((z) => z.value === v);
+    return zone ? colourBands(face).find((b) => zone.edge <= b.edge)?.zone || 'miss' : 'miss';
+  }
   if (v == null) return 'empty';
   if (v === 'X' || v === 10 || v === 9) return 'gold';
   if (v === 8 || v === 7) return 'red';
@@ -243,6 +264,7 @@ export function zoneOf(v) {
  * 0.8, blue 1.
  */
 export function colourBands(face) {
+  if (faceOf(face).bands) return faceOf(face).bands;
   const [, ...edges] = ringEdges(face);
   const bands = [];
   edges.forEach((edge, k) => {

@@ -85,7 +85,7 @@ function sessionRow(ss) {
       fk: `session-${ss.id}`,
     });
   }
-  const st = computeStats(ss.ends);
+  const st = computeStats(ss.ends, ss.face);
   return APL.SessionRow({
     href,
     when: listWhen(ss),
@@ -220,7 +220,7 @@ function renderTrash(ctx) {
   const items = ctx.finished.deleted();
   const left = (days) => (days <= 1 ? 'Removed within a day' : `Removed in ${days} days`);
   const summary = (ss) =>
-    isScored(ss.type) ? setupSummary(ss, `${ss.ends.length} ends`, `${computeStats(ss.ends).total} points`) : formSummary(ss) || '—';
+    isScored(ss.type) ? setupSummary(ss, `${ss.ends.length} ends`, `${computeStats(ss.ends, ss.face).total} points`) : formSummary(ss) || '—';
   const restore = (ss) => {
     const { status } = ctx.finished.restore(ss.id);
     if (status === 'restored') ctx.toast('Session restored.');

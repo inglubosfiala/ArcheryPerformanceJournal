@@ -10,6 +10,8 @@ import {
   zoneOf,
   suggestedSpot,
   quickKeys,
+  cameraSupported,
+  cameraSupportMessage,
 } from '../scoring.js';
 import { fmt } from '../stats.js';
 import { endRows, sessionCounts, sessionTotal, isEndComplete } from '../endSummary.js';
@@ -263,7 +265,7 @@ function renderActive(ctx, session) {
             dataset: { fk: `slot-${i}` },
             onClick: () => update(ctx, (cur) => L.selectArrow(cur, i)),
           },
-          h('span', { class: `score-chip z-${zoneOf(a.v)}`, 'aria-hidden': 'true' }, a.v == null ? no || String(i + 1) : String(a.v)),
+          h('span', { class: `score-chip z-${zoneOf(a.v, session.face)}`, 'aria-hidden': 'true' }, a.v == null ? no || String(i + 1) : String(a.v)),
           grades ? h('span', { class: 'slot-card-grades', 'aria-hidden': 'true' }, grades) : null,
         ),
         // only the selected, scored arrow: × empties its score, position and grades (today's Clear)
@@ -302,7 +304,7 @@ function renderActive(ctx, session) {
       label: 'Score without position',
       keys: quickKeys(session.face).map((k) => ({
         value: k,
-        zone: zoneOf(k),
+        zone: zoneOf(k, session.face),
         ariaLabel: `Score ${k === 'M' ? 'miss' : k}`,
       })),
       value: picked.v,
@@ -445,7 +447,7 @@ function renderActive(ctx, session) {
           h(
             'span',
             { class: 'total-end-arrows', 'aria-hidden': 'true' },
-            r.arrows.map((a) => h('span', { class: `score-chip z-${zoneOf(a.v)}` }, a.v == null ? '–' : String(a.v))),
+            r.arrows.map((a) => h('span', { class: `score-chip z-${zoneOf(a.v, session.face)}` }, a.v == null ? '–' : String(a.v))),
           ),
           h(
             'span',
@@ -480,7 +482,7 @@ function renderActive(ctx, session) {
         h('section', { class: 'score-screen', 'aria-label': T.endN(endNo) }, strip, input, under, chips),
         totalSection,
       ),
-      APL.BottomBar({ children: [multiViewButton(ctx, session), h('div', { class: 'score-actions' }, prevBtn, nextBtn, watchBtn, photoButton(ctx, session))] }),
+      APL.BottomBar({ children: [!cameraSupported(session.face) && h('p', { class: 'apl-soft', role: 'note' }, cameraSupportMessage), multiViewButton(ctx, session), h('div', { class: 'score-actions' }, prevBtn, nextBtn, watchBtn, photoButton(ctx, session))] }),
     ),
     overlay: sheet === 'details' ? detailsSheet() : scoreOverlay(ctx, session, { sheet, setSheet }),
   };
@@ -1131,7 +1133,7 @@ function targetInput(session, enter, { hintSpot = null, onMove } = {}) {
     const hit = locateOnSheet(p.x, p.y, session.face);
     const v = scoreFromPoint(hit.x, hit.y, session.face);
     loupeScore.textContent = String(v);
-    loupeScore.className = `score-chip loupe-score z-${zoneOf(v)}`;
+    loupeScore.className = `score-chip loupe-score z-${zoneOf(v, session.face)}`;
     dockLoupe(p);
     loupe.hidden = false;
     if (active?.offset) drawAimGuide(p);

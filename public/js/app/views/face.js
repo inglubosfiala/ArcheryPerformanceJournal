@@ -1,6 +1,6 @@
 // Target face drawing shared by the Log tab and the session detail (SVG, face radius = 100 units).
 import { s } from '../../core/dom.js';
-import { isSpotFace, isMultiSpot, spotCentres, ringEdges, zoneOf } from '../scoring.js';
+import { isSpotFace, isMultiSpot, spotCentres, ringEdges, zoneOf, scoringProfile, colourBands, TARGET_COLOURS } from '../scoring.js';
 
 export const VB = 101; // viewBox half-size; the face radius is 100
 
@@ -8,6 +8,14 @@ const FILL = { gold: '#FFE11A', red: '#D22B2B', blue: '#00A2E8', black: '#1A1A1A
 
 export function faceRings(face) {
   const ring = (r, fill, stroke, sw = 0.6) => s('circle', { r, fill, stroke, 'stroke-width': sw });
+  if (scoringProfile(face)) {
+    const colours = colourBands(face);
+    const fillAt = (edge) => colours.find((b) => edge <= b.edge).zone;
+    return [...ringEdges(face)].reverse().map((edge) => {
+      const colour = fillAt(edge);
+      return ring(edge * 100, TARGET_COLOURS[colour], ['black', 'navy', 'teal'].includes(colour) ? '#FFFFFF' : '#14181C');
+    });
+  }
   const [xEdge, ...edges] = ringEdges(face);
   // a spot is drawn with bolder lines, its rings being wider
   const spot = isSpotFace(face);

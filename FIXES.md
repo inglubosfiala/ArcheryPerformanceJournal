@@ -120,3 +120,33 @@ and steady lock, manual review, automatic review and camera cleanup. The scoring
 screen was checked in a 360 × 800 browser viewport, including its 56 px multi-view
 button. Android viewpoint diversity, accuracy and capture latency still need
 real bow-and-target testing.
+
+## Extensible circular target families (20 November 2026)
+
+Added WA Field black/teal and IFAA Field, Hunter, Expert, Indoor single/five-spot
+and Flint circular faces, including reduced Flint centres and relevant practice
+layouts. Added a family selector and correct target drawings and keypad colours.
+Physical size, scoring profile, palette, layout and camera capability now have
+separate catalogue definitions for future additions.
+
+Totals, maxima, X values, History end editing, score buckets, grade insights and
+comparisons now receive face context. IFAA X is worth five. Validators support
+five spots and reject out-of-profile scores. Existing WA IDs, point-boundary
+behaviour and scan modes are retained. Distance edits preserve the selected
+non-WA family; IFAA yards entry converts to canonical metres. The new module is
+in the offline shell.
+
+New-family camera buttons are explicitly disabled and the detector itself rejects
+unsupported faces. No incompatible gold/red camera recognition is presented as
+working. Animal silhouettes are excluded at the user's request; course sequences,
+walk-ups and competition penalties are not automated. The existing document
+shape is unchanged; older builds cannot necessarily import new face IDs.
+
+Rules, geometry, limitations and the extension approach are documented in
+`specs/target-faces.md`. Regression coverage includes setup, drawings, keypads,
+face-specific totals, comparisons, repository persistence and backup round-trip.
+
+Validation for this change: lint passed; 665 Vitest tests across 42 files and
+seven PWA tests passed. Added 14 catalogue/integration tests and updated the
+all-face boundary regression to respect each profile. Setup and five-spot target
+rendering were checked at 360 × 800. New camera detection was not claimed or tested.

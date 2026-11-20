@@ -17,7 +17,7 @@
 
 import * as L from './sessionLogic.js';
 import { consensus, matchArrows } from './photoDetect.js';
-import { ringEdges, scoreFromPoint, scoringZoneAt } from './scoring.js';
+import { ringEdges, scoreFromPoint, scoringZoneAt, cameraSupported } from './scoring.js';
 import { CLOSE_UP_MARGIN, spotsBox, isCloseUp, keepCloseUp, withArrows, moveArrow, arrowMarkLayout, resultOnCrop } from './scanGeometry.js';
 
 /** A photo is read at most this many pixels on its long side (each of the two looks). */
@@ -44,7 +44,7 @@ export function scoresOf(arrows, face) {
 
 /** A Scan fills the end being shot, never an earlier end opened for editing. */
 export function canScan(session) {
-  return !!session && session.view == null;
+  return !!session && session.view == null && cameraSupported(session.face);
 }
 
 /**

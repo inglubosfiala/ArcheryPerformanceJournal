@@ -2875,3 +2875,7 @@ button.arrow-count:hover {
 .live-actions-multiview {
   grid-template-columns: repeat(2, minmax(0, 1fr));
 }
+
+/* Additional target palettes; score colours are selected by the face's scoring profile. */
+.z-navy { --z-bg: #041e42; --z-fg: #ffffff; --z-bd: var(--border); }
+.z-teal { --z-bg: #147d92; --z-fg: #ffffff; --z-bd: var(--border); }

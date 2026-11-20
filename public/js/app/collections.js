@@ -1,5 +1,5 @@
 // What the app stores (ARCHITECTURE §6.4). The repository validates before every save and on import.
-import { FACE_IDS, ARROWS_PER_END_MAX, isValidArrowsPerEnd, isValidArrowValue } from './scoring.js';
+import { FACE_IDS, spotCentres, scoringProfile, ARROWS_PER_END_MAX, isValidArrowsPerEnd, isValidArrowValue } from './scoring.js';
 import { sightErrors, historyErrors } from './gearFields.js';
 import { defaultLastSetup, isGoal } from './lastSetup.js';
 import { SESSION_TYPES, DRILL_IDS, MENTAL_TECHNIQUES, GYM_FOCUS, EFFORT_MAX, FOCUS_MAX, isScored, countsArrows, isTime, emptyReview, emptyCompetition } from './sessionTypes.js';
@@ -45,16 +45,16 @@ const isGrade = (g) => g == null || (Number.isInteger(g) && g >= 1 && g <= 5);
 const isCount = (n) => Number.isInteger(n) && n >= 0;
 const isUnit = (n) => n == null || (typeof n === 'number' && Number.isFinite(n) && Math.abs(n) <= 2);
 
-function validateArrow(a, where, requireValue) {
+function validateArrow(a, where, requireValue, face) {
   const errs = [];
   if (!a || typeof a !== 'object') return [`${where}: not an arrow`];
   if (a.v == null) {
     if (requireValue) errs.push(`${where}: missing score`);
-  } else if (!isValidArrowValue(a.v)) errs.push(`${where}: invalid score ${a.v}`);
+  } else if (!isValidArrowValue(a.v, face)) errs.push(`${where}: invalid score ${a.v}`);
   if (!isGrade(a.m)) errs.push(`${where}: invalid M grade`);
   if (!isGrade(a.s)) errs.push(`${where}: invalid S grade`);
   if (!isUnit(a.x) || !isUnit(a.y)) errs.push(`${where}: invalid position`);
-  if (a.spot != null && !(Number.isInteger(a.spot) && a.spot >= 0 && a.spot <= 2)) errs.push(`${where}: invalid spot`);
+  if (a.spot != null && !(Number.isInteger(a.spot) && a.spot >= 0 && a.spot < (scoringProfile(face) ? spotCentres(face).length : 3))) errs.push(`${where}: invalid spot`);
   // from the watch (watchCode.js): which numbered arrow it was, and the heart rate at the shot
   if (a.no != null && !(Number.isInteger(a.no) && a.no >= 1 && a.no <= ARROW_NO_MAX)) errs.push(`${where}: invalid arrow number`);
   if (a.hr != null && !(Number.isInteger(a.hr) && a.hr >= HR_MIN && a.hr <= HR_MAX)) errs.push(`${where}: invalid heart rate`);
@@ -62,11 +62,11 @@ function validateArrow(a, where, requireValue) {
   return errs;
 }
 
-function validateEnd(e, where, n, requireValues) {
+function validateEnd(e, where, n, requireValues, face) {
   if (!e || !Array.isArray(e.arrows)) return [`${where}: missing arrows`];
   const errs = [];
   if (e.arrows.length !== n) errs.push(`${where}: expected ${n} arrows`);
-  e.arrows.forEach((a, i) => errs.push(...validateArrow(a, `${where} arrow ${i + 1}`, requireValues)));
+  e.arrows.forEach((a, i) => errs.push(...validateArrow(a, `${where} arrow ${i + 1}`, requireValues, face)));
   if (e.hrTrace != null && !isTrace(e.hrTrace)) errs.push(`${where}: invalid heart-rate trace`);
   if (e.watchShots != null && !isDetected(e.watchShots)) errs.push(`${where}: invalid detected shots`);
   if (!isCount(e.ld) || !isCount(e.cld)) errs.push(`${where}: invalid let-downs`);
@@ -146,7 +146,7 @@ export const collections = {
       if (!isValidArrowsPerEnd(r.arrowsPerEnd)) errs.push(`arrows per end must be 1 to ${ARROWS_PER_END_MAX}`);
       if (!Array.isArray(r.ends)) errs.push('ends must be a list');
       // ends may be partly scored (Next auto-saves an unfinished end)
-      else r.ends.forEach((e, i) => errs.push(...validateEnd(e, `end ${i + 1}`, r.arrowsPerEnd, false)));
+      else r.ends.forEach((e, i) => errs.push(...validateEnd(e, `end ${i + 1}`, r.arrowsPerEnd, false, r.face)));
       if (!isOptInt(r.minutes, 0, 1440)) errs.push('invalid minutes');
       if (r.timer != null) {
         const tm = r.timer;
@@ -155,7 +155,7 @@ export const collections = {
         else if (tm.running && Number.isNaN(Date.parse(tm.startedAt))) errs.push('invalid timer start');
       }
       if (r.status === 'active') {
-        errs.push(...validateEnd(r.current, 'current end', r.arrowsPerEnd, false));
+        errs.push(...validateEnd(r.current, 'current end', r.arrowsPerEnd, false, r.face));
         if (!(Number.isInteger(r.cursor) && r.cursor >= 0 && r.cursor < r.arrowsPerEnd)) errs.push('invalid cursor');
         if (r.view != null && !(Number.isInteger(r.view) && r.view >= 0 && r.view < r.ends.length)) errs.push('invalid end view');
       }

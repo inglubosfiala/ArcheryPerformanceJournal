@@ -6,8 +6,8 @@ import { sumArrows } from './stats.js';
 const scored = (arrows) => arrows.filter((a) => a && a.v != null);
 
 /** The score of one end (X = 10, M and empty slots = 0). */
-export function endSum(end) {
-  return sumArrows(end.arrows);
+export function endSum(end, face) {
+  return sumArrows(end.arrows, face);
 }
 
 /** True when every slot of the end has a score. */
@@ -31,7 +31,7 @@ function allEnds(session) {
 
 /** The session's total: every end, the one being shot included. */
 export function sessionTotal(session) {
-  return allEnds(session).reduce((t, e) => t + endSum(e), 0);
+  return allEnds(session).reduce((t, e) => t + endSum(e, session.face), 0);
 }
 
 /**
@@ -42,7 +42,7 @@ export function sessionTotal(session) {
 export function endRows(session) {
   let run = 0;
   return allEnds(session).map((e, i) => {
-    const sum = endSum(e);
+    const sum = endSum(e, session.face);
     run += sum;
     const g = gradeAverages(e.arrows);
     return {
