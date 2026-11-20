@@ -2,7 +2,7 @@
 
 **Status:** Pilot · **Date:** 2026-11-09 · **Owner:** Vladimír Gál
 
-The technical foundation for a small personal web app that runs in **mobile Chrome (Android)** as an installable Progressive Web App (PWA). It has no backend, no external APIs and no accounts, and all data stays on the device.
+The technical foundation for a small personal web app that runs in **mobile Chrome (Android)** as an installable Progressive Web App (PWA). It has no application backend. Data stays on the device by default; optional Google Drive sync uses Google OAuth and the Drive API. The camera-testing deployment in the fork disables this sync.
 
 This document covers **only the platform**: hosting and GitHub, storage, offline support, backup and the project skeleton. The app's own features, screens and data fields are defined separately and plug into the extension points described here (§4, §6.4).
 
@@ -29,7 +29,7 @@ This document covers **only the platform**: hosting and GitHub, storage, offline
 | Browser storage is per origin | The app must keep **one stable URL**; changing it starts with empty storage |
 
 ### Out of scope (pilot)
-Multi-user use, sync between devices, server-side storage, third-party integrations, and official support for iOS Safari or desktop browsers.
+Multi-user collaboration, an application-hosted database, and official support for iOS Safari or desktop browsers. Optional cross-device Google Drive sync was added after the original pilot; see `specs/google-drive-sync/`.
 
 ---
 
@@ -163,6 +163,8 @@ Trigger: CI passing on `main` or `main-test`, and manual `workflow_dispatch`. De
 
 Settings: **Repository → Settings → Pages → Source: GitHub Actions**.
 
+The `inglubosfiala` fork disables this dual-environment deployment and uses a separate, validated `camera-test` deployment at the site root. See the README for its storage isolation, disabled Drive sync and required Pages settings.
+
 ### 5.5 URL and origin
 - Default URL: `https://<user>.github.io/<app-name>/`. All paths in the app must be **relative** (`./js/main.js`), and the manifest `start_url` and `scope` should be `./`.
 - **Pick the URL once.** Storage is tied to the origin, so moving to another domain later means the app starts empty there (users must export and then import).
@@ -260,10 +262,10 @@ Switch when data contains binary files (photos, GPX), grows past ~2 MB, or needs
 `name`, `short_name`, `start_url: "./"`, `scope: "./"`, `display: "standalone"`, `background_color`, `theme_color`, and icons 192, 512 and 512 maskable.
 
 ### 7.2 Service worker (`sw.js`)
-- **Cache name:** `<app-name>-<APP_VERSION>`, stamped at deploy (§5.4).
+- **Cache name:** app/environment prefix, encoded service-worker scope, version, commit and build time, stamped at deploy (§5.4). Cache lookup and cleanup are restricted to this namespace.
 - **Install:** pre-cache the app-shell file list (HTML, CSS, JS modules, manifest, icons).
 - **Fetch:** cache-first for same-origin GET requests, network fallback. No other origins are used.
-- **Activate:** delete caches with other versions.
+- **Activate:** delete older caches only within the same environment and registration scope. Legacy cache names are left untouched to protect other applications.
 - The service worker **never reads or writes user data**.
 
 ### 7.3 Updates (`pwa/updates.js`)

@@ -3,7 +3,7 @@
 A phone-first PWA for an Olympic recurve archer. It logs training arrow by arrow and grades every shot on process — **mental program (M)** and **shooting cycle (S)** — following the *With Winning in Mind* approach: measure process quality, not only score.
 
 - **Platform:** [ARCHITECTURE.md](ARCHITECTURE.md) — static files, no backend, data only on the device, offline, installable.
-- **Features:** [archery-journal-handoff/HANDOFF.md](archery-journal-handoff/HANDOFF.md) and the reference prototype.
+- **Features and terminology:** [CONTEXT.md](CONTEXT.md), with feature-specific specifications in `specs/`.
 
 ## Run locally
 
@@ -35,6 +35,37 @@ To test on an Android phone: connect over USB, open `chrome://inspect` on the PC
 | `main-test` | https://vladicek79.github.io/ArcheryPerformanceJournal/test/ | test build: **TEST** badge, separate data and Drive file |
 
 Push to `main-test` to try a change on the phone before merging it into `main`. Every deploy republishes both from their branch tips.
+
+## Camera testing in the inglubosfiala fork
+
+The fork-only `Deploy camera test` workflow publishes `camera-test` at
+https://inglubosfiala.github.io/ArcheryPerformanceJournal/ after lint and tests
+pass on the exact deployed commit. It also validates manual runs, which must be
+started on `camera-test`. The inherited dual-environment deploy is disabled in
+this fork; the upstream repository retains its existing layout.
+
+Before the first deployment, enable Actions in the fork, select **Settings →
+Pages → Source: GitHub Actions**, and allow `camera-test` in the `github-pages`
+environment's deployment branch rules. Creating the branch or changing these
+settings is a separate setup step; adding the workflow alone does not deploy.
+
+The deployed copy shows **TEST**, installs as **Archery Camera TEST**, uses
+`apj-camera-test.v1` for journal data, and disables Google Drive sync. Source
+configuration is not rewritten. Keep Drive disabled until a separate OAuth
+client and fork-specific Drive file are configured. Browser storage on this
+fork's origin is separate from the upstream site's storage.
+
+Service-worker caches include the environment, registration scope, commit and
+build time. Reads and cleanup are restricted to this worker's cache namespace.
+Legacy caches from older releases are left untouched to avoid deleting caches
+belonging to another app on the same origin. Export a backup before manually
+clearing site data; that also removes the journal.
+
+For Android checks, use HTTPS Pages or the USB localhost forwarding described
+above. Verify rear-camera permission, scan accuracy, correction controls,
+latency, offline cold launch, and updating from a previously installed build.
+The historical reports under `Claude outputs/` are experiments, not a current
+accuracy baseline: measure the real-photo set before changing detection.
 
 ## Google Drive sync (optional)
 

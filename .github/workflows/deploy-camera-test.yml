@@ -1,0 +1,88 @@
+name: Deploy camera test
+
+# The fork serves camera-test at the project root. Push and manual runs both validate
+# the exact checked-out commit before publishing; other branches cannot deploy here.
+on:
+  push:
+    branches: [camera-test]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    if: ${{ github.repository == 'inglubosfiala/ArcheryPerformanceJournal' && github.ref == 'refs/heads/camera-test' }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: lts/*
+          cache: npm
+      - run: npm ci
+      - run: npm run lint
+      - run: npm test
+      - name: Assemble isolated test application
+        run: |
+          mkdir site
+          cp -r public/. site/
+          python3 - <<'PY'
+          from pathlib import Path
+          import datetime
+          import json
+          import re
+          import subprocess
+
+          def git(*args):
+              return subprocess.check_output(['git', *args], text=True).strip()
+
+          base = '.'.join(json.loads(Path('package.json').read_text())['version'].split('.')[:2])
+          values = {
+              '__APP_VERSION__': base + '.' + git('rev-list', '--count', '--first-parent', 'HEAD'),
+              '__APP_COMMIT__': git('rev-parse', 'HEAD'),
+              '__APP_BUILT_AT__': datetime.datetime.now(datetime.timezone.utc).isoformat(),
+              '__APP_ENV__': 'test',
+          }
+          for name in ['sw.js', 'js/config.js', 'js/theme-boot.js']:
+              path = Path('site') / name
+              content = path.read_text()
+              for placeholder, value in values.items():
+                  content = content.replace(placeholder, value)
+              if name == 'js/config.js':
+                  content = content.replace("'apj-test.v1'", "'apj-camera-test.v1'")
+                  # Do not reuse the upstream OAuth client or its Drive data.
+                  content = re.sub(r"export const GOOGLE_CLIENT_ID = [^;]+;", "export const GOOGLE_CLIENT_ID = '';", content)
+                  content = content.replace("`archery-journal-${APP_ENV}.json`", "`archery-journal-camera-${APP_ENV}.json`")
+              if name == 'js/theme-boot.js':
+                  content = content.replace("'apj-test.v1'", "'apj-camera-test.v1'")
+              path.write_text(content)
+          path = Path('site/manifest.webmanifest')
+          manifest = json.loads(path.read_text())
+          manifest.update(name='Archery Camera TEST', short_name='Camera TEST')
+          path.write_text(json.dumps(manifest, indent=2) + '\n')
+          PY
+      - uses: actions/upload-pages-artifact@v5
+        with:
+          path: site
+
+  deploy:
+    needs: build
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/configure-pages@v6
+      - id: deployment
+        uses: actions/deploy-pages@v5

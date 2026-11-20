@@ -6,7 +6,7 @@
   "type": "module",
   "scripts": {
     "start": "npx --yes serve public -l 8080",
-    "test": "vitest run",
+    "test": "node scripts/test-pwa.mjs && vitest run",
     "test:watch": "vitest",
     "lint": "eslint .",
     "format": "prettier --write .",

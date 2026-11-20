@@ -1,11 +1,13 @@
 // Service worker: cache-first app shell (ARCHITECTURE §7.2). Never touches user data.
 const VERSION = '__APP_VERSION__';
-// 'test' for the main-test build served under /test/; test and production share the origin and
-// therefore the Cache Storage, so each environment only manages caches with its own prefix.
+// Cache Storage is shared by every application on this origin. Include the worker's scope
+// as well as its environment, so another Pages project cannot read or remove these caches.
 const ENV = '__APP_ENV__';
-const PREFIX = ENV === 'test' ? 'archery-journal-test-' : 'archery-journal-';
-const CACHE = `${PREFIX}${VERSION}`;
-const ownCache = (k) => k.startsWith(PREFIX) && (ENV === 'test' || !k.startsWith('archery-journal-test-'));
+const COMMIT = '__APP_COMMIT__';
+const BUILT_AT = '__APP_BUILT_AT__';
+const PREFIX = `archery-journal-${ENV}-${encodeURIComponent(self.registration.scope)}-`;
+const CACHE = `${PREFIX}${VERSION}-${COMMIT}-${BUILT_AT}`;
+const ownCache = (key) => key.startsWith(PREFIX);
 
 const SHELL = [
   './',
@@ -46,6 +48,13 @@ const SHELL = [
   './js/sync/syncController.js',
   './js/pwa/updates.js',
   './js/app/collections.js',
+  './js/app/drillView.js',
+  './js/app/gym.js',
+  './js/app/timeMath.js',
+  './js/app/views/formFinish.js',
+  './js/app/views/gymForm.js',
+  './js/app/views/gymRunning.js',
+  './js/app/views/gymSetup.js',
   './js/app/lastSetup.js',
   './js/app/sessionInsights.js',
   './js/app/gearFields.js',
@@ -122,17 +131,21 @@ self.addEventListener('message', (event) => {
 
 self.addEventListener('fetch', (event) => {
   const req = event.request;
-  if (req.method !== 'GET' || new URL(req.url).origin !== self.location.origin) return;
-  // The deploy stamps VERSION; an unstamped placeholder (still containing "APP_VERSION") means local dev.
-  if (VERSION.includes('APP_VERSION')) {
-    // Unstamped local build: network first so edits show up on reload; cache only as offline fallback.
-    event.respondWith(fetch(req).catch(() => caches.match(req, { ignoreSearch: true }).then((hit) => hit || caches.match('./index.html'))));
-    return;
-  }
+  const url = new URL(req.url);
+  if (req.method !== 'GET' || !url.href.startsWith(self.registration.scope)) return;
+
   event.respondWith(
-    caches.match(req, { ignoreSearch: true }).then((hit) => {
-      if (hit) return hit;
-      return fetch(req).catch(() => (req.mode === 'navigate' ? caches.match('./index.html') : Response.error()));
+    caches.open(CACHE).then(async (cache) => {
+      const offline = async () => {
+        const hit = await cache.match(req, { ignoreSearch: true });
+        if (hit) return hit;
+        return (req.mode === 'navigate' && (await cache.match('./index.html'))) || Response.error();
+      };
+      // Local development is network-first so edits show up immediately. Only navigations may
+      // fall back to HTML: returning index.html for a missing JS module hides the real failure.
+      if (VERSION.includes('APP_VERSION')) return fetch(req).catch(offline);
+      const hit = await cache.match(req, { ignoreSearch: true });
+      return hit || fetch(req).catch(offline);
     }),
   );
 });

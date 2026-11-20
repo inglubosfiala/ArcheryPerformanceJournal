@@ -24,7 +24,8 @@ concurrency:
 
 jobs:
   deploy:
-    if: ${{ github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success' }}
+    # The fork has a separate, single-branch testing deployment.
+    if: ${{ github.repository != 'inglubosfiala/ArcheryPerformanceJournal' && (github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success') }}
     runs-on: ubuntu-latest
     environment:
       name: github-pages
@@ -54,6 +55,18 @@ jobs:
           path: testsrc
           fetch-depth: 0
 
+      - uses: actions/setup-node@v4
+        with:
+          node-version: lts/*
+
+      - name: Validate checked-out revisions
+        run: |
+          for source in prod testsrc; do
+            if [ -d "$source" ]; then
+              (cd "$source" && npm ci && npm run lint && npm test)
+            fi
+          done
+
       - name: Assemble site
         run: |
           stamp() { # $1 = source dir, $2 = env
@@ -65,7 +78,7 @@ jobs:
             version="${base}.${count}"
             commit=$(git -C "$1" rev-parse --short HEAD)
             built=$(date -u +%Y-%m-%dT%H:%M:%SZ)
-            sed -i "s/__APP_VERSION__/${version}/g; s/__APP_COMMIT__/${commit}/g; s/__APP_BUILT_AT__/${built}/g; s/__APP_ENV__/$2/g" "$1/public/sw.js" "$1/public/js/config.js"
+            sed -i "s/__APP_VERSION__/${version}/g; s/__APP_COMMIT__/${commit}/g; s/__APP_BUILT_AT__/${built}/g; s/__APP_ENV__/$2/g" "$1/public/sw.js" "$1/public/js/config.js" "$1/public/js/theme-boot.js"
           }
           stamp prod prod
           mkdir -p site
