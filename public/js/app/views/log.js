@@ -480,7 +480,7 @@ function renderActive(ctx, session) {
         h('section', { class: 'score-screen', 'aria-label': T.endN(endNo) }, strip, input, under, chips),
         totalSection,
       ),
-      APL.BottomBar({ children: h('div', { class: 'score-actions' }, prevBtn, nextBtn, watchBtn, photoButton(ctx, session)) }),
+      APL.BottomBar({ children: [multiViewButton(ctx, session), h('div', { class: 'score-actions' }, prevBtn, nextBtn, watchBtn, photoButton(ctx, session))] }),
     ),
     overlay: sheet === 'details' ? detailsSheet() : scoreOverlay(ctx, session, { sheet, setSheet }),
   };
@@ -680,17 +680,27 @@ function photoButton(ctx, session) {
   );
 }
 
+function multiViewButton(ctx, session) {
+  return h('button', {
+    type: 'button', class: 'score-scan score-multiview',
+    'aria-label': 'Score arrows with multi-view camera scanning (experimental)',
+    disabled: !canScan(session),
+    onClick: () => scanTarget(ctx, { multiView: true }),
+    dataset: { fk: 'photo-multiview' },
+  }, icons.camera(), 'Multi-view scan · experimental');
+}
+
 /**
  * Scan the target into the shown end. The sequence (a full end first, the two looks at a photo,
  * the found arrows, Use) is scan.js's; this page lends it the camera, the photo, the detector and
  * the preview dialog.
  */
-async function scanTarget(ctx) {
+async function scanTarget(ctx, { multiView = false } = {}) {
   const scan = createScan({
     running: ctx.running,
     // the live camera locks by itself (or Take now); its frame is previewed cut to the sheet
     camera: async (room) => {
-      const got = await liveScan({ face: room.face, maxArrows: room.empty, spotHint: room.spotHint });
+      const got = await liveScan({ face: room.face, maxArrows: room.empty, spotHint: room.spotHint, multiView });
       // the raw picture the arrows are read from is kept on the phone (a gallery photo is there already)
       if (got && (got.canvas || got.taken) && keepsScanPhotos(ctx.repo.getSettings())) saveScanPhoto(got, { face: room.face });
       return got && !got.file ? cropToSpots(got.canvas, got.res) : got;
@@ -698,7 +708,7 @@ async function scanTarget(ctx) {
     openPhoto,
     detect: (canvas, room) =>
       detectArrows(canvas.getContext('2d').getImageData(0, 0, canvas.width, canvas.height), room.face, room.empty, { spotHint: room.spotHint }),
-    preview: ({ found, picture, again }) => previewFound(picture, found, { cancelLabel: again ? 'Back to camera' : 'Cancel' }),
+    preview: ({ found, picture, again }) => previewFound(picture, found, { cancelLabel: again ? 'Back to camera' : 'Cancel', titlePrefix: multiView ? 'Multi-view · ' : '' }),
     onChange: () => ctx.rerender(),
   });
   const res = await scan.start();
@@ -751,7 +761,7 @@ async function openPhoto(file) {
  * Show the picture with what was found (the face's rings, each arrow numbered with its score);
  * dragging a score label moves its arrow. Resolves with the archer's answer (Use / OK, or not).
  */
-async function previewFound(canvas, found, { cancelLabel }) {
+async function previewFound(canvas, found, { cancelLabel, titlePrefix = '' }) {
   const g = canvas.getContext('2d');
   // the clean photo is kept, so the marks can be drawn again when a label is dragged
   const photo = document.createElement('canvas');
@@ -836,9 +846,9 @@ async function previewFound(canvas, found, { cancelLabel }) {
   // the dialog say so (a picture without marks would explain nothing).
   return confirmDialog(
     found.arrows.length
-      ? { title: `Found arrows: ${found.scores().join(', ')}`, bare: true, confirmLabel: 'Use', cancelLabel, body: canvas }
+      ? { title: `${titlePrefix}Found arrows: ${found.scores().join(', ')}`, bare: true, confirmLabel: 'Use', cancelLabel, body: canvas }
       : {
-          title: 'No arrows found',
+          title: `${titlePrefix}No arrows found`,
           message: 'Try a photo taken straight at the target, close enough that the face fills the picture.',
           confirmLabel: 'OK',
           cancelLabel,

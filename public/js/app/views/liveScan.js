@@ -11,6 +11,7 @@ import { detectArrows } from '../photoDetect.js';
 import { spotCentres } from '../scoring.js';
 import { resultOffCrop, arrowMarkLayout } from '../scanGeometry.js';
 import { createSteadyReading, nextLook } from '../scan.js';
+import { createMultiViewReading, MULTI_VIEW_GOAL } from '../multiViewScan.js';
 
 const FRAME_MAX = 560; // frames are scaled to this many pixels on their long side for detection
 const VIEW_MAX = 1920; // the overlay and the kept picture: the whole frame, up to this size (the preview is cut from it)
@@ -82,7 +83,7 @@ export function drawArrowMarks(g, spots, arrows, labels, { hollow = false, activ
  *   { file, taken }  a photo chosen instead (`taken`: with Photo just now; else picked with Gallery), or
  *   null             closed without a result.
  */
-export function liveScan({ face, maxArrows, spotHint = 0 }) {
+export function liveScan({ face, maxArrows, spotHint = 0, multiView = false }) {
   return new Promise((resolve) => {
     let closed = false;
     let stream = null;
@@ -90,7 +91,8 @@ export function liveScan({ face, maxArrows, spotHint = 0 }) {
     let timer = 0;
     let busy = false;
     let seq = 0;
-    const reading = createSteadyReading({ face, maxArrows });
+    let sweepGeneration = 0;
+    const reading = multiView ? createMultiViewReading({ face, maxArrows }) : createSteadyReading({ face, maxArrows });
 
     const video = h('video', { class: 'live-video', playsinline: true, muted: true, autoplay: true });
     video.muted = true;
@@ -116,35 +118,45 @@ export function liveScan({ face, maxArrows, spotHint = 0 }) {
       });
     const cameraInput = fileInput(true);
     const galleryInput = fileInput(false);
-    const takeBtn = APL.Button({ children: 'Take now', disabled: true, onClick: () => take(), fk: 'live-take' });
+    const takeBtn = APL.Button({ children: multiView ? 'Review views' : 'Take now', disabled: true, onClick: () => take(), fk: 'live-take' });
     const dialog = h(
       'dialog',
-      { class: 'live-scan', 'aria-label': 'Scan the target with the camera' },
+      { class: 'live-scan', 'aria-label': multiView ? 'Multi-view scan (experimental)' : 'Scan the target with the camera' },
       h(
         'div',
         { class: 'live-top' },
         APL.IconButton({ icon: 'close', label: 'Close the camera', onClick: () => finish(null), fk: 'live-close' }),
       ),
+      multiView ? h('p', { class: 'live-sweep-help' }, 'Multi-view · experimental. Move slowly from side to side with the target upright. Review after 3 views; 5 views open the preview automatically.') : null,
       stage,
       progress,
       status,
       h(
         'div',
-        { class: 'live-actions' },
-        APL.Button({
+        { class: ['live-actions', multiView && 'live-actions-multiview'] },
+        !multiView && APL.Button({
           children: 'Photo',
           variant: 'secondary',
           leadingIcon: icons.camera(),
           onClick: () => cameraInput.click(),
           fk: 'live-photo',
         }),
-        APL.Button({
+        !multiView && APL.Button({
           children: 'Gallery',
           variant: 'secondary',
           leadingIcon: icons.gallery(),
           onClick: () => galleryInput.click(),
           fk: 'live-gallery',
         }),
+        multiView && APL.Button({ children: 'Reset sweep', variant: 'secondary', fk: 'multi-reset', onClick: () => {
+          sweepGeneration++;
+          reading.reset();
+          shot.width = 0;
+          takeBtn.disabled = true;
+          bar.style.width = '0%';
+          status.textContent = 'Sweep reset. Move slowly sideways.';
+          draw(null);
+        } }),
         takeBtn,
       ),
       cameraInput,
@@ -239,17 +251,18 @@ export function liveScan({ face, maxArrows, spotHint = 0 }) {
 
     function onResult(res) {
       if (closed) return;
-      if (!res.error) {
+      const r = reading.read(res, performance.now());
+      if (!res.error && (!multiView || r.accepted)) {
         // keep the analysed moment (the whole frame) for the preview
         shot.width = full.width;
         shot.height = full.height;
         shot.getContext('2d').drawImage(full, 0, 0);
       }
-      const r = reading.read(res, performance.now());
       draw(r.show, r.scores, r.hollow);
       takeBtn.disabled = !r.canTake;
       bar.style.width = `${Math.round(r.progress * 100)}%`;
-      status.textContent = STATUS[r.kind](r);
+      status.textContent = multiView ? `${r.count}/${MULTI_VIEW_GOAL} views. ${r.message}` : STATUS[r.kind](r);
+      if (multiView) takeBtn.textContent = `Review ${r.count} views`;
       if (r.locked) {
         if (navigator.vibrate) navigator.vibrate(40);
         take();
@@ -302,9 +315,13 @@ export function liveScan({ face, maxArrows, spotHint = 0 }) {
         // the same moment twice: the analysed part, and the whole frame for the preview
         wctx.drawImage(video, r.x, r.y, r.w, r.h, 0, 0, w, hgt);
         full.getContext('2d').drawImage(video, 0, 0, ow, oh);
+        const captureGeneration = sweepGeneration;
         try {
           const res = await detect(wctx.getImageData(0, 0, w, hgt));
-          if (res.error === 'retry') {
+          if (closed) return;
+          if (multiView && captureGeneration !== sweepGeneration) {
+            // Reset was pressed while this frame was being analysed. Discard the old capture.
+          } else if (res.error === 'retry') {
             // the worker gave up: nothing to show for this frame
           } else if (res.error) {
             region = null; // lost the target: look at the whole frame again
@@ -329,7 +346,7 @@ export function liveScan({ face, maxArrows, spotHint = 0 }) {
 
     const media = navigator.mediaDevices;
     if (!media?.getUserMedia) {
-      status.textContent = 'This browser has no camera access here. Use Photo or Gallery instead.';
+      status.textContent = multiView ? 'Camera access is unavailable. Close this view and use the original Scan → Photo or Gallery.' : 'This browser has no camera access here. Use Photo or Gallery instead.';
       return;
     }
     media
@@ -342,11 +359,11 @@ export function liveScan({ face, maxArrows, spotHint = 0 }) {
         stream = s;
         video.srcObject = s;
         video.play().catch(() => {});
-        status.textContent = 'Fit the target in the frame.';
+        status.textContent = multiView ? 'Move slowly sideways, keeping the whole target visible.' : 'Fit the target in the frame.';
         tick();
       })
       .catch(() => {
-        status.textContent = 'The camera is not available (permission refused or no camera). Use Photo or Gallery instead.';
+        status.textContent = multiView ? 'The camera is unavailable or permission was refused. Close this view and try the original Scan.' : 'The camera is not available (permission refused or no camera). Use Photo or Gallery instead.';
       });
   });
 }

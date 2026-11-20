@@ -89,3 +89,34 @@ Validation: lint passed; all 637 Vitest tests across 38 files and all seven PWA
 tests passed using an isolated Node 22 runtime. Added regressions for conflicting
 current frames and slow-device sampling, and updated the timing tests. Android
 capture timing and false-lock frequency still require device testing.
+
+## Separate experimental multi-view scan (20 November 2026)
+
+Added a second scan button above the original four-action row, leaving the
+original Scan button, steady lock, Photo and Gallery path intact. Multi-view
+samples changing observations at least 350 ms apart, matches arrows by spot and
+position, and combines their normalized coordinates with a median. At least
+three observations are needed to review; five open the preview automatically.
+Repeated appearance signatures, incomplete sheets, missing arrows, non-finite
+positions and ambiguous matches are rejected. The user can reset or cancel.
+
+The fused coordinates are projected onto the last accepted frame for the normal
+editable preview. Later rejected frames do not replace its saved reference
+image. Frames pending when Reset is pressed are discarded. Camera tracks and
+workers are stopped when the dialog closes. The offline shell includes the new
+module; existing storage and sync configuration is unchanged.
+
+This is an experimental 2D fusion baseline using the existing ellipse mapping,
+not calibrated camera poses, homography reconstruction or shaft triangulation.
+Its appearance-diversity check does not prove physically distinct viewpoints.
+All arrows for the end must be visible; uncertain or overlapping arrows may
+require resetting or using the original Scan. Only one reference image is saved
+if scan-photo saving is enabled, not the full sweep.
+
+Validation: lint, 651 Vitest tests across 40 files and seven PWA tests passed.
+New tests cover observation count and spacing, duplicate rejection, coordinate
+fusion, reordered/ambiguous matches, target loss, reset, original camera controls
+and steady lock, manual review, automatic review and camera cleanup. The scoring
+screen was checked in a 360 × 800 browser viewport, including its 56 px multi-view
+button. Android viewpoint diversity, accuracy and capture latency still need
+real bow-and-target testing.

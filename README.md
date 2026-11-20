@@ -67,6 +67,32 @@ latency, offline cold launch, and updating from a previously installed build.
 The historical reports under `Claude outputs/` are experiments, not a current
 accuracy baseline: measure the real-photo set before changing detection.
 
+## Comparing camera scan modes
+
+The scoring screen keeps the original **Scan** button (live steady lock, Photo
+and Gallery) in its existing row. A separate **Multi-view scan · experimental**
+button above it opens the sweep mode.
+
+For multi-view, keep the target upright and move slowly sideways through a
+shallow arc. Keep the whole sheet and all the end's arrows visible. The counter
+collects up to five observations with changed shaft directions or target shape;
+repeated views and incompatible arrow readings do not count. After three views,
+tap **Review views**, or let the fifth view open the preview. **Reset sweep**
+clears the collected readings. Closing cancels without applying detected arrows.
+Both modes use the same draggable preview and require **Use** before replacing
+the end's arrows; scanning a full end first opens the next end as before.
+
+This first version combines median arrow coordinates using each frame's
+existing target-ellipse mapping. It is **not 3D triangulation or full perspective
+reconstruction**. View diversity is estimated from image appearance, not measured
+camera angles. Large angles, camera roll, glare, overlapping shafts or incorrect
+ring fits can still produce wrong results. Compare the two previews on the same
+physical arrows before accepting either; improved accuracy is not yet measured.
+
+Only the final accepted reference frame is offered for saving under Settings →
+Scan. The other frames are processed in memory; the sweep does not save a photo
+sequence or add images to the journal. The new module is precached for offline use.
+
 ## Google Drive sync (optional)
 
 Settings → **Sync with Google Drive** keeps the journal in a hidden app-only folder of your own Google Drive and syncs it between devices (on start, after changes, after finishing a session, when back online, and on *Sync now*). It needs a one-time Google Cloud setup: [specs/google-drive-sync/google-setup.md](specs/google-drive-sync/google-setup.md). Until `GOOGLE_CLIENT_ID` is set in `public/js/config.js`, the card says sync is not set up.
