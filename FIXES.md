@@ -70,3 +70,22 @@ On HTTPS Pages or USB-forwarded localhost, verify camera permission, rear-camera
 selection, detection accuracy and latency, manual corrections, offline cold
 launch and updating an already installed PWA. Compare algorithm changes against
 a fresh real-photo baseline; historical reports are not results for this change.
+
+## Faster live-camera lock (20 November 2026)
+
+Following phone feedback that the steady hold took too long, automatic capture
+now requires three agreeing readings spanning at least 600 ms, instead of five
+spanning at least 1000 ms. This is a minimum observation period, not a promised
+capture time: processing speed and inconsistent detections can take longer.
+Position tolerance, photo detection, score calculation and the incomplete-sheet
+restriction are unchanged. Fewer samples can make auto-capture less conservative;
+check the preview and correct detected arrows before using the result.
+
+A current frame must also agree with the consensus before automatic capture.
+An older majority can still be displayed through a transient bad frame, but
+cannot trigger capture on that conflicting frame. Take now remains available.
+
+Validation: lint passed; all 637 Vitest tests across 38 files and all seven PWA
+tests passed using an isolated Node 22 runtime. Added regressions for conflicting
+current frames and slow-device sampling, and updated the timing tests. Android
+capture timing and false-lock frequency still require device testing.

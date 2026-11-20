@@ -434,21 +434,19 @@ describe('a steady reading (live camera)', () => {
     const first = r.read(A(), 0);
     expect(first).toMatchObject({ kind: 'reading', hollow: true, progress: 0, canTake: true, locked: false });
     expect(first.scores).toEqual([7, 5]);
-    expect(r.read(A(), 250)).toMatchObject({ kind: 'holding', hollow: false, locked: false });
-    expect(r.read(A(), 500).progress).toBeCloseTo(0.5, 9); // 3 of 5 frames, half a second of one
-    expect(r.read(A(), 750).locked).toBe(false); // 4 frames
-    const last = r.read(A(), 1000);
+    expect(r.read(A(), 300)).toMatchObject({ kind: 'holding', hollow: false, locked: false });
+    const last = r.read(A(), 600);
     expect(last).toMatchObject({ kind: 'holding', progress: 1, locked: true });
-    expect(LOCK_MS).toBe(1000);
-    expect(LOCK_FRAMES).toBe(5);
+    expect(LOCK_MS).toBe(600);
+    expect(LOCK_FRAMES).toBe(3);
   });
 
   it('does not lock on enough frames in too short a time', () => {
     const r = createSteadyReading({ face, maxArrows: 3 });
     let s;
-    for (let t = 0; t < 8; t++) s = r.read(A(), t * 100);
+    for (let t = 0; t < 8; t++) s = r.read(A(), t * 50);
     expect(s.locked).toBe(false);
-    expect(s.progress).toBeCloseTo(0.7, 9);
+    expect(s.progress).toBeCloseTo(350 / LOCK_MS, 9);
   });
 
   it('an odd frame now and then resets nothing', () => {
@@ -461,6 +459,22 @@ describe('a steady reading (live camera)', () => {
     r.read(A(), 750);
     r.read(A(), 1000);
     expect(r.read(A(), 1250).locked).toBe(true);
+  });
+
+  it('does not auto-capture an old majority on a conflicting current frame', () => {
+    const r = createSteadyReading({ face, maxArrows: 3 });
+    r.read(A(), 0);
+    r.read(A(), 200);
+    r.read(A(), 400);
+    expect(r.read(B(), 600)).toMatchObject({ kind: 'holding', locked: false });
+    expect(r.read(A(), 800).locked).toBe(true);
+  });
+
+  it('still needs three readings on a slow phone even when the time threshold has passed', () => {
+    const r = createSteadyReading({ face, maxArrows: 3 });
+    r.read(A(), 0);
+    expect(r.read(A(), 900).locked).toBe(false);
+    expect(r.read(A(), 1800).locked).toBe(true);
   });
 
   it('a frame without the target starts over, and Take is not allowed', () => {
@@ -511,7 +525,7 @@ describe('a steady reading (live camera)', () => {
     r.read(A(), 4000);
     // the first is 5 s old by now: three frames agree, since the one at 2 s
     expect(r.read(A(), 5000).progress).toBeCloseTo(Math.min(3000 / LOCK_MS, 3 / LOCK_FRAMES), 9);
-    expect(r.read(A(), 5000).progress).toBe(0.8); // four frames since 2 s
+    expect(r.read(A(), 5000).progress).toBe(1); // four frames since 2 s
   });
 
   it('hands over the agreed arrows, at their average place, on the latest picture', () => {

@@ -16,7 +16,7 @@
 //   'no-target' (with the detector's `error`) · 'failed' (the save was refused)
 
 import * as L from './sessionLogic.js';
-import { consensus } from './photoDetect.js';
+import { consensus, matchArrows } from './photoDetect.js';
 import { ringEdges, scoreFromPoint, scoringZoneAt } from './scoring.js';
 import { CLOSE_UP_MARGIN, spotsBox, isCloseUp, keepCloseUp, withArrows, moveArrow, arrowMarkLayout, resultOnCrop } from './scanGeometry.js';
 
@@ -29,9 +29,9 @@ export const PHOTO_MAX = 640;
 export const PREVIEW_MAX = 2048;
 
 /** The live camera locks when the agreed reading goes back at least this long… */
-export const LOCK_MS = 1000;
+export const LOCK_MS = 600;
 /** …and this many of the recent frames agree on it. */
-export const LOCK_FRAMES = 5;
+export const LOCK_FRAMES = 3;
 /** How many recent readings are compared… */
 const WINDOW_FRAMES = 8;
 /** …and readings older than this are dropped. */
@@ -284,9 +284,12 @@ export function createSteadyReading({ face, maxArrows }) {
     const agreed = consensus(recent.map((f) => f.arrows));
     hold = agreed && agreed.count >= 2 ? { ...agreed, since: recent[agreed.oldest].t } : null;
     if (!hold) return state('reading', take(), { hollow: true });
+    // An older majority can survive a blurred or changed frame. Keep its overlay, but do not
+    // capture that reading on an image which no longer agrees with it.
+    const currentAgrees = !!matchArrows(hold.arrows, res.arrows);
     return state('holding', take(), {
       progress: Math.min(1, (now - hold.since) / LOCK_MS, hold.count / LOCK_FRAMES),
-      locked: now - hold.since >= LOCK_MS && hold.count >= LOCK_FRAMES,
+      locked: currentAgrees && now - hold.since >= LOCK_MS && hold.count >= LOCK_FRAMES,
     });
   }
 
