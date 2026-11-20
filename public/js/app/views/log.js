@@ -12,6 +12,8 @@ import {
   quickKeys,
   cameraSupported,
   cameraSupportMessage,
+  cameraIsExperimental,
+  cameraExperimentalMessage,
 } from '../scoring.js';
 import { fmt } from '../stats.js';
 import { endRows, sessionCounts, sessionTotal, isEndComplete } from '../endSummary.js';
@@ -482,7 +484,7 @@ function renderActive(ctx, session) {
         h('section', { class: 'score-screen', 'aria-label': T.endN(endNo) }, strip, input, under, chips),
         totalSection,
       ),
-      APL.BottomBar({ children: [!cameraSupported(session.face) && h('p', { class: 'apl-soft', role: 'note' }, cameraSupportMessage), multiViewButton(ctx, session), h('div', { class: 'score-actions' }, prevBtn, nextBtn, watchBtn, photoButton(ctx, session))] }),
+      APL.BottomBar({ children: [cameraIsExperimental(session.face) && h('p', { class: 'apl-soft', role: 'note' }, cameraExperimentalMessage), !cameraSupported(session.face) && h('p', { class: 'apl-soft', role: 'note' }, cameraSupportMessage), multiViewButton(ctx, session), h('div', { class: 'score-actions' }, prevBtn, nextBtn, watchBtn, photoButton(ctx, session))] }),
     ),
     overlay: sheet === 'details' ? detailsSheet() : scoreOverlay(ctx, session, { sheet, setSheet }),
   };

@@ -77,6 +77,8 @@ export const targetDefinition = (face) => faceOf(face);
 export const targetFamily = (face) => faceOf(face).family || 'wa-target';
 export const scoringProfile = (face) => SCORING_PROFILES[faceOf(face).profile] || null;
 export const maxArrowValue = (face) => scoringProfile(face)?.max ?? 10;
+export const cameraIsExperimental = (face) => faceOf(face).camera === 'experimental';
+export const cameraExperimentalMessage = 'Experimental camera detection: check every arrow in the preview, especially on dark rings or near score lines.';
 export const cameraSupported = (face) => face in FACES && faceOf(face).camera !== false;
 export const cameraSupportMessage = 'Camera scanning is not available for this target family yet. Place arrows on the face or use the score keys.';
 

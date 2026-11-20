@@ -7,7 +7,9 @@
 //    the colour the ring there should have. Pixels that do not match (nocks, fletchings, shafts,
 //    holes) are grouped into blobs; the biggest blobs are the arrows, at their centroids.
 // The result is approximate by design: the archer moves any arrow that landed in the wrong place.
-import { isSpotFace, isMultiSpot, spotCentres, colourBands, cameraSupported, cameraSupportMessage } from './scoring.js';
+import { isSpotFace, isMultiSpot, spotCentres, colourBands, ringEdges, cameraSupported, cameraSupportMessage, scoringProfile } from './scoring.js';
+
+import { targetAnchor, targetColour, anchorEllipse, matchesTarget } from './targetDetect.js';
 
 /** Colour class of one pixel: 'gold' | 'red' | 'blue' | 'black' | 'white' | 'other'. */
 export function colourClass(r, g, b) {
@@ -34,13 +36,19 @@ export function colourClass(r, g, b) {
  * units: 0.8 on spots, 2/3 on the 6-ring face, 0.4 on full faces. This filled disc is what a spot is measured by: it is big,
  * so a shaft or a few holes across it barely move its centre or size.
  */
-const coreRadius = (face) => colourBands(face).find((b) => b.zone === 'red').edge;
+const coreRadius = (face) => scoringProfile(face) ? targetAnchor(face).outer : colourBands(face).find((b) => b.zone === 'red').edge;
 
 /** The colour a face should have at distance `d` from its centre (radius 1), or null near a ring edge. */
+const bandCache = new Map();
 export function expectedColour(d, face, margin = 0.05) {
-  const bands = colourBands(face);
-  if (bands.some((b) => Math.abs(d - b.edge) < margin)) return null;
-  return bands.find((b) => d < b.edge)?.zone ?? null;
+  let spec = bandCache.get(face);
+  if (!spec) {
+    spec = { bands: colourBands(face), lines: scoringProfile(face) ? ringEdges(face) : null };
+    bandCache.set(face, spec);
+  }
+  if (spec.lines && spec.lines.some((edge) => Math.abs(d - edge) < Math.min(margin, 0.018))) return null;
+  if (spec.bands.some((b) => Math.abs(d - b.edge) < margin)) return null;
+  return spec.bands.find((b) => d < b.edge)?.zone ?? null;
 }
 
 /** Connected components (8-neighbour) of a mask; returns [{ area, sx, sy, px: [indices] }]. */
@@ -134,13 +142,23 @@ function makeSpot(e, face) {
 
 /** Put the found spots in the sheet's order (triple: top to bottom; Vegas: top, bottom left, bottom right). */
 function orderSpots(spots, face) {
-  if (face === '40t') return [...spots].sort((p, q) => p.cy - q.cy);
-  if (face === '40v') {
-    const byY = [...spots].sort((p, q) => p.cy - q.cy);
-    const [top, ...rest] = byY;
-    return [top, ...rest.sort((p, q) => p.cx - q.cx)];
+  const template = spotCentres(face);
+  const n = template.length;
+  if (n === 1) return spots;
+  if (template.every(([x]) => x === template[0][0])) return [...spots].sort((p, q) => p.cy - q.cy);
+  if (n === 2) return [...spots].sort((p, q) => p.cx - q.cx);
+  const byY = [...spots].sort((p, q) => p.cy - q.cy);
+  const byX = (row) => row.sort((p, q) => p.cx - q.cx);
+  if (n === 3) return [byY[0], ...byX(byY.slice(1))];
+  if (n === 4) return [...byX(byY.slice(0, 2)), ...byX(byY.slice(2))];
+  if (n === 5) {
+    const cx = spots.reduce((sum, s) => sum + s.cx, 0) / n;
+    const cy = spots.reduce((sum, s) => sum + s.cy, 0) / n;
+    const centre = [...spots].sort((p, q) => Math.hypot(p.cx - cx, p.cy - cy) - Math.hypot(q.cx - cx, q.cy - cy))[0];
+    const corners = byY.filter((s) => s !== centre);
+    return [...byX(corners.slice(0, 2)), centre, ...byX(corners.slice(2))];
   }
-  return spots;
+  return byY;
 }
 
 /**
@@ -153,21 +171,40 @@ export function detectArrows(img, face, maxArrows, { debug = false, spotHint = 0
   if (!cameraSupported(face)) return { error: cameraSupportMessage };
   const { width, height, data } = img;
   const n = width * height;
+  const profile = scoringProfile(face);
+  const anchor = profile ? targetAnchor(face) : null;
+  const palette = profile ? colourBands(face).map((band) => band.zone) : null;
   const cls = new Array(n);
   const core = new Uint8Array(n);
   const gold = new Uint8Array(n);
   for (let i = 0; i < n; i++) {
-    const c = colourClass(data[i * 4], data[i * 4 + 1], data[i * 4 + 2]);
+    const c = profile ? targetColour(data[i * 4], data[i * 4 + 1], data[i * 4 + 2], palette) : colourClass(data[i * 4], data[i * 4 + 1], data[i * 4 + 2]);
     cls[i] = c;
     if (c === 'gold') gold[i] = 1;
-    if (c === 'gold' || c === 'red') core[i] = 1;
+    if (anchor ? c === anchor.zone : c === 'gold' || c === 'red') core[i] = 1;
   }
 
   const wantSpots = spotCentres(face).length;
   // Each spot's gold + red disc. A shaft lying across it can cut it into pieces: pieces close
   // together are one spot. A red or yellow thing that is not a target has (almost) no gold in it.
-  const golds = mergeNearby(components(core, width, height, Math.max(12, n * 0.0004)), width)
-    .filter((g) => g.area >= n * 0.004 && g.px.filter((i) => gold[i]).length >= 0.08 * g.area)
+  let anchorCandidates;
+  if (profile) {
+    const parts = components(core, width, height, Math.max(10, n * 0.00002))
+      // Paper/background connected to the image border is not an enclosed target anchor.
+      .filter((g) => !g.px.some((i) => i < width || i >= n - width || i % width === 0 || i % width === width - 1))
+      .map((g) => {
+        const ellipse = fitEllipse(g.px, width);
+        return { ...g, scale: Math.sqrt(ellipse.a * ellipse.b) };
+      });
+    // Join a centre split by a thin scoring line, but not distant concentric white lines.
+    anchorCandidates = mergeNearby(parts, width, 2.4)
+      .map((g) => ({ ...g, ellipse: anchorEllipse(fitEllipse(g.px, width), anchor) }))
+      .filter((g) => matchesTarget(g.ellipse, anchor, img, cls, face));
+  } else {
+    anchorCandidates = mergeNearby(components(core, width, height, Math.max(12, n * 0.0004)), width)
+      .filter((g) => g.area >= n * 0.004 && g.px.filter((i) => gold[i]).length >= 0.08 * g.area);
+  }
+  const golds = anchorCandidates
     .sort((p, q) => q.area - p.area)
     .slice(0, wantSpots);
   if (!golds.length) return { error: 'Could not find the target face in the photo.' };
@@ -175,9 +212,9 @@ export function detectArrows(img, face, maxArrows, { debug = false, spotHint = 0
   // spot found is used, and its arrows go on the sheet's spot `spotHint`.
   const partial = golds.length < wantSpots;
   const spots = partial
-    ? [makeSpot(fitEllipse(golds[0].px, width), face)]
+    ? [makeSpot(golds[0].ellipse || fitEllipse(golds[0].px, width), face)]
     : orderSpots(
-        golds.map((g) => makeSpot(fitEllipse(g.px, width), face)),
+        golds.map((g) => makeSpot(g.ellipse || fitEllipse(g.px, width), face)),
         face,
       );
 
@@ -320,7 +357,7 @@ export function detectArrows(img, face, maxArrows, { debug = false, spotHint = 0
 }
 
 /** Merge blobs whose centres are close (pieces of one gold cut apart by a shaft). */
-function mergeNearby(blobs, width) {
+function mergeNearby(blobs, width, scaleLimit = Infinity) {
   const groups = [];
   for (const b of [...blobs].sort((p, q) => q.area - p.area)) {
     let sx = 0;
@@ -330,12 +367,13 @@ function mergeNearby(blobs, width) {
       sy += (i / width) | 0;
     }
     const c = { x: sx / b.area, y: sy / b.area };
-    const home = groups.find((g) => Math.hypot(g.c.x - c.x, g.c.y - c.y) < 1.3 * Math.sqrt(g.area / Math.PI));
+    const home = groups.find((g) => (!Number.isFinite(scaleLimit) || Math.max(g.scale, b.scale) / Math.min(g.scale, b.scale) <= scaleLimit) && Math.hypot(g.c.x - c.x, g.c.y - c.y) < 1.3 * Math.sqrt(g.area / Math.PI));
     if (home) {
       home.px = home.px.concat(b.px);
       home.c = { x: (home.c.x * home.area + c.x * b.area) / (home.area + b.area), y: (home.c.y * home.area + c.y * b.area) / (home.area + b.area) };
       home.area += b.area;
-    } else groups.push({ px: b.px, area: b.area, c });
+      home.scale = Math.max(home.scale || 0, b.scale || 0);
+    } else groups.push({ px: b.px, area: b.area, c, scale: b.scale });
   }
   return groups;
 }
@@ -365,6 +403,8 @@ function findShafts({ width, height, data, nearest, spotPx, face, rejects = null
     blue: new Int32Array(256),
     black: new Int32Array(256),
     white: new Int32Array(256),
+    navy: new Int32Array(256),
+    teal: new Int32Array(256),
   };
   const dist = new Float32Array(width * height);
   for (let i = 0; i < width * height; i++) {
@@ -409,7 +449,7 @@ function findShafts({ width, height, data, nearest, spotPx, face, rejects = null
   // often printed only out to the blue (the 10-6 centre): where the black ring would be there is
   // white paper, or whatever is behind the sheet. Then that zone is like any other, and a shaft
   // shows on it; with a real black ring a dark shaft cannot be seen there.
-  const hasBlack = !isSpotFace(face) && refs.black != null && refs.black < 110 && refs.black <= 0.6 * (refs.blue ?? 255);
+  const hasBlack = !scoringProfile(face) && !isSpotFace(face) && refs.black != null && refs.black < 110 && refs.black <= 0.6 * (refs.blue ?? 255);
   if (hasBlack) delete refs.black;
   const maxRef = Math.max(0, ...Object.values(refs));
   const raw = new Uint8Array(width * height);

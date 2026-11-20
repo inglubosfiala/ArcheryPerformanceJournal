@@ -61,6 +61,7 @@ const SHELL = [
   './js/app/icons.js',
   './js/app/scoring.js',
   './js/app/targetCatalog.js',
+  './js/app/targetDetect.js',
   './js/app/loupePlacement.js',
   './js/app/photoDetect.js',
   './js/app/photoWorker.js',

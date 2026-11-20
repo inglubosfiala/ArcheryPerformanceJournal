@@ -76,9 +76,10 @@ five-spot; the other families include their relevant multi-spot variants.
 IFAA X scores count as five; totals, History and backups preserve that meaning.
 IFAA setup accepts yards, converted to metres for storage and summaries.
 
-The added families support manual target placement and score keys. Their camera
-buttons are disabled until a suitable detector is implemented. Existing WA
-Target camera modes remain available. Circular targets only; animal silhouettes
+All available circular faces now support camera scanning as well as manual
+target placement and score keys. Detection for the added families is experimental:
+select the correct face and keep the whole sheet upright and well lit, then
+review/correct every arrow. Existing WA Target camera modes remain available. Circular targets only; animal silhouettes
 and full field-course/round enforcement are not included. See
 [the target catalogue specification](specs/target-faces.md) for sizes, rules,
 layout assumptions, line-cut limitations and extension points.

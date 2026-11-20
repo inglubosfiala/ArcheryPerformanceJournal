@@ -40,7 +40,7 @@ describe('target-family setup and rendering', () => {
     const render = () => renderShootingSetup(ctx, 'training').content;
     control(render(), 'face-family-ifaa-indoor').click();
     let root = render();
-    expect(root.textContent).toContain('Camera scanning is not available');
+    expect(root.textContent).toContain('Experimental camera detection');
     expect(control(root, 'face-scoring-compound')).toBeNull();
     control(root, 'face-size-16').click();
     root = render();
@@ -78,7 +78,7 @@ describe('target-family setup and rendering', () => {
     }
   });
 
-  it('shows five spots and face-specific score keys, and disables both incompatible cameras', () => {
+  it('shows five spots and face-specific score keys, and enables both experimental cameras', () => {
     vi.useFakeTimers();
     const ctx = context();
     const session = {
@@ -92,9 +92,9 @@ describe('target-family setup and rendering', () => {
     };
     ctx.running.get = () => session;
     const root = renderLog(ctx).content;
-    expect(control(root, 'photo').disabled).toBe(true);
-    expect(control(root, 'photo-multiview').disabled).toBe(true);
-    expect(root.textContent).toContain('Camera scanning is not available');
+    expect(control(root, 'photo').disabled).toBe(false);
+    expect(control(root, 'photo-multiview').disabled).toBe(false);
+    expect(root.textContent).toContain('Experimental camera detection');
     const keys = [...root.querySelectorAll('[aria-label^="Score "]')].map((node) =>
       node.getAttribute('aria-label'),
     );

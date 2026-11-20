@@ -71,7 +71,7 @@ describe('extensible circular target catalog', () => {
       expect(scoreFromPoint(1.01, 0, id)).toBe('M');
       expect(colourBands(id).at(-1).edge).toBe(1);
       expect(maxArrowValue(id)).toBe(face.family === 'wa-field' ? 6 : 5);
-      expect(cameraSupported(id)).toBe(false);
+      expect(cameraSupported(id)).toBe(true);
       const { size, kind, compound } = faceParts(id);
       expect(faceId(size, kind, compound)).toBe(id);
       expect(faceLabel(id)).toContain(String(face.size));
@@ -141,10 +141,10 @@ describe('extensible circular target catalog', () => {
     ]);
   });
 
-  it('blocks both scan entry points and unsupported detector work before accessing pixels', () => {
-    expect(canScan({ face: field, view: null })).toBe(false);
+  it('enables registered targets and rejects unknown detector requests before accessing pixels', () => {
+    expect(canScan({ face: field, view: null })).toBe(true);
     expect(canScan({ face: '40t', view: null })).toBe(true);
-    expect(detectArrows(null, field, 4).error).toContain('not available');
+    expect(detectArrows(null, 'unknown-face', 4).error).toContain('not available');
     expect(cameraSupported('40tc')).toBe(true);
     expect(FACES['80s']).toBeDefined();
   });

@@ -150,3 +150,30 @@ Validation for this change: lint passed; 665 Vitest tests across 42 files and
 seven PWA tests passed. Added 14 catalogue/integration tests and updated the
 all-face boundary regression to respect each profile. Setup and five-spot target
 rendering were checked at 360 × 800. New camera detection was not claimed or tested.
+
+## Camera detection for all circular targets (20 November 2026)
+
+Supersedes the new-family camera restriction in the previous change. All
+registered faces now enable both scan buttons; new-family detection is explicitly
+labelled experimental. Added palette-based disc/annulus anchors, ring-pattern and
+outer-boundary validation, printed-line suppression, and navy/teal shaft contrast
+histograms. WA Target retains its existing anchor path. Spot ordering now follows
+layout geometry for 60 cm/compound triples, Vegas, double, four- and five-spot faces.
+
+Repeated scoring lines cannot be merged into an incorrectly sized white centre.
+Pattern checks also reject a single indoor face mistaken for a five-spot centre.
+The new module is precached and uses the existing worker, photo, editable preview
+and multi-view paths. No images leave the device and no additional runtime
+libraries are loaded.
+
+Generated-image regressions exercise every registered face, printed lines, clean
+faces, modest tilt/dimming, side-on shafts, multiple arrows, partial spot hints,
+wrong profiles and blank images. Detector results are passed through both steady
+and multi-view readers. UI tests now require both scan buttons enabled. Real
+IFAA/WA Field accuracy and Android latency have not yet been measured: user
+review remains essential, especially on black rings and near score lines.
+
+Validation: lint, all 748 Vitest tests across 43 files and all seven PWA tests
+passed. The added generated-image suite has 83 cases covering all 56 registered
+face IDs, plus the negative and capture-integration cases described above.
+These results are not a real-photo accuracy benchmark.

@@ -79,7 +79,7 @@ function add(family, size, layout, variant, profile, colourBands) {
     profile,
     label: `${TARGET_FAMILIES[family]} ${size} cm · ${variant} · ${layout === 'five' ? 'five-spot' : layout}`,
     setup: true,
-    camera: false,
+    camera: 'experimental',
     ...(layout === 'single' ? {} : { spots: TARGET_LAYOUTS[layout] }),
     bands: colourBands,
   };

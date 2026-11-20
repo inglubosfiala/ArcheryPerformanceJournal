@@ -19,6 +19,8 @@ import {
   faceLabel,
   cameraSupported,
   cameraSupportMessage,
+  cameraIsExperimental,
+  cameraExperimentalMessage,
 } from '../scoring.js';
 import {
   TYPE_LABELS,
@@ -342,6 +344,7 @@ function scoredSections(fields, setKind) {
           s('svg', { width: 84, height: 110, viewBox: faceViewBox(fields.face), role: 'img', 'aria-label': faceLabel(fields.face) }, faceSheet(fields.face)),
           h('div', { class: 'apl-stack' }, h('strong', null, faceLabel(fields.face)))),
         !cameraSupported(fields.face) && h('p', { class: 'apl-soft' }, cameraSupportMessage),
+        cameraIsExperimental(fields.face) && h('p', { class: 'apl-soft' }, cameraExperimentalMessage),
         APL.SegmentedControl({
           label: 'Face size',
           value: size,

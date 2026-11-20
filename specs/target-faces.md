@@ -2,7 +2,7 @@
 
 Added 20 November 2026. Scope: circular faces only; animal silhouettes are deferred
 at the user's request. These definitions support practice logging, manual target
-placement and score entry. They do not constitute complete tournament-round
+placement, score entry and experimental camera detection. They do not constitute complete tournament-round
 validation, target certification or automatic judging of line cutters.
 
 ## Reference rules
@@ -84,21 +84,52 @@ Older application versions do not know the new face IDs and may reject backups
 containing them. Keep backups private, and use the updated testing build for
 new-family data. There is no automatic conversion of existing sessions.
 
-## Camera boundary
+## Camera detection
 
-The existing detector depends on gold/red regions. New families deliberately
-have `camera: false`: both scan buttons are disabled, an explanation appears in
-setup and logging, and direct detector calls return a clear unsupported-family
-error before examining pixels. Old WA Target single-view and multi-view scans
-remain available. A future family-specific detector can be enabled per face
-without altering the score or storage model. Do not remove this guard merely
-because a new face has a yellow centre.
+All registered circular faces support single-view, photo/gallery and multi-view
+scanning. New catalogue faces have `camera: 'experimental'`; unknown IDs are
+still rejected before pixel analysis. The existing WA Target gold/red anchor
+path is retained, with template-based ordering also covering 60 cm and compound
+multi-spot faces.
+
+`targetDetect.js` supplies palette-aware pixel classification and anchor
+validation. Gold or white centres provide a disc; black/white/black faces use the
+larger white annulus; the reduced Flint centre uses its black disc. Annulus
+moments are corrected before mapping pixels into the selected face's coordinates.
+Border-connected background components are excluded. Nearby anchor parts split
+by scoring lines can merge, but differently sized concentric white lines cannot.
+
+Every candidate must match the selected face's colour bands at several radii
+and angles. Dark scoring faces must also end at their predicted outside edge,
+which helps reject a small disc fitted using the wrong face profile. Printed
+score-line pixels are excluded from new-family arrow masks. Navy/teal brightness
+histograms allow the shaft path to compare pixels against those rings rather
+than the legacy palette. Ordered two-, three-, four- and five-spot results feed
+both existing capture modes and the same editable preview.
+
+Select the correct family/layout before scanning. Keep all relevant spots in
+view, upright, at a shallow angle and in good light. The pattern checks can
+reject truncated/obscured faces or anchors under heavy arrow damage. In a partial
+view the single-view mode uses the selected spot hint; multi-view still requires
+the complete sheet. A dark shaft against black ink can be visually indistinguishable;
+fletchings/holes may only provide an approximate impact point. Ring lines, glare,
+poor lighting, camera roll and neighbouring targets can still cause errors.
+There is no calibrated perspective reconstruction or automatic shaft-diameter
+line-cut correction. Always review and correct the preview before Use.
+
+This is generated-image and integration coverage, not measured accuracy on real
+IFAA/WA Field photographs. Real-target Android validation and a labelled photo
+set are still required before claiming production detection accuracy.
 
 ## Validation
 
 Tests cover every added definition's geometry and palette, boundary semantics,
 family/size/layout selection, yard conversion, five-point X totals and maxima,
 History summaries, five-spot persistence and backup import, invalid scores and
-spots, camera guards and existing WA regressions. Browser QA checks the selector
+spots, camera capability checks and existing WA regressions. Detection tests cover every
+registered face, clean faces, printed score lines, tilt, moderate dimming, shafts,
+four-arrow single faces, partial-view hints, wrong profiles and blank backgrounds.
+Real detector outputs also exercise steady and multi-view capture on multi-spot
+new-family faces. Browser QA checks the selector
 and rendered faces at phone width. Real paper-target and camera validation remain
-separate from these manual-scoring checks.
+separate from generated-image and UI checks.
